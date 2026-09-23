@@ -5,12 +5,11 @@
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "allowJs": true,
     "skipLibCheck": true,
-    "esModuleInterop": false,
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "strictNullChecks": true,
@@ -18,15 +17,16 @@
     "jsx": "react-jsx",
     "types": [
       "vitest/globals",
+      "vite/client",
+      "@testing-library/jest-dom/vitest",
       "node",
     ],
-    "baseUrl": "./",
     "paths": {
-      "@": ["src"],
-      "test": ["test"],
-      "test/*": ["test/*"],
-      "@/*": ["src/*"],
-      "~/*": ["node_modules/*"]
+      "@": ["./src"],
+      "test": ["./test"],
+      "test/*": ["./test/*"],
+      "@/*": ["./src/*"],
+      "~/*": ["./node_modules/*"]
     }
   },
   "include": ["src", "src/**/*", "src/**/*.tsx"],

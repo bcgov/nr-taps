@@ -3,38 +3,37 @@ name: Merge
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - '*.md'
-      - '.github/**'
-      - '.github/graphics/**'
-      - '!.github/workflows/**'
-  workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}
+  group: merge
   cancel-in-progress: false
 
 permissions: {}
 
 jobs:
   init:
-    name: Initialize
+    name: Find merged PR image
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       pull-requests: read
     outputs:
       pr: ${{ steps.pr.outputs.pr }}
-    runs-on: ubuntu-24.04
     steps:
-      # Get PR number for squash merges to main
       - id: pr
         uses: bcgov/action-get-pr@28b0adf8e4d40720d41f9c87356ce24b0a4bd6af # v0.3.1
+      - name: Require PR image
+        env:
+          PR: ${{ steps.pr.outputs.pr }}
+        run: test -n "$PR"
+
   deploy-test:
-    name: TEST Deploys (${{ needs.init.outputs.pr }})
+    name: TEST Deploy
     needs: [init]
+    permissions:
+      contents: read
     uses: ./.github/workflows/reusable-deploy.yml
     secrets:
-      db_password: ${{ secrets.db_password }}
       oc_namespace: ${{ secrets.oc_namespace }}
       oc_token: ${{ secrets.oc_token }}
     with:
@@ -42,86 +41,29 @@ jobs:
       target: test
       tag: ${{ needs.init.outputs.pr }}
 
-  tests:
-    name: Tests
+  smoke:
+    name: TEST Smoke
     needs: [deploy-test]
     uses: ./.github/workflows/reusable-tests.yml
     with:
       target: test
 
-  deploy-prod:
-    name: PROD Deploys (${{ needs.init.outputs.pr }})
-    needs: [tests, init]
-    uses: ./.github/workflows/reusable-deploy.yml
-    secrets:
-      db_password: ${{ secrets.db_password }}
-      oc_namespace: ${{ secrets.oc_namespace }}
-      oc_token: ${{ secrets.oc_token }}
-    with:
-      environment: prod
-      target: prod
-      tag: ${{ needs.init.outputs.pr }}
-
-  # Vanity TLS on the PROD frontend Service.
-  # No-ops cleanly if vars.ROUTE_HOST is unset. Sibling of promote/monitor-prod
-  # so an expired or invalid cert fails Merge after containers have already rolled.
-  route-tls:
-    name: Route TLS (PROD)
-    needs: [deploy-prod]
-    runs-on: ubuntu-24.04
-    environment: prod
-    permissions:
-      contents: read
-    timeout-minutes: 10
-    steps:
-      - uses: bcgov/actions-openshift/route-tls@9d7230d1b1533eb02e98b9bd23fe89825d5c8b41
-        if: ${{ vars.ROUTE_HOST != '' }}
-        with:
-          hostname: ${{ vars.ROUTE_HOST }}
-          target_service: ${{ github.event.repository.name }}-prod-frontend
-          tls_certificate: ${{ secrets.TLS_CERTIFICATE }}
-          tls_private_key: ${{ secrets.TLS_PRIVATE_KEY }}
-          tls_ca_certificate: ${{ secrets.TLS_CA_CERTIFICATE }}
-          oc_namespace: ${{ secrets.oc_namespace }}
-          oc_server: ${{ vars.oc_server }}
-          oc_token: ${{ secrets.oc_token }}
-
-  # Sync Sysdig email alerts for PROD. No-ops cleanly if SYSDIG_API_TOKEN is
-  # unset or monitoring/alerts/ is empty — adoption is gradual. Alert
-  # templates live in monitoring/alerts/ in this repo; add or remove files
-  # there to customize the alert set.
-  monitor-prod:
-    name: Sysdig Monitor (PROD)
-    needs: [deploy-prod]
-    runs-on: ubuntu-24.04
-    environment: prod
-    permissions:
-      contents: read
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v7
-      # 0.0.3 is the first version with __APP__ template substitution, which
-      # monitoring/alerts/*.json depend on — don't downgrade this pin.
-      - uses: bcgov/actions/sysdig-monitor@ac9d89eede94f5f58d3446784c94cff634d98eac # v0.6.0
-        with:
-          sysdig_api_token: ${{ secrets.SYSDIG_API_TOKEN }}
-          oc_namespace: ${{ secrets.oc_namespace }}
-          app: ${{ github.event.repository.name }}
-
-  promote:
-    name: Promote Images
-    needs: [deploy-prod, init]
+  promote-test:
+    name: Tag TEST Images
+    needs: [init, smoke]
     runs-on: ubuntu-slim
     permissions:
       packages: write
     strategy:
       matrix:
-        package: [migrations, backend, frontend]
-    timeout-minutes: 1
+        package: [backend, frontend]
     steps:
       - uses: shrink/actions-docker-registry-tag@e6aaef25c595b6e0edd18bf4c7dbfea3abd43299 # v5
         with:
           registry: ghcr.io
           repository: ${{ github.repository }}/${{ matrix.package }}
           target: ${{ needs.init.outputs.pr }}
-          tags: prod
+          tags: test
+
+  # PROD remains disabled. Add a separate, reviewed promotion workflow only after
+  # its dedicated hostname, certificate, FAM client and acceptance are ready.

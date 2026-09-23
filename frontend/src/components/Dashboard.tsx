@@ -1,94 +1,93 @@
-import type { FC } from 'react'
-import type { AxiosResponse } from '~/axios'
-import type UserDto from '@/interfaces/UserDto'
 import { useEffect, useState } from 'react'
-import { Table, Modal, Button } from 'react-bootstrap'
-import apiService from '@/service/api-service'
+import { Button } from 'react-bootstrap'
+import {
+  clearLogin,
+  getOidcUser,
+  isOidcConfigured,
+  logout,
+  startLogin,
+} from '@/service/oidc-service'
 
-type ModalProps = {
-  show: boolean
-  onHide: () => void
-  user?: UserDto
-}
+type CurrentUser = { subject: string; name: string }
+type State =
+  | { kind: 'loading' }
+  | { kind: 'signed-out' }
+  | { kind: 'signed-in'; user: CurrentUser }
+  | { kind: 'error'; message: string }
 
-const ModalComponent: FC<ModalProps> = ({ show, onHide, user }) => {
-  return (
-    <Modal
-      show={show}
-      onHide={onHide}
-      size="lg"
-      aria-labelledby="contained-modal-title-vcenter"
-      centered
-    >
-      <Modal.Header closeButton>
-        <Modal.Title id="contained-modal-title-vcenter">Row Details</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>{JSON.stringify(user)}</Modal.Body>
-      <Modal.Footer>
-        <Button onClick={onHide}>Close</Button>
-      </Modal.Footer>
-    </Modal>
-  )
-}
-
-const Dashboard: FC = () => {
-  const [data, setData] = useState<any>([])
-  const [selectedUser, setSelectedUser] = useState<UserDto | undefined>(undefined)
+export default function Dashboard() {
+  const [state, setState] = useState<State>({ kind: 'loading' })
 
   useEffect(() => {
-    apiService
-      .getAxiosInstance()
-      .get('/v1/users')
-      .then((response: AxiosResponse) => {
-        const users: UserDto[] = []
-        for (const user of response.data) {
-          const userDto = {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-          }
-          users.push(userDto)
+    let active = true
+    async function load() {
+      try {
+        const oidcUser = await getOidcUser()
+        if (!oidcUser) {
+          if (active) setState({ kind: 'signed-out' })
+          return
         }
-        setData(users)
-      })
-      .catch((error) => {
-        console.error(error)
-      })
+        const response = await fetch('/api/me', {
+          headers: { Authorization: `Bearer ${oidcUser.access_token}` },
+        })
+        if (response.status === 401) {
+          await clearLogin()
+          if (active) setState({ kind: 'signed-out' })
+          return
+        }
+        if (!response.ok) throw new Error('The TAPS service is unavailable.')
+        const user = (await response.json()) as CurrentUser
+        if (active) setState({ kind: 'signed-in', user })
+      } catch {
+        if (active) setState({ kind: 'error', message: 'Unable to load your session.' })
+      }
+    }
+    void load()
+    return () => {
+      active = false
+    }
   }, [])
 
-  const handleClose = () => {
-    setSelectedUser(undefined)
+  async function signIn(provider: 'idir' | 'business-bceid') {
+    try {
+      await startLogin(provider)
+    } catch {
+      setState({ kind: 'error', message: 'Unable to start sign in.' })
+    }
+  }
+
+  async function signOut() {
+    try {
+      await logout()
+    } catch {
+      await clearLogin()
+      setState({ kind: 'signed-out' })
+    }
   }
 
   return (
-    <div className="min-vh-45 mh-45 mw-50 ml-4">
-      <Table striped bordered hover>
-        <thead>
-          <tr>
-            <th>Employee ID</th>
-            <th>Employee Name</th>
-            <th>Employee Email</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((user: UserDto) => (
-            <tr key={user.id}>
-              <td>{user.id}</td>
-              <td>{user.name}</td>
-              <td>{user.email}</td>
-              <td className="text-center">
-                <Button variant="secondary" size="sm" onClick={() => setSelectedUser(user)}>
-                  View Details
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      <ModalComponent show={!!selectedUser} onHide={handleClose} user={selectedUser} />
-    </div>
+    <main className="container" style={{ maxWidth: '48rem' }}>
+      <h1>TAPS</h1>
+      {state.kind === 'loading' && <p>Loading…</p>}
+      {state.kind === 'signed-in' && (
+        <>
+          <p>Signed in as {state.user.name}.</p>
+          <p>The TAPS application is being set up.</p>
+          <Button onClick={() => void signOut()}>Sign out</Button>
+        </>
+      )}
+      {state.kind === 'error' && <p role="alert">{state.message}</p>}
+      {(state.kind === 'signed-out' || state.kind === 'error') &&
+        (isOidcConfigured() ? (
+          <div className="d-flex gap-2">
+            <Button onClick={() => void signIn('idir')}>Sign in with IDIR</Button>
+            <Button variant="secondary" onClick={() => void signIn('business-bceid')}>
+              Sign in with Business BCeID
+            </Button>
+          </div>
+        ) : (
+          <p>Sign in is not configured for this environment.</p>
+        ))}
+    </main>
   )
 }
-
-export default Dashboard

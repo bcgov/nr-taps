@@ -1,0 +1,27 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+parameters:
+  - name: NAME
+    required: true
+  - name: ZONE
+    required: true
+  - name: DOMAIN
+    description: OpenShift apps domain, without scheme
+    required: true
+objects:
+  - apiVersion: route.openshift.io/v1
+    kind: Route
+    metadata:
+      name: ${NAME}-${ZONE}-frontend
+      labels:
+        app: ${NAME}-${ZONE}
+    spec:
+      host: ${NAME}-${ZONE}.${DOMAIN}
+      to:
+        kind: Service
+        name: ${NAME}-${ZONE}-frontend
+      port:
+        targetPort: http
+      tls:
+        termination: edge
+        insecureEdgeTerminationPolicy: Redirect
