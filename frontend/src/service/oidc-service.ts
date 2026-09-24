@@ -36,12 +36,15 @@ export async function getOidcUser(): Promise<User | null> {
   if (!user) return null
   if (!user.expired && (user.expires_in ?? 0) > 60) return user
   if (!user.refresh_token) return null
+  // Another caller may have started renewing while this one read storage.
+  if (renewal) return renewal
 
-  renewal = userManager().signinSilent()
+  const attempt = userManager().signinSilent()
+  renewal = attempt
   try {
-    return await renewal
+    return await attempt
   } finally {
-    renewal = undefined
+    if (renewal === attempt) renewal = undefined
   }
 }
 

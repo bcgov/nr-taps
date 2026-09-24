@@ -67,7 +67,7 @@ jobs:
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_server: ${{ vars.oc_server }}
           oc_token: ${{ secrets.oc_token }}
-          parameters: |
+          parameters: >-
             -p NAME="${{ github.event.repository.name }}"
             -p ZONE="${{ inputs.target }}"
             -p IMAGE_TAG="${{ inputs.tag }}"
@@ -93,7 +93,7 @@ jobs:
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_server: ${{ vars.oc_server }}
           oc_token: ${{ secrets.oc_token }}
-          parameters: |
+          parameters: >-
             -p NAME="${{ github.event.repository.name }}"
             -p ZONE="${{ inputs.target }}"
             -p IMAGE_TAG="${{ inputs.tag }}"
@@ -106,7 +106,7 @@ jobs:
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_server: ${{ vars.oc_server }}
           oc_token: ${{ secrets.oc_token }}
-          parameters: |
+          parameters: >-
             -p NAME="${{ github.event.repository.name }}"
             -p ZONE="${{ inputs.target }}"
             -p DOMAIN="${{ vars.OC_APPS_DOMAIN }}"
