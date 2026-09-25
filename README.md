@@ -26,7 +26,7 @@ The following configuration must exist before the deployment workflows can succe
 | TEST environment secret | `oc_namespace`, `oc_token` | TEST namespace and deployment service token |
 | TEST environment variable | `TAPS_OIDC_ISSUER_URI`, `TAPS_OIDC_CLIENT_ID` | TEST FAM issuer and browser client |
 
-Create GitHub Environments named `dev` and `test`; restrict TEST to `main`. The caller passes the DEV repository secrets, and the called deployment jobs select TEST environment secrets for the TEST run. Give the service tokens only the permissions needed to manage this app in their respective namespace. GHCR images must be pullable by those namespaces.
+Create GitHub Environments named `dev` and `test`; restrict TEST to `main`. The caller passes the DEV repository secrets, and the called deployment jobs select TEST environment secrets for the TEST run. An environment secret replaces the caller's secret only when it exists, so the deployment check requires `oc_namespace` to end in `-dev` or `-test` to match the environment. A missing TEST secret therefore stops the run instead of deploying into DEV. Give the service tokens only the permissions needed to manage this app in their respective namespace. GHCR images must be pullable by those namespaces.
 
 FAM must allow each active DEV preview redirect URI `https://nr-taps-<PR>.<OC_APPS_DOMAIN>/authCallback` and the TEST redirect URI `https://nr-taps-test.<OC_APPS_DOMAIN>/authCallback`. Allow the matching origins as post-logout redirects. IDIR and Business BCeID provider hints follow the Lexis FAM setup. No TAPS roles are created or checked in this slice. Sign-in and logout still require live credentialed acceptance after the clients and redirect URIs are configured.
 
