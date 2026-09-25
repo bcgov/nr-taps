@@ -4,6 +4,12 @@ on:
   pull_request:
     types: [closed]
 
+# Share the PR workflow's group so an in-progress preview deployment is cancelled before cleanup.
+# Otherwise it could finish after cleanup and leave an orphaned preview in DEV.
+concurrency:
+  group: pr-${{ github.event.number }}
+  cancel-in-progress: true
+
 permissions: {}
 
 jobs:
