@@ -88,3 +88,47 @@ test('uses a valid access token without refreshing it', async () => {
   await expect(getOidcUser()).resolves.toBe(renewedUser)
   expect(oidc.signinSilent).not.toHaveBeenCalled()
 })
+
+test('logs off SiteMinder before ending the Keycloak session', async () => {
+  window.config = {
+    ...window.config,
+    VITE_OIDC_SITEMINDER_LOGOUT_URL: 'https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi',
+  }
+  oidc.getUser.mockResolvedValue({ ...renewedUser, id_token: 'test-id-token' } as User)
+  const navigate = vi.fn<(url: string) => void>()
+  const { logout } = await import('@/service/oidc-service')
+
+  await logout(navigate)
+
+  expect(oidc.removeUser.mock.invocationCallOrder[0]).toBeLessThan(
+    navigate.mock.invocationCallOrder[0],
+  )
+  const siteminder = new URL(navigate.mock.calls[0][0])
+  expect(`${siteminder.origin}${siteminder.pathname}`).toBe(
+    'https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi',
+  )
+  expect(siteminder.searchParams.get('retnow')).toBe('1')
+  const keycloak = new URL(siteminder.searchParams.get('returl') ?? '')
+  expect(`${keycloak.origin}${keycloak.pathname}`).toBe(
+    'https://example.invalid/realms/taps/protocol/openid-connect/logout',
+  )
+  expect(Object.fromEntries(keycloak.searchParams)).toEqual({
+    client_id: 'taps-test',
+    post_logout_redirect_uri: window.location.origin,
+    id_token_hint: 'test-id-token',
+  })
+})
+
+test('ends only the Keycloak session when SiteMinder logoff is not configured', async () => {
+  const navigate = vi.fn<(url: string) => void>()
+  const { logout } = await import('@/service/oidc-service')
+
+  await logout(navigate)
+
+  const keycloak = new URL(navigate.mock.calls[0][0])
+  expect(`${keycloak.origin}${keycloak.pathname}`).toBe(
+    'https://example.invalid/realms/taps/protocol/openid-connect/logout',
+  )
+  expect(keycloak.searchParams.get('client_id')).toBe('taps-test')
+  expect(oidc.removeUser).toHaveBeenCalled()
+})

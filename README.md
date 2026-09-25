@@ -25,10 +25,11 @@ The following configuration must exist before the deployment workflows can succe
 | DEV environment variable | `TAPS_OIDC_ISSUER_URI`, `TAPS_OIDC_CLIENT_ID` | DEV FAM issuer and browser client |
 | TEST environment secret | `oc_namespace`, `oc_token` | TEST namespace and deployment service token |
 | TEST environment variable | `TAPS_OIDC_ISSUER_URI`, `TAPS_OIDC_CLIENT_ID` | TEST FAM issuer and browser client |
+| Optional environment variable | `TAPS_OIDC_SITEMINDER_LOGOUT_URL` | SiteMinder logoff URL; defaults to `https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi` for DEV and TEST |
 
 Create GitHub Environments named `dev` and `test`; restrict TEST to `main`. The caller passes the DEV repository secrets, and the called deployment jobs select TEST environment secrets for the TEST run. An environment secret replaces the caller's secret only when it exists, so the deployment check requires `oc_namespace` to end in `-dev` or `-test` to match the environment. A missing TEST secret therefore stops the run instead of deploying into DEV. Give the service tokens only the permissions needed to manage this app in their respective namespace. GHCR images must be pullable by those namespaces.
 
-FAM must allow each active DEV preview redirect URI `https://nr-taps-<PR>.<OC_APPS_DOMAIN>/authCallback` and the TEST redirect URI `https://nr-taps-test.<OC_APPS_DOMAIN>/authCallback`. Allow the matching origins as post-logout redirects. IDIR and Business BCeID provider hints follow the Lexis FAM setup. No TAPS roles are created or checked in this slice. Sign-in and logout still require live credentialed acceptance after the clients and redirect URIs are configured.
+FAM must allow each active DEV preview redirect URI `https://nr-taps-<PR>.<OC_APPS_DOMAIN>/authCallback` and the TEST redirect URI `https://nr-taps-test.<OC_APPS_DOMAIN>/authCallback`. Allow the matching origins as post-logout redirects. IDIR and Business BCeID provider hints follow the Lexis FAM setup. Keycloak logout does not end the SiteMinder session behind Business BCeID, so sign out goes to SiteMinder `logoff.cgi` first and returns through Keycloak logout. PROD must use `https://logon7.gov.bc.ca/clp-cgi/logoff.cgi`. No TAPS roles are created or checked in this slice. Sign-in and logout still require live credentialed acceptance after the clients and redirect URIs are configured.
 
 ## Local development
 

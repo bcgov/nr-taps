@@ -15,7 +15,8 @@ window.config = {
   VITE_OIDC_ISSUER_URI: "$(escape "$VITE_OIDC_ISSUER_URI")",
   VITE_OIDC_CLIENT_ID: "$(escape "$VITE_OIDC_CLIENT_ID")",
   VITE_OIDC_IDIR_HINT: "$(escape "${VITE_OIDC_IDIR_HINT:-azureidir}")",
-  VITE_OIDC_BCEID_HINT: "$(escape "${VITE_OIDC_BCEID_HINT:-bceidbusiness}")"
+  VITE_OIDC_BCEID_HINT: "$(escape "${VITE_OIDC_BCEID_HINT:-bceidbusiness}")",
+  VITE_OIDC_SITEMINDER_LOGOUT_URL: "$(escape "${VITE_OIDC_SITEMINDER_LOGOUT_URL:-}")"
 };
 EOF
 

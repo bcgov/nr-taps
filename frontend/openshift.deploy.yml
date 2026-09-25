@@ -11,6 +11,9 @@ parameters:
     required: true
   - name: OIDC_CLIENT_ID
     required: true
+  - name: OIDC_SITEMINDER_LOGOUT_URL
+    description: SiteMinder logoff.cgi chained before Keycloak logout so Business BCeID sign out ends the upstream session
+    required: true
 objects:
   - apiVersion: apps/v1
     kind: Deployment
@@ -70,6 +73,8 @@ objects:
                   value: ${OIDC_ISSUER_URI}
                 - name: VITE_OIDC_CLIENT_ID
                   value: ${OIDC_CLIENT_ID}
+                - name: VITE_OIDC_SITEMINDER_LOGOUT_URL
+                  value: ${OIDC_SITEMINDER_LOGOUT_URL}
                 - name: XDG_CONFIG_HOME
                   value: /tmp/caddy
                 - name: XDG_DATA_HOME

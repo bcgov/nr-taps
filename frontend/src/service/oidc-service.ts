@@ -79,8 +79,31 @@ export function completeLogin(): Promise<User> {
   return callback
 }
 
-export async function logout(): Promise<void> {
-  await userManager().signoutRedirect()
+// Keycloak does not end the SiteMinder session behind Business BCeID. Without SiteMinder logoff, the
+// next Business BCeID sign in in this browser returns the previous account without a password. When
+// configured, the browser logs off SiteMinder first, and SiteMinder returns it to Keycloak.
+export async function logout(
+  navigate: (url: string) => void = (url) => window.location.assign(url),
+): Promise<void> {
+  const user = await userManager().getUser()
+  // Read the ID token before removing the user: Keycloak needs it to find the session to end.
+  const url = endSessionUrl(user?.id_token)
+  await userManager().removeUser()
+  navigate(url)
+}
+
+function endSessionUrl(idTokenHint?: string): string {
+  const issuer = env('VITE_OIDC_ISSUER_URI').trim().replace(/\/+$/, '')
+  const params = new URLSearchParams({
+    client_id: env('VITE_OIDC_CLIENT_ID').trim(),
+    post_logout_redirect_uri: window.location.origin,
+  })
+  if (idTokenHint) params.set('id_token_hint', idTokenHint)
+  const keycloakLogoutUrl = `${issuer}/protocol/openid-connect/logout?${params}`
+  const siteminderLogoutUrl = env('VITE_OIDC_SITEMINDER_LOGOUT_URL').trim()
+  return siteminderLogoutUrl
+    ? `${siteminderLogoutUrl}?retnow=1&returl=${encodeURIComponent(keycloakLogoutUrl)}`
+    : keycloakLogoutUrl
 }
 
 export async function clearLogin(): Promise<void> {
