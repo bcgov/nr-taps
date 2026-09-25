@@ -1,4 +1,4 @@
-import { UserManager, WebStorageStateStore, type User } from 'oidc-client-ts'
+import { ErrorResponse, UserManager, WebStorageStateStore, type User } from 'oidc-client-ts'
 import { env } from '@/env'
 
 export const AUTH_CALLBACK_PATH = '/authCallback'
@@ -39,12 +39,25 @@ export async function getOidcUser(): Promise<User | null> {
   // Another caller may have started renewing while this one read storage.
   if (renewal) return renewal
 
-  const attempt = userManager().signinSilent()
+  const attempt = renew()
   renewal = attempt
   try {
     return await attempt
   } finally {
     if (renewal === attempt) renewal = undefined
+  }
+}
+
+// SSO rejects the refresh token once its session has ended, for example after the idle timeout.
+// Remove that session so the user is signed out. Keep it after network or server failures, which a
+// later attempt can recover from.
+async function renew(): Promise<User | null> {
+  try {
+    return await userManager().signinSilent()
+  } catch (error) {
+    if (!(error instanceof ErrorResponse)) throw error
+    await userManager().removeUser()
+    return null
   }
 }
 

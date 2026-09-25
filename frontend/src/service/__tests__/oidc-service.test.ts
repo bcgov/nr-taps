@@ -4,12 +4,16 @@ import type { User } from 'oidc-client-ts'
 const oidc = vi.hoisted(() => ({
   getUser: vi.fn<() => Promise<User | null>>(),
   signinSilent: vi.fn<() => Promise<User | null>>(),
+  removeUser: vi.fn<() => Promise<void>>(),
+  ErrorResponse: class extends Error {},
 }))
 
 vi.mock('oidc-client-ts', () => ({
+  ErrorResponse: oidc.ErrorResponse,
   UserManager: class {
     getUser = oidc.getUser
     signinSilent = oidc.signinSilent
+    removeUser = oidc.removeUser
   },
   WebStorageStateStore: class {},
 }))
@@ -52,6 +56,15 @@ test('shares one refresh across concurrent storage reads and an in-flight caller
   expect(oidc.signinSilent).toHaveBeenCalledTimes(1)
 })
 
+test('signs out when SSO rejects the refresh token', async () => {
+  oidc.signinSilent.mockRejectedValue(new oidc.ErrorResponse('invalid_grant'))
+  const { getOidcUser } = await import('@/service/oidc-service')
+
+  expect(await Promise.all([getOidcUser(), getOidcUser()])).toEqual([null, null])
+  expect(oidc.signinSilent).toHaveBeenCalledTimes(1)
+  expect(oidc.removeUser).toHaveBeenCalledTimes(1)
+})
+
 test('shares a failed refresh and allows a subsequent attempt', async () => {
   const error = new Error('Session renewal failed')
   oidc.signinSilent.mockRejectedValueOnce(error).mockResolvedValueOnce(renewedUser)
@@ -62,6 +75,7 @@ test('shares a failed refresh and allows a subsequent attempt', async () => {
     { status: 'rejected', reason: error },
   ])
   expect(oidc.signinSilent).toHaveBeenCalledTimes(1)
+  expect(oidc.removeUser).not.toHaveBeenCalled()
 
   await expect(getOidcUser()).resolves.toBe(renewedUser)
   expect(oidc.signinSilent).toHaveBeenCalledTimes(2)
