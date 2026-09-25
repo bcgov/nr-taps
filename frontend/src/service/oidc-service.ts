@@ -48,14 +48,15 @@ export async function getOidcUser(): Promise<User | null> {
   }
 }
 
-// SSO rejects the refresh token once its session has ended, for example after the idle timeout.
-// Remove that session so the user is signed out. Keep it after network or server failures, which a
-// later attempt can recover from.
+// SSO rejects the refresh token as invalid_grant once it is expired or revoked, or its session has
+// ended, for example after the idle timeout. Remove that session so the user is signed out. Keep it
+// after anything else, including OAuth errors such as server_error or temporarily_unavailable,
+// because a later attempt can recover from those.
 async function renew(): Promise<User | null> {
   try {
     return await userManager().signinSilent()
   } catch (error) {
-    if (!(error instanceof ErrorResponse)) throw error
+    if (!(error instanceof ErrorResponse && error.error === 'invalid_grant')) throw error
     await userManager().removeUser()
     return null
   }

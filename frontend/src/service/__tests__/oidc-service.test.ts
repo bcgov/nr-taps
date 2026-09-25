@@ -5,7 +5,13 @@ const oidc = vi.hoisted(() => ({
   getUser: vi.fn<() => Promise<User | null>>(),
   signinSilent: vi.fn<() => Promise<User | null>>(),
   removeUser: vi.fn<() => Promise<void>>(),
-  ErrorResponse: class extends Error {},
+  ErrorResponse: class extends Error {
+    error: string
+    constructor(error: string) {
+      super(error)
+      this.error = error
+    }
+  },
 }))
 
 vi.mock('oidc-client-ts', () => ({
@@ -63,6 +69,16 @@ test('signs out when SSO rejects the refresh token', async () => {
   expect(await Promise.all([getOidcUser(), getOidcUser()])).toEqual([null, null])
   expect(oidc.signinSilent).toHaveBeenCalledTimes(1)
   expect(oidc.removeUser).toHaveBeenCalledTimes(1)
+})
+
+test('keeps the session when SSO reports a temporary error', async () => {
+  const error = new oidc.ErrorResponse('server_error')
+  oidc.signinSilent.mockRejectedValueOnce(error).mockResolvedValueOnce(renewedUser)
+  const { getOidcUser } = await import('@/service/oidc-service')
+
+  await expect(getOidcUser()).rejects.toBe(error)
+  expect(oidc.removeUser).not.toHaveBeenCalled()
+  await expect(getOidcUser()).resolves.toBe(renewedUser)
 })
 
 test('shares a failed refresh and allows a subsequent attempt', async () => {
