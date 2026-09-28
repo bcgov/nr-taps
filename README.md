@@ -11,6 +11,8 @@ This repository is the initial TAPS application foundation. It has a Java 21 Spr
 
 The PR workflow builds both images under the PR number and head SHA, deploys the SHA images to DEV, and checks that the public shell responds and `/api/me` rejects anonymous requests. On merge, TEST deploys the PR-numbered images, runs the same smoke check, then tags those images `test`. Closing a PR cancels any in-progress preview deployment, then removes its DEV resources. The backend has no public Route; Caddy proxies the API through the frontend Route.
 
+The OpenShift deployer (v4.2.2 or later) keeps rendered templates, which will include Secret values once the app has them, out of workflow logs; don't pin an older version or print rendered templates from other steps.
+
 **PROD deployment is disabled.** There is no PROD job, Route, or image promotion. When PROD is planned, give it a dedicated hostname and certificate rather than an OpenShift generated hostname, and add a separate reviewed promotion path.
 
 ## GitHub and FAM setup
