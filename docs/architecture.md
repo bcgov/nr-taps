@@ -26,7 +26,7 @@ Only the frontend has a public Route. Caddy serves the SPA, applies browser secu
 
 | Component                  | Implemented responsibility                                                                                              | Deferred responsibility                                                                           |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| React frontend             | Shared session, IDIR/Business BCeID login, accepted-grant display, capability-gated ECAS/GAS links and five page shells | Working forms, searches, record views and inactivity-warning UX                                   |
+| React frontend             | Shared session, IDIR/Business BCeID login, accepted-grant display, capability-gated ECAS/GAS links and five page shells | Carbon components/theming, working forms, searches, record views and inactivity-warning UX        |
 | Caddy / Coraza             | Static assets, API proxy, CSP/security headers, credential-safe log configuration, WAF and health endpoint              | Container/WAF runtime acceptance in DEV/TEST                                                      |
 | Spring Boot / Undertow     | JWT validation, principal/grant conversion, capability and record-scope helpers, `/api/me`, health probes               | Business endpoints, authoritative record ownership, workflow validation and transactions          |
 | FAM / BC Gov SSO           | Integration and role-assignment model supported by the application                                                      | TAPS clients, approved role definitions/assignments and credentialed acceptance                   |
@@ -34,6 +34,19 @@ Only the frontend has a public Route. Caddy serves the SPA, applies browser secu
 | GitHub Actions / OpenShift | Image build, DEV preview/TEST deployment templates, smoke checks, quality checks and advisory security scan             | Provisioned namespaces, deployment credentials, actual CI/rollout evidence and operational sizing |
 
 No service-client API, mail delivery, report engine, file scanner or scheduled business process is configured in this foundation. Add those integrations when their TAPS requirements and ownership are established.
+
+## Frontend design system
+
+Carbon Design System is the target UI framework, following the LEXIS interface. The current React scaffold uses Bootstrap and BC Gov components; Carbon integration remains to be implemented. TanStack Router continues to handle application routing.
+
+| UI concern          | Carbon package / component              |
+| ------------------- | --------------------------------------- |
+| Controls and themes | `@carbon/react`                         |
+| Detail side drawers | `SidePanel` from `@carbon/ibm-products` |
+| Icons               | `@carbon/icons-react`                   |
+| Pictograms          | `@carbon/pictograms-react`              |
+
+Follow LEXIS's responsive drawer and focus-management pattern. Prefer Carbon icons and pictograms over other icon libraries or hand-drawn SVGs; use alternatives only when Carbon has no suitable asset. Retain official BC Gov branding assets.
 
 ## Authentication
 

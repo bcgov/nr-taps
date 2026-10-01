@@ -9,6 +9,7 @@ Deployment requires environment-specific OpenShift namespaces, SSO clients and O
 | Component     | Technology / status                                                           |
 | ------------- | ----------------------------------------------------------------------------- |
 | Frontend      | React 19, TypeScript, Vite, TanStack Router, BC Gov components / Bootstrap    |
+| UI target     | Carbon React, IBM Products SidePanel, Carbon icons/pictograms (planned)       |
 | Backend       | Spring Boot 3.5.16, Java 21, Undertow, Spring Security and Actuator           |
 | Database      | Existing ECAS/GAS2 Oracle schema and tables; application proxy access pending |
 | Identity      | BC Gov SSO / FAM; IDIR MFA and Business BCeID only                            |
