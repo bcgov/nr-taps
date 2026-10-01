@@ -4,9 +4,9 @@ import java.util.Optional;
 
 /**
  * The sign-in types TAPS accepts. The CSS integration offers IDIR (through Azure AD, so the realm
- * reports {@code azureidir}) and Business BCeID. Basic and Personal BCeID are not enabled in this
- * proposal. The legacy archives identify BCeID users without recording which BCeID type they used;
- * migration must confirm that Business BCeID covers all external users.
+ * reports {@code azureidir}) and Business BCeID. Project direction confirms Business BCeID for
+ * external access; Basic and Personal BCeID are not supported. The ECAS access form also permits
+ * BCeID for BCTS consultants, while government staff use IDIR.
  */
 public enum IdentityProvider {
   IDIR("IDIR", "idir_username", "idir_user_guid"),

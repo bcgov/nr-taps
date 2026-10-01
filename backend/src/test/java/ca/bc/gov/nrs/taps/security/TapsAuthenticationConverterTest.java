@@ -70,6 +70,51 @@ class TapsAuthenticationConverterTest {
   }
 
   @Test
+  void bctsConsultantsUseBusinessBceidWithClientScopedAccess() {
+    TapsUser user =
+        converter.toUser(
+            bceid(
+                List.of(
+                    "TAPS_BCTS_SUBMITTER_FOREST_CLIENT-00001018",
+                    "TAPS_ADMIN",
+                    "TAPS_REGION_APPRAISER_REGION-CARIBOO")));
+
+    assertThat(user.grants())
+        .containsExactly(
+            new RoleGrant(
+                TapsRole.TAPS_BCTS_SUBMITTER,
+                new FamRoleName.Scope("FOREST_CLIENT", "00001018")));
+    assertThat(user.can(TapsCapability.ECAS_BCTS_ENTRY, client("00001018"))).isTrue();
+    assertThat(user.can(TapsCapability.ECAS_SUBMISSION_SUBMIT, client("00001018"))).isTrue();
+    assertThat(user.can(TapsCapability.GAS_BCTS_RATE_UPDATE, client("00001018"))).isTrue();
+    assertThat(user.can(TapsCapability.ECAS_SUBMISSION_SUBMIT, client("00147603"))).isFalse();
+    assertThat(user.can(TapsCapability.GAS_BCTS_RATE_UPDATE, client("00147603"))).isFalse();
+    assertThat(user.can(TapsCapability.ECAS_REGION_REVIEW)).isFalse();
+    assertThat(user.can(TapsCapability.GAS_REFERENCE_ADMIN)).isFalse();
+  }
+
+  @Test
+  void bctsEntryAndSubmitterRolesAcceptStaffAndConsultantsWithoutChangingTheirCapabilities() {
+    for (IdentityProvider provider : IdentityProvider.values()) {
+      List<String> roles = List.of("TAPS_BCTS_FOREST_CLIENT-00001018");
+      TapsUser entry = converter.toUser(provider == IdentityProvider.IDIR ? idir(roles) : bceid(roles));
+
+      assertThat(entry.can(TapsCapability.ECAS_BCTS_ENTRY, client("00001018"))).isTrue();
+      assertThat(entry.can(TapsCapability.ECAS_BCTS_ENTRY, client("00147603"))).isFalse();
+      assertThat(entry.can(TapsCapability.ECAS_SUBMISSION_SUBMIT)).isFalse();
+      assertThat(entry.can(TapsCapability.GAS_BCTS_RATE_UPDATE)).isFalse();
+
+      List<String> submittingRoles = List.of("TAPS_BCTS_SUBMITTER_FOREST_CLIENT-00001018");
+      TapsUser submitter =
+          converter.toUser(
+              provider == IdentityProvider.IDIR ? idir(submittingRoles) : bceid(submittingRoles));
+      assertThat(submitter.can(TapsCapability.ECAS_SUBMISSION_SUBMIT, client("00001018"))).isTrue();
+      assertThat(submitter.can(TapsCapability.ECAS_SUBMISSION_SUBMIT, client("00147603"))).isFalse();
+      assertThat(submitter.can(TapsCapability.ECAS_REGION_REVIEW)).isFalse();
+    }
+  }
+
+  @Test
   void malformedOrMisspelledGrantsAreIgnored() {
     TapsUser user =
         converter.toUser(

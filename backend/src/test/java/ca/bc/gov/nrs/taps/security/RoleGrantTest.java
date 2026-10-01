@@ -134,6 +134,10 @@ class RoleGrantTest {
 
   private static RoleGrant grant(String roleName) {
     TapsRole role = TapsRole.fromCode(FamRoleName.parse(roleName).baseRole()).orElseThrow();
-    return RoleGrant.accept(FamRoleName.parse(roleName), role.identityProvider()).orElseThrow();
+    IdentityProvider provider =
+        role.identityProviders().contains(IdentityProvider.IDIR)
+            ? IdentityProvider.IDIR
+            : IdentityProvider.BCEID_BUSINESS;
+    return RoleGrant.accept(FamRoleName.parse(roleName), provider).orElseThrow();
   }
 }

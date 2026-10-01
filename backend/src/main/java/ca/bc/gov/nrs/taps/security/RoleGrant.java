@@ -15,7 +15,9 @@ public record RoleGrant(TapsRole role, FamRoleName.Scope scope) {
    */
   public static Optional<RoleGrant> accept(FamRoleName name, IdentityProvider identityProvider) {
     Optional<TapsRole> known = TapsRole.fromCode(name.baseRole());
-    if (known.isEmpty() || known.get().identityProvider() != identityProvider) {
+    if (known.isEmpty()
+        || identityProvider == null
+        || !known.get().identityProviders().contains(identityProvider)) {
       return Optional.empty();
     }
     TapsRole role = known.get();

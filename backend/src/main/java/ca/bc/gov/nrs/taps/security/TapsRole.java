@@ -104,13 +104,13 @@ public enum TapsRole {
           GAS_APPRAISAL_VIEW,
           GAS_CLIENT_REPORTS,
           GAS_MINISTRY_REPORTS)),
-  // BC Timber Sales; legacy modelled BCTS as forest clients. IDIR is inferred, not confirmed.
+  // BC Timber Sales staff use IDIR; authorized consultants use Business BCeID.
   TAPS_BCTS(
-      IdentityProvider.IDIR,
+      Set.of(IdentityProvider.IDIR, IdentityProvider.BCEID_BUSINESS),
       FamRoleName.FOREST_CLIENT,
       EnumSet.of(ECAS_SUBMISSION_VIEW, ECAS_SUBMISSION_EDIT, ECAS_BCTS_ENTRY, GAS_CLIENT_REPORTS)),
   TAPS_BCTS_SUBMITTER(
-      IdentityProvider.IDIR,
+      Set.of(IdentityProvider.IDIR, IdentityProvider.BCEID_BUSINESS),
       FamRoleName.FOREST_CLIENT,
       EnumSet.of(
           ECAS_SUBMISSION_VIEW,
@@ -135,13 +135,20 @@ public enum TapsRole {
       FamRoleName.FOREST_CLIENT,
       EnumSet.of(ECAS_SUBMISSION_VIEW, GAS_CLIENT_REPORTS));
 
-  private final IdentityProvider identityProvider;
+  private final Set<IdentityProvider> identityProviders;
   private final String scopeType;
   private final Set<TapsCapability> capabilities;
 
   TapsRole(
       IdentityProvider identityProvider, String scopeType, EnumSet<TapsCapability> capabilities) {
-    this.identityProvider = identityProvider;
+    this(Set.of(identityProvider), scopeType, capabilities);
+  }
+
+  TapsRole(
+      Set<IdentityProvider> identityProviders,
+      String scopeType,
+      EnumSet<TapsCapability> capabilities) {
+    this.identityProviders = Set.copyOf(identityProviders);
     this.scopeType = scopeType;
     this.capabilities = Set.copyOf(capabilities);
   }
@@ -150,8 +157,8 @@ public enum TapsRole {
     return Arrays.stream(values()).filter(role -> role.name().equals(code)).findFirst();
   }
 
-  public IdentityProvider identityProvider() {
-    return identityProvider;
+  public Set<IdentityProvider> identityProviders() {
+    return identityProviders;
   }
 
   /** {@link FamRoleName#DISTRICT}, {@link FamRoleName#REGION}, {@link FamRoleName#FOREST_CLIENT} or null. */
