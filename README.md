@@ -1,30 +1,32 @@
 # TAPS - Timber Appraisal and Pricing System
 
-This repository is the initial TAPS application foundation for modernizing ECAS and GAS2 together. It has a Java 21 Spring Boot API with Undertow and a React frontend. The frontend serves the app through Caddy and proxies `/api/*` to the backend. Browser sign in uses the modern FAM Keycloak client with authorization code and PKCE. The backend accepts signed user access tokens for the configured TAPS client and interprets a proposed, scoped TAPS role catalogue. The frontend uses the API session to gate separate ECAS and GAS page shells. Oracle integration, working legacy forms and business transactions remain to be ported.
+This repository is the initial TAPS application foundation for modernizing ECAS and GAS2 together. It has a Java 21 Spring Boot API with Undertow and a React frontend. The frontend serves the app through Caddy and proxies `/api/*` to the backend. Browser sign in uses the modern FAM Keycloak client with authorization code and PKCE. The backend accepts signed user access tokens for the configured TAPS client and maps application roles to capabilities and record scopes. The frontend uses the API session to gate separate ECAS and GAS page shells. Oracle proxy connectivity remains to be configured; working legacy forms and business transactions remain to be ported.
 
-Gold project-set `af11ba` is awaiting provisioning. SSO registration and public configuration can be prepared now; Oracle access, deployed acceptance and PROD delivery are not yet configured.
+The modernization focuses on application frameworks, FAM access, OpenShift hosting and GitHub Actions CI/CD. TAPS will reuse the existing Oracle schema, tables and data through an application proxy account; no data migration is planned.
 
-| Component     | Technology / status                                                               |
-| ------------- | --------------------------------------------------------------------------------- |
-| Frontend      | React 19, TypeScript, Vite, TanStack Router, BC Gov components / Bootstrap        |
-| Backend       | Spring Boot 3.5.16, Java 21, Undertow, Spring Security and Actuator               |
-| Database      | Existing ECAS/GAS Oracle data; integration and target access pending              |
-| Identity      | BC Gov SSO / FAM; IDIR MFA and Business BCeID only                                |
-| Authorization | Proposed role/capability catalogue with district, region and forest-client grants |
-| Hosting       | Gold OpenShift templates, Caddy/Coraza frontend proxy, GitHub Actions / GHCR      |
+Deployment requires environment-specific OpenShift namespaces, SSO clients and Oracle proxy access. Keep deployment credentials and local setup notes outside Git. PROD delivery is disabled.
+
+| Component     | Technology / status                                                           |
+| ------------- | ----------------------------------------------------------------------------- |
+| Frontend      | React 19, TypeScript, Vite, TanStack Router, BC Gov components / Bootstrap    |
+| Backend       | Spring Boot 3.5.16, Java 21, Undertow, Spring Security and Actuator           |
+| Database      | Existing ECAS/GAS2 Oracle schema and tables; application proxy access pending |
+| Identity      | BC Gov SSO / FAM; IDIR MFA and Business BCeID only                            |
+| Authorization | Role/capability mapping with district, region and forest-client scope checks  |
+| Hosting       | Gold OpenShift templates, Caddy/Coraza frontend proxy, GitHub Actions / GHCR  |
 
 ## Project documentation
 
-| Document                                                                 | Purpose                                                                                                |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| [Architecture](docs/architecture.md)                                     | Runtime, trust boundaries, authentication and delivery diagrams; implemented versus planned components |
-| [Access and identity](docs/access-and-identity.md)                       | Confirmed account types, BCTS consultants, proposed roles/scopes and outstanding business decisions    |
-| [Intentional legacy divergences](docs/intentional-legacy-divergences.md) | Technical choices and proposed policy differences; unported features are not retirements               |
-| [SSO and deployment configuration](docs/deployment-configuration.md)     | SSO request fields, exact callback/origin patterns and GitHub variables/secrets                        |
+| Document                                                               | Purpose                                                                                                |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| [Architecture](docs/architecture.md)                                   | Runtime, trust boundaries, authentication and delivery diagrams; implemented versus planned components |
+| [Authentication and authorization](docs/access-and-identity.md)        | SSO configuration, token validation, grant formats and record-scope enforcement                        |
+| [Technical legacy divergences](docs/intentional-legacy-divergences.md) | Implemented framework/integration differences and functional coverage                                  |
+| [SSO and deployment configuration](docs/deployment-configuration.md)   | SSO request fields, exact callback/origin patterns and GitHub variables/secrets                        |
 
-The account-type decision is confirmed: **IDIR and Business BCeID; no Basic BCeID**. The [ECAS access form](https://forms.gov.bc.ca/industry/electronic-commerce-appraisal-system-ecas-requesting-access-or-removal/) also permits BCeID for BCTS consultants. Supported BCTS roles therefore accept IDIR staff or Business BCeID consultants while retaining forest-client scope. This does not grant consultants IDIR-only ministry permissions.
+TAPS supports **IDIR MFA and Business BCeID; no Basic BCeID**.
 
-The proposed roles and capabilities are defined in [TapsRole.java](backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsRole.java). Scoped grants require a district, region or forest client, and record access must bind the capability and scope to the same grant. Confirm the role catalogue before provisioning, especially the proposed provincial admin/HQ coverage and business-action eligibility.
+The current access scaffold maps roles to capabilities in [TapsRole.java](backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsRole.java). Scoped grants require a district, region or forest client, and record access must bind the capability and scope to the same grant. New application endpoints require validated authorization rules before they are enabled.
 
 ## Deployment flow
 
@@ -59,9 +61,9 @@ Start with a **public OpenID Connect browser client using code + PKCE**, with **
 
 Create GitHub Environments named `dev` and `test`; restrict TEST to `main`. The caller passes the DEV repository secrets, and the called deployment jobs select TEST environment secrets for the TEST run. An environment secret replaces the caller's secret only when it exists, so the deployment check requires `oc_namespace` to end in `-dev` or `-test` to match the environment. A missing TEST secret therefore stops the run instead of deploying into DEV. Give the service tokens only the permissions needed to manage this app in their respective namespace. GHCR images must be pullable by those namespaces.
 
-FAM must allow DEV redirect URIs `https://nr-taps-0.<OC_APPS_DOMAIN>/authCallback` through `https://nr-taps-49.<OC_APPS_DOMAIN>/authCallback` and the TEST redirect URI `https://nr-taps-test.<OC_APPS_DOMAIN>/authCallback`. Allow the matching origins as post-logout redirects. IDIR and Business BCeID provider hints follow the Lexis FAM setup. Keycloak logout does not end the SiteMinder session behind Business BCeID, so sign out goes to SiteMinder `logoff.cgi` first and returns through Keycloak logout. PROD must use `https://logon7.gov.bc.ca/clp-cgi/logoff.cgi`. TAPS role parsing and scope checks are implemented locally, but the proposed roles must be confirmed before external provisioning. No roles or grants were created by this work. Sign-in and logout still require live credentialed acceptance after the clients and redirect URIs are configured.
+FAM must allow DEV redirect URIs `https://nr-taps-0.<OC_APPS_DOMAIN>/authCallback` through `https://nr-taps-49.<OC_APPS_DOMAIN>/authCallback` and the TEST redirect URI `https://nr-taps-test.<OC_APPS_DOMAIN>/authCallback`. Allow the matching origins as post-logout redirects. Provider hints are `azureidir` and `bceidbusiness`. Keycloak logout does not end the SiteMinder session behind Business BCeID, so sign out goes to SiteMinder `logoff.cgi` first and returns through Keycloak logout. PROD must use `https://logon7.gov.bc.ca/clp-cgi/logoff.cgi`. Verify real sign-in and logout against the configured clients.
 
-See [SSO and deployment configuration](docs/deployment-configuration.md) for request fields, callback generation and the full configuration contract. Actual client IDs remain pending the request process. Deployment tokens wait for namespace provisioning; do not create placeholder credentials.
+See [SSO and deployment configuration](docs/deployment-configuration.md) for request fields, callback generation and the configuration contract. Configure each environment's client ID and least-privilege deployment credentials before deployment.
 
 ## Local development
 

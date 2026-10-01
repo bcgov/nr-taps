@@ -3,7 +3,7 @@ package ca.bc.gov.nrs.taps.security;
 import java.util.Arrays;
 import java.util.Optional;
 
-/** Proposed rollup codes; verify against ORG_UNIT before using live records. */
+/** Verify rollup codes against ORG_UNIT when implementing database access. */
 public enum FamRegion {
   CARIBOO("RCB"),
   KOOTENAY_BOUNDARY("RKB"),

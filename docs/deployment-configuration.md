@@ -1,21 +1,21 @@
 # SSO and deployment configuration
 
-SSO registration and public GitHub configuration can be prepared before Gold provisioning. Deployment credentials and successful rollout acceptance require the actual namespaces. The TAPS project-set identifier supplied for Gold is `af11ba`; provisioning is pending.
+Configure the application-specific SSO clients, OpenShift namespaces and deployment credentials for each environment. Keep namespace allocations, request tracking and local setup notes outside the repository.
 
 ## Starting the SSO request
 
-| Request field         | TAPS choice                                                           |
-| --------------------- | --------------------------------------------------------------------- |
-| Application           | Timber Appraisal and Pricing System (TAPS), modernizing ECAS + GAS2   |
-| Protocol              | OpenID Connect                                                        |
-| Client                | Public browser/SPA client                                             |
-| Flow                  | Authorization code with PKCE                                          |
-| Identity providers    | IDIR MFA and Business BCeID                                           |
-| Basic BCeID           | Disabled; project direction confirms Business only for external users |
-| Environments          | DEV and TEST initially; PROD is a separate later deployment gate      |
-| Browser client secret | None; do not create or inject a confidential secret into the SPA      |
+| Request field         | TAPS choice                                                         |
+| --------------------- | ------------------------------------------------------------------- |
+| Application           | Timber Appraisal and Pricing System (TAPS), modernizing ECAS + GAS2 |
+| Protocol              | OpenID Connect                                                      |
+| Client                | Public browser/SPA client                                           |
+| Flow                  | Authorization code with PKCE                                        |
+| Identity providers    | IDIR MFA and Business BCeID                                         |
+| Basic BCeID           | Disabled                                                            |
+| Environments          | DEV and TEST initially; PROD is a separate later deployment gate    |
+| Browser client secret | None; do not create or inject a confidential secret into the SPA    |
 
-Reuse the existing TAPS request/integration if one exists rather than creating a duplicate. Copy the installation JSON's public `resource` client ID for each environment; the request/integration number is not the client ID. The application's browser issuer/client and backend issuer/client must match. A successful integration request does not establish approved TAPS role definitions or user assignments.
+Copy the installation JSON's public `resource` client ID for each environment; the request/integration number is not the client ID. The application's browser issuer/client and backend issuer/client must match. Manage application role assignments through FAM.
 
 The current implementation uses `azureidir` and `bceidbusiness` provider hints. Confirm the actual approved providers and public client metadata before live acceptance.
 
@@ -44,7 +44,7 @@ No PROD hostname, certificate or redirect is operationally accepted by this docu
 
 ## GitHub Actions variables and secrets
 
-Create `dev` and `test` GitHub Environments. Restrict TEST deployment to `main`. Public values go in Actions variables; actual credentials go in secrets. Do not reuse a LEXIS client ID, FAM's own browser client, another application's deployment token or a fake placeholder.
+Create `dev` and `test` GitHub Environments. Restrict TEST deployment to `main`. Public values go in Actions variables; credentials go in secrets. Use TAPS-specific clients and least-privilege deployment credentials.
 
 | Scope                                    | Name                              | Required value / availability                                                |
 | ---------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------- |
@@ -52,11 +52,11 @@ Create `dev` and `test` GitHub Environments. Restrict TEST deployment to `main`.
 | Repository variable                      | `OC_APPS_DOMAIN`                  | `apps.gold.devops.gov.bc.ca`                                                 |
 | DEV environment variable                 | `TAPS_OIDC_ISSUER_URI`            | `https://dev.loginproxy.gov.bc.ca/auth/realms/standard`                      |
 | TEST environment variable                | `TAPS_OIDC_ISSUER_URI`            | `https://test.loginproxy.gov.bc.ca/auth/realms/standard`                     |
-| DEV/TEST environment variable            | `TAPS_OIDC_CLIENT_ID`             | Public TAPS `resource` value for that CSS environment; pending registration  |
+| DEV/TEST environment variable            | `TAPS_OIDC_CLIENT_ID`             | Public TAPS `resource` value for that CSS environment                        |
 | DEV/TEST environment variable            | `TAPS_OIDC_SITEMINDER_LOGOUT_URL` | `https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi`; also the workflow default |
-| Repository secret for current DEV caller | `oc_namespace`                    | Actual DEV namespace, expected `af11ba-dev`; confirm provisioning            |
-| Repository secret for current DEV caller | `oc_token`                        | Least-privilege DEV deployment service token; unavailable until provisioning |
-| TEST environment secret                  | `oc_namespace`                    | Actual TEST namespace, expected `af11ba-test`; confirm provisioning          |
+| Repository secret for current DEV caller | `oc_namespace`                    | The provisioned DEV namespace, ending in `-dev`                              |
+| Repository secret for current DEV caller | `oc_token`                        | Least-privilege DEV deployment service token                                 |
+| TEST environment secret                  | `oc_namespace`                    | The provisioned TEST namespace, ending in `-test`                            |
 | TEST environment secret                  | `oc_token`                        | Separate least-privilege TEST deployment service token                       |
 
 The current DEV workflow/cleanup caller passes repository-scoped DEV secrets. TEST jobs select TEST environment secrets, and validation requires the namespace suffix to match the environment so missing TEST credentials cannot silently fall back to DEV. Keep the environment-specific OIDC values in their environment rather than adding a repository-level fallback.
@@ -79,7 +79,7 @@ Set the real public client IDs after registration. Use GitHub's secret entry or 
 1. Confirm SSO request/providers, DEV/TEST public clients and exact callback/origin lists.
 2. Confirm GitHub variables, TEST branch restriction and the provisioned namespace/token pairs.
 3. Build the images and deploy DEV; the automated smoke checks the public shell/config and anonymous `/api/me` denial.
-4. Review the proposed roles before authorized FAM provisioning. Use separate IDIR and Business BCeID personas, including BCTS consultants, to verify accepted grants and negative cases.
+4. Verify accepted grants and negative cases for both providers against the environment's approved FAM configuration.
 5. Check real login, token renewal, logout/re-login and no-role behavior. Then verify record-scope/workflow rules as business endpoints are ported.
 6. Perform TEST rollout, security-findings review and actual rolling-availability acceptance. PROD remains disabled.
 

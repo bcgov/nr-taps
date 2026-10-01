@@ -25,9 +25,7 @@ import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Set;
 
-/** Proposed role policy; see docs/access-and-identity.md before provisioning. */
 public enum TapsRole {
-  // Admin/HQ provincial coverage still requires business approval.
   TAPS_ADMIN(
       IdentityProvider.IDIR,
       null,
