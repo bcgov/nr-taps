@@ -1,93 +1,56 @@
-import { useEffect, useState } from 'react'
 import { Button } from 'react-bootstrap'
-import {
-  clearLogin,
-  getOidcUser,
-  isOidcConfigured,
-  logout,
-  startLogin,
-} from '@/service/oidc-service'
-
-type CurrentUser = { subject: string; name: string }
-type State =
-  | { kind: 'loading' }
-  | { kind: 'signed-out' }
-  | { kind: 'signed-in'; user: CurrentUser }
-  | { kind: 'error'; message: string }
+import { Link } from '@tanstack/react-router'
+import { applications, type ApplicationId } from '@/application-catalogue'
+import { useAuth } from '@/context/auth/AuthContext'
+import { describeGrant } from '@/context/auth/capabilities'
+import SessionStatus, { NoRoleNotice } from '@/components/SessionStatus'
 
 export default function Dashboard() {
-  const [state, setState] = useState<State>({ kind: 'loading' })
-
-  useEffect(() => {
-    let active = true
-    async function load() {
-      try {
-        const oidcUser = await getOidcUser()
-        if (!oidcUser) {
-          if (active) setState({ kind: 'signed-out' })
-          return
-        }
-        const response = await fetch('/api/me', {
-          headers: { Authorization: `Bearer ${oidcUser.access_token}` },
-        })
-        if (response.status === 401) {
-          await clearLogin()
-          if (active) setState({ kind: 'signed-out' })
-          return
-        }
-        if (!response.ok) throw new Error('The TAPS service is unavailable.')
-        const user = (await response.json()) as CurrentUser
-        if (active) setState({ kind: 'signed-in', user })
-      } catch {
-        if (active) setState({ kind: 'error', message: 'Unable to load your session.' })
-      }
-    }
-    void load()
-    return () => {
-      active = false
-    }
-  }, [])
-
-  async function signIn(provider: 'idir' | 'business-bceid') {
-    try {
-      await startLogin(provider)
-    } catch {
-      setState({ kind: 'error', message: 'Unable to start sign in.' })
-    }
-  }
-
-  async function signOut() {
-    try {
-      await logout()
-    } catch {
-      await clearLogin()
-      setState({ kind: 'signed-out' })
-    }
-  }
+  const { state, can, logout } = useAuth()
 
   return (
-    <main className="container" style={{ maxWidth: '48rem' }}>
+    <main className="container taps-content">
       <h1>TAPS</h1>
-      {state.kind === 'loading' && <p>Loading…</p>}
+      <p>Timber appraisal services</p>
+      <SessionStatus />
       {state.kind === 'signed-in' && (
         <>
-          <p>Signed in as {state.user.name}.</p>
-          <p>The TAPS application is being set up.</p>
-          <Button onClick={() => void signOut()}>Sign out</Button>
+          <p>
+            Signed in as {state.session.displayName}
+            {state.session.businessName && ` for ${state.session.businessName}`}.
+          </p>
+          {state.session.roles.length ? (
+            <>
+              <h2 className="h5">Your TAPS access</h2>
+              <ul>
+                {state.session.roles.map((grant) => {
+                  const label = describeGrant(grant)
+                  return <li key={label}>{label}</li>
+                })}
+              </ul>
+              <div className="row g-3 mb-4">
+                {(Object.keys(applications) as ApplicationId[])
+                  .filter((application) => applications[application].capabilities.some(can))
+                  .map((application) => (
+                    <div className="col-sm-6" key={application}>
+                      <div className="card h-100">
+                        <div className="card-body">
+                          <h2 className="h4">
+                            <Link to={`/${application}`}>{applications[application].title}</Link>
+                          </h2>
+                          <p className="mb-0">{applications[application].description}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </>
+          ) : (
+            <NoRoleNotice />
+          )}
+          <Button onClick={() => void logout()}>Sign out</Button>
         </>
       )}
-      {state.kind === 'error' && <p role="alert">{state.message}</p>}
-      {(state.kind === 'signed-out' || state.kind === 'error') &&
-        (isOidcConfigured() ? (
-          <div className="d-flex gap-2">
-            <Button onClick={() => void signIn('idir')}>Sign in with IDIR</Button>
-            <Button variant="secondary" onClick={() => void signIn('business-bceid')}>
-              Sign in with Business BCeID
-            </Button>
-          </div>
-        ) : (
-          <p>Sign in is not configured for this environment.</p>
-        ))}
     </main>
   )
 }

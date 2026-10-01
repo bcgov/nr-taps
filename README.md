@@ -1,6 +1,8 @@
 # TAPS
 
-This repository is the initial TAPS application foundation. It has a Java 21 Spring Boot API and a React frontend. The frontend serves the app through Caddy and proxies `/api/*` to the backend. Browser sign in uses the modern FAM Keycloak client with authorization code and PKCE. The backend accepts signed user access tokens for the configured FAM client. Roles, business endpoints, database integration, and NEXCOL-style machine APIs are outside this first slice.
+This repository is the initial TAPS application foundation for modernizing ECAS and GAS2 together. It has a Java 21 Spring Boot API and a React frontend. The frontend serves the app through Caddy and proxies `/api/*` to the backend. Browser sign in uses the modern FAM Keycloak client with authorization code and PKCE. The backend accepts signed user access tokens for the configured TAPS client and interprets a proposed, scoped TAPS role catalogue. The frontend uses the API session to gate separate ECAS and GAS page shells. Oracle integration, working legacy forms and business transactions remain to be ported.
+
+The proposed roles and capabilities are defined in [TapsRole.java](backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsRole.java). Scoped grants require a district, region or forest client, and record access must bind the capability and scope to the same grant. Confirm the catalogue before provisioning, especially the proposed provincial admin/HQ coverage and Business BCeID-only external access: the legacy archives identify generic BCeID without distinguishing account types.
 
 ## Deployment flow
 
@@ -31,7 +33,9 @@ The following configuration must exist before the deployment workflows can succe
 
 Create GitHub Environments named `dev` and `test`; restrict TEST to `main`. The caller passes the DEV repository secrets, and the called deployment jobs select TEST environment secrets for the TEST run. An environment secret replaces the caller's secret only when it exists, so the deployment check requires `oc_namespace` to end in `-dev` or `-test` to match the environment. A missing TEST secret therefore stops the run instead of deploying into DEV. Give the service tokens only the permissions needed to manage this app in their respective namespace. GHCR images must be pullable by those namespaces.
 
-FAM must allow each active DEV preview redirect URI `https://nr-taps-<PR>.<OC_APPS_DOMAIN>/authCallback` and the TEST redirect URI `https://nr-taps-test.<OC_APPS_DOMAIN>/authCallback`. Allow the matching origins as post-logout redirects. IDIR and Business BCeID provider hints follow the Lexis FAM setup. Keycloak logout does not end the SiteMinder session behind Business BCeID, so sign out goes to SiteMinder `logoff.cgi` first and returns through Keycloak logout. PROD must use `https://logon7.gov.bc.ca/clp-cgi/logoff.cgi`. No TAPS roles are created or checked in this slice. Sign-in and logout still require live credentialed acceptance after the clients and redirect URIs are configured.
+FAM must allow each active DEV preview redirect URI `https://nr-taps-<PR>.<OC_APPS_DOMAIN>/authCallback` and the TEST redirect URI `https://nr-taps-test.<OC_APPS_DOMAIN>/authCallback`. Allow the matching origins as post-logout redirects. IDIR and Business BCeID provider hints follow the Lexis FAM setup. Keycloak logout does not end the SiteMinder session behind Business BCeID, so sign out goes to SiteMinder `logoff.cgi` first and returns through Keycloak logout. PROD must use `https://logon7.gov.bc.ca/clp-cgi/logoff.cgi`. TAPS role parsing and scope checks are implemented locally, but the proposed roles must be confirmed before external provisioning. No roles or grants were created by this work. Sign-in and logout still require live credentialed acceptance after the clients and redirect URIs are configured.
+
+The TAPS Gold project-set name is `af11ba`, supplied by the user; provisioning is pending. Use the actual provisioned environment namespaces and their least-privilege credentials when they become available.
 
 ## Local development
 
@@ -44,7 +48,7 @@ cd frontend && npm ci && npm run dev
 
 The frontend runs at `http://localhost:3000`, proxies `/api` to `http://localhost:8080`, and returns from FAM at `http://localhost:3000/authCallback`. Add that local redirect and origin to a development FAM client before attempting sign in. The backend exits at startup when its issuer or client ID is missing.
 
-The only app endpoint today is `GET /api/me`, which returns the authenticated user's subject and name. Spring Boot Actuator exposes `/actuator/health/liveness` and `/actuator/health/readiness` for pod probes. The frontend serves `/config.js` from environment values at container startup, so the same image can run in DEV and TEST.
+The only app endpoint today is `GET /api/me`, which returns the authenticated user's identity, accepted role grants, capabilities and forest clients. A valid sign-in without a TAPS role gets an empty access list. Spring Boot Actuator exposes `/actuator/health/liveness` and `/actuator/health/readiness` for pod probes. The frontend serves `/config.js` from environment values at container startup, so the same image can run in DEV and TEST.
 
 ## Validation boundary
 

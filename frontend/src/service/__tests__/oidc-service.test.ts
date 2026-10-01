@@ -5,6 +5,7 @@ const oidc = vi.hoisted(() => ({
   getUser: vi.fn<() => Promise<User | null>>(),
   signinSilent: vi.fn<() => Promise<User | null>>(),
   removeUser: vi.fn<() => Promise<void>>(),
+  signinRedirectCallback: vi.fn<() => Promise<User>>(),
   ErrorResponse: class extends Error {
     error: string
     constructor(error: string) {
@@ -20,6 +21,7 @@ vi.mock('oidc-client-ts', () => ({
     getUser = oidc.getUser
     signinSilent = oidc.signinSilent
     removeUser = oidc.removeUser
+    signinRedirectCallback = oidc.signinRedirectCallback
   },
   WebStorageStateStore: class {},
 }))
@@ -44,6 +46,19 @@ beforeEach(() => {
 
 afterEach(() => {
   delete window.config
+})
+
+test('shares one callback completion when React mounts the callback more than once', async () => {
+  const callback = Promise.withResolvers<User>()
+  oidc.signinRedirectCallback.mockReturnValue(callback.promise)
+  const { completeLogin } = await import('@/service/oidc-service')
+
+  const first = completeLogin()
+  const second = completeLogin()
+  callback.resolve(renewedUser)
+
+  expect(await Promise.all([first, second])).toEqual([renewedUser, renewedUser])
+  expect(oidc.signinRedirectCallback).toHaveBeenCalledOnce()
 })
 
 test('shares one refresh across concurrent storage reads and an in-flight caller', async () => {
