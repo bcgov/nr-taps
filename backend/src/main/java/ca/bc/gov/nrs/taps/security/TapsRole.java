@@ -25,24 +25,9 @@ import java.util.EnumSet;
 import java.util.Optional;
 import java.util.Set;
 
-/**
- * The FAM roles TAPS accepts and what each grants. This table is the only place a role name is
- * interpreted.
- *
- * <p>The archived WebADE design bundles ECAS and GAS roles (for example the ECAS_REGION profile
- * includes GAS REGION, CLERICAL and DISTRICT). These proposed combined roles use those profiles as
- * a starting point, with conservative limits where the archive layers differ. Confirm the catalogue
- * with the business before provisioning it, because renaming a FAM role orphans every grant made
- * under it.
- *
- * <p>Each role in this initial catalogue has one fixed scope type. A grant must carry exactly that
- * scope: an unscoped grant of a scoped role, or a scoped grant of an unscoped role, is ignored.
- */
+/** Proposed role policy; see docs/access-and-identity.md before provisioning. */
 public enum TapsRole {
-  // IDIR: Ministry staff
-  // Legacy ECAS_ADMINISTRATOR bundled GAS BRANCH_ADMIN, but never GAS BCTS_UPDATE.
-  // Province-wide admin/HQ scope is a proposal, not proven legacy ECAS provisioning.
-  // Ordinary client submit is excluded; the special Administrator/BUP flow is deferred.
+  // Admin/HQ provincial coverage still requires business approval.
   TAPS_ADMIN(
       IdentityProvider.IDIR,
       null,
@@ -104,7 +89,6 @@ public enum TapsRole {
           GAS_APPRAISAL_VIEW,
           GAS_CLIENT_REPORTS,
           GAS_MINISTRY_REPORTS)),
-  // BC Timber Sales staff use IDIR; authorized consultants use Business BCeID.
   TAPS_BCTS(
       Set.of(IdentityProvider.IDIR, IdentityProvider.BCEID_BUSINESS),
       FamRoleName.FOREST_CLIENT,
@@ -120,7 +104,6 @@ public enum TapsRole {
           GAS_BCTS_RATE_UPDATE,
           GAS_CLIENT_REPORTS)),
 
-  // Business BCeID: licensee staff, RPFs and RFTs, each for one forest client per grant
   TAPS_LICENSEE(
       IdentityProvider.BCEID_BUSINESS,
       FamRoleName.FOREST_CLIENT,
@@ -161,7 +144,7 @@ public enum TapsRole {
     return identityProviders;
   }
 
-  /** {@link FamRoleName#DISTRICT}, {@link FamRoleName#REGION}, {@link FamRoleName#FOREST_CLIENT} or null. */
+  /** Null denotes a provincial grant. */
   public String scopeType() {
     return scopeType;
   }

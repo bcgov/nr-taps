@@ -65,5 +65,4 @@ jobs:
           target: ${{ needs.init.outputs.pr }}
           tags: test
 
-  # PROD remains disabled. Add a separate, reviewed promotion workflow only after
-  # its dedicated hostname, certificate, FAM client and acceptance are ready.
+  # PROD promotion remains disabled pending provisioning and acceptance.

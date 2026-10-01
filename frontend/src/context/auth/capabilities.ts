@@ -1,7 +1,6 @@
 import type { RoleGrant } from '@/service/session-service'
 
-// Mirrors TapsCapability in the backend. The backend decides what a user holds; these names only
-// shape navigation, and every endpoint checks again.
+// Navigation hints only; the API enforces authorization.
 export const Capability = {
   EcasSubmissionView: 'ECAS_SUBMISSION_VIEW',
   EcasSubmissionEdit: 'ECAS_SUBMISSION_EDIT',

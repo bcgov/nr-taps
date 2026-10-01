@@ -37,11 +37,9 @@ public class JwtDecoderConfiguration {
     return decoder;
   }
 
-  // TAPS is a public browser client, so every accepted token belongs to an IDIR or Business BCeID
-  // sign-in; a token from any other provider in the shared realm is refused.
   static OAuth2TokenValidator<Jwt> clientTokenValidator(String clientId) {
     return jwt -> {
-      // Read raw values: getClaimAsString can coerce malformed claims or throw for object values.
+      // Do not coerce malformed claim types.
       if (jwt.getExpiresAt() != null
           && clientId.equals(jwt.getClaim("azp"))
           && "Bearer".equals(jwt.getClaim("typ"))

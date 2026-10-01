@@ -12,7 +12,6 @@ export type AuthState =
 
 export type AuthContextValue = {
   state: AuthState
-  /** Whether the signed-in user holds a capability anywhere; record scope is checked by the API. */
   can: (capability: Capability) => boolean
   reloadSession: () => Promise<void>
   login: (provider: LoginProvider) => Promise<void>

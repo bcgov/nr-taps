@@ -6,15 +6,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A FAM role name read from the token, split into its base code and scopes.
- *
- * <p>A CSS role is a bare name, so FAM writes a grant's scope into the name: {@code
- * <CODE>_DISTRICT-<value>}, {@code <CODE>_REGION-<value>} and {@code <CODE>_FOREST_CLIENT-<value>},
- * chained in that order when a role has several. A scoped holder never carries the bare code. Codes
- * match {@code ^[A-Z][A-Z0-9_]{1,58}$}, so they contain no {@code -}, while region values and the
- * {@code FOREST_CLIENT} type contain underscores. Suffixes are therefore peeled from the right at
- * the last hyphen, never split on underscores. This is a port of {@code CssRoleNaming.parse} in
- * nr-fam; keep the two in step.
+ * Matches nr-fam's CssRoleNaming; parse suffixes from the right because scope values can contain
+ * underscores.
  */
 public record FamRoleName(String baseRole, List<Scope> scopes) {
 
@@ -22,10 +15,9 @@ public record FamRoleName(String baseRole, List<Scope> scopes) {
   public static final String REGION = "REGION";
   public static final String FOREST_CLIENT = "FOREST_CLIENT";
 
-  /** FAM bookkeeping roles such as {@code FAM:EXPIRES:2026-09-30:<ROLE>}; never authorities. */
+  /** FAM metadata never grants application access. */
   public static final String SIDECAR_PREFIX = "FAM:";
 
-  // Longest first, so FOREST_CLIENT is tried before a type that it ends with.
   private static final List<String> SCOPE_TYPES = List.of(FOREST_CLIENT, DISTRICT, REGION);
 
   public FamRoleName {
@@ -49,7 +41,6 @@ public record FamRoleName(String baseRole, List<Scope> scopes) {
       scopes.add(split.get().scope());
       remaining = split.get().head();
     }
-    // Peeled right to left; restore the written order.
     Collections.reverse(scopes);
     return new FamRoleName(remaining, scopes);
   }
@@ -72,7 +63,6 @@ public record FamRoleName(String baseRole, List<Scope> scopes) {
             new Split(head.substring(0, head.length() - suffix.length()), new Scope(type, value)));
       }
     }
-    // A hyphen that is not a scope separator: the name is its own base role.
     return Optional.empty();
   }
 

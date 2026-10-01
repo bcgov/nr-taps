@@ -14,11 +14,6 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.InvalidBearerTokenException;
 import org.springframework.stereotype.Component;
 
-/**
- * Turns a validated FAM access token into a {@link TapsUser}. Spring authorities are the user's
- * capabilities, never role names, so {@code hasAuthority} checks cannot depend on how roles are
- * named or bundled.
- */
 @Component
 public class TapsAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
@@ -40,7 +35,7 @@ public class TapsAuthenticationConverter implements Converter<Jwt, AbstractAuthe
   }
 
   TapsUser toUser(Jwt jwt) {
-    // Also guard the converter so another decoder cannot admit a different client or token type.
+    // Recheck client claims if another decoder is supplied.
     if (JwtDecoderConfiguration.clientTokenValidator(clientId).validate(jwt).hasErrors()) {
       throw new InvalidBearerTokenException("A TAPS user access token is required");
     }
@@ -67,15 +62,9 @@ public class TapsAuthenticationConverter implements Converter<Jwt, AbstractAuthe
         grants);
   }
 
-  /**
-   * CSS emits {@code client_roles}; stock Keycloak mappers emit {@code resource_access.<client>.roles}.
-   * Names are matched exactly: Keycloak role names are case-sensitive, so a differently cased role is
-   * a different role and must not be read as a TAPS one.
-   */
   private List<String> roleNames(Jwt jwt) {
     if (jwt.hasClaim("client_roles")) {
-      // An explicitly empty or malformed CSS role claim grants nothing; it must not fall back
-      // to another mapper and accidentally turn a failed claim into access.
+      // Malformed CSS roles must grant nothing, without falling back to another mapper.
       return strings(jwt.getClaim("client_roles"));
     }
     if (jwt.getClaim("resource_access") instanceof Map<?, ?> byClient
@@ -91,11 +80,7 @@ public class TapsAuthenticationConverter implements Converter<Jwt, AbstractAuthe
         : List.of();
   }
 
-  /**
-   * Legacy ECAS and GAS audit columns hold {@code IDIR\USER} and {@code BCEID\USER}; keep that form
-   * so a person has one name across legacy and TAPS rows. Fall back to the GUID, upper-cased because
-   * its case varies between claims, when the username is missing.
-   */
+  /** Preserve legacy audit identities: IDIR\USER or BCEID\USER. */
   private static String userId(Jwt jwt, IdentityProvider provider) {
     String account =
         firstText(jwt, provider.usernameClaim())

@@ -55,15 +55,12 @@ export async function getOidcUser(): Promise<User | null> {
   }
 }
 
-// SSO rejects the refresh token as invalid_grant once it is expired or revoked, or its session has
-// ended, for example after the idle timeout. Remove that session so the user is signed out. Keep it
-// after anything else, including OAuth errors such as server_error or temporarily_unavailable,
-// because a later attempt can recover from those.
+// Only invalid_grant is terminal; transient failures must preserve the session.
 async function renew(started: number): Promise<User | null> {
   try {
     const user = await userManager().signinSilent()
     if (started !== generation || signedOut) {
-      // The SDK stores a refresh result before resolving. Discard a late write after sign out.
+      // The SDK stores refresh results before resolving; discard writes after logout.
       await endingSession?.catch(() => undefined)
       await userManager().removeUser()
       return null
@@ -78,7 +75,7 @@ async function renew(started: number): Promise<User | null> {
 
 export async function startLogin(provider: 'idir' | 'business-bceid'): Promise<void> {
   if (!isOidcConfigured()) throw new Error('TAPS sign in is not configured.')
-  // An old renewal must finish discarding its credentials before another login can store a user.
+  // Wait for old credentials to be cleared before starting another login.
   await renewal?.catch(() => null)
   await endingSession?.catch(() => undefined)
   signedOut = false
@@ -93,7 +90,7 @@ export async function startLogin(provider: 'idir' | 'business-bceid'): Promise<v
   })
 }
 
-// React StrictMode can mount a callback twice. The authorization code can only be used once.
+// StrictMode mounts twice; share the single-use authorization code exchange.
 export function completeLogin(): Promise<User> {
   if (!callback) {
     const started = generation
@@ -109,9 +106,7 @@ export function completeLogin(): Promise<User> {
   return callback
 }
 
-// Keycloak does not end the SiteMinder session behind Business BCeID. Without SiteMinder logoff, the
-// next Business BCeID sign in in this browser returns the previous account without a password. When
-// configured, the browser logs off SiteMinder first, and SiteMinder returns it to Keycloak.
+// End SiteMinder before Keycloak to prevent Business BCeID account reuse.
 export function logout(
   navigate: (url: string) => void = (url) => window.location.assign(url),
 ): Promise<void> {
@@ -121,7 +116,6 @@ export function logout(
   endingSession = (async () => {
     try {
       const user = await userManager().getUser()
-      // Read the ID token before removing the user: Keycloak needs it to find the session to end.
       const url = endSessionUrl(user?.id_token)
       await userManager().removeUser()
       navigate(url)

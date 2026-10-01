@@ -54,13 +54,12 @@ jobs:
               exit 1
             fi
           done
-          # An environment secret replaces the caller's secret only when it exists. Without this
-          # check, a missing TEST secret would fall back to the DEV namespace passed by the caller.
+          # Missing environment secrets fall back to the caller's DEV secrets.
           if [[ "$OC_NAMESPACE" != *-"$DEPLOY_ENV" ]]; then
             echo "::error title=Wrong OpenShift namespace::oc_namespace must be the ${DEPLOY_ENV} namespace, ending in -${DEPLOY_ENV}."
             exit 1
           fi
-          # Keep DEV hosts within the registered 0-49 CSS redirect range.
+          # CSS callbacks cover DEV slots 0-49.
           if [[ "$DEPLOY_ENV" == dev ]]; then
             route_slot=$((10#$DEPLOY_TARGET % 50))
           else
@@ -113,7 +112,6 @@ jobs:
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_server: ${{ vars.OC_SERVER }}
           oc_token: ${{ secrets.oc_token }}
-          # DEV and TEST CSS realms use the test SiteMinder. A future PROD path must use logon7.
           parameters: >-
             -p NAME="${{ github.event.repository.name }}"
             -p ZONE="${{ inputs.target }}"

@@ -5,7 +5,6 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
-/** An authenticated FAM token whose principal is the {@link TapsUser} built from it. */
 public class TapsAuthentication extends AbstractAuthenticationToken {
 
   private final Jwt token;

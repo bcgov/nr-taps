@@ -23,8 +23,6 @@ type ApplicationScreen = {
   capability: Capability
 }
 
-// Initial shells verified against ECAS/GAS action, Tiles and JSP definitions. This list only
-// contains the pages available in the UI.
 export const applicationScreens: readonly ApplicationScreen[] = [
   {
     application: 'ecas',
@@ -38,8 +36,7 @@ export const applicationScreens: readonly ApplicationScreen[] = [
     id: 'ECAS88',
     title: 'Your profile',
     description: 'Your ECAS contact information and notification preferences.',
-    // The legacy Maintain Users screen also has an administrator mode. This shell is self-profile
-    // only; user administration will require its own backend permission and endpoints.
+    // Self-profile only; legacy user administration needs separate permissions.
     capability: Capability.EcasSubmissionView,
   },
   {

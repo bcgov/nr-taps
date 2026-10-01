@@ -30,7 +30,6 @@ public class CurrentUserController {
         user.forestClients());
   }
 
-  /** The browser uses capabilities only to shape navigation; every endpoint checks again. */
   public record CurrentUser(
       String userId,
       String displayName,

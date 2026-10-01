@@ -1,11 +1,9 @@
-// Basic theme until the TAPS product UI is defined.
 $primary: #234075;
 $secondary: #385a8a;
 $success: #234720;
 $warning: #81692c;
 $danger: #712024;
 
-// Import Bootstrap and Bootstrap Icons
 @import '../../node_modules/bootstrap/scss/bootstrap';
 $bootstrap-icons-font-src:
   url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2')

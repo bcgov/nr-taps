@@ -1,19 +1,16 @@
-# Listen only on high ports (3000, 3001, 3003).
 {
 	metrics
 	auto_https off
-	# Keep the admin/metrics endpoint available to the container without exposing it on the pod network.
 	admin 127.0.0.1:3003
-	# Apply browser security headers even when the WAF rejects a request.
+	# Apply security headers before WAF rejection.
 	order coraza_waf after header
 	log default {
-		# Coraza messages at any severity can embed request values and cannot be field-filtered.
-		# Use only its AKZ audit log for rule details; access logs retain paths/status/timing.
+		# WAF messages can contain credentials; use the sanitized audit log.
 		exclude http.handlers.waf
 		format filter {
 			wrap console
 			fields {
-				# Headers can contain custom credentials, referrers and OAuth redirect URLs.
+				# Queries and headers may contain SSO credentials.
 				request>uri regexp \?.*$ ""
 				request>headers delete
 				resp_headers delete
@@ -58,7 +55,6 @@
 		level {$LOG_LEVEL}
 	}
 
-	# Enable Coraza WAF
 	coraza_waf {
 		directives `
 		Include /etc/caddy/coraza.conf
@@ -75,17 +71,15 @@
 		}
 	}
 	rewrite @spa_router {http.matchers.file.relative}
-	# Proxy requests to API service
 	reverse_proxy /api* {$BACKEND_URL} {
 		header_up Host {http.reverse_proxy.upstream.hostport}
 		header_up X-Real-IP {remote_host}
-		# Avoid keeping requests pinned to a backend pod after its Service endpoint is removed.
+		# Do not retain connections to terminating backend pods.
 		transport http {
 			keepalive off
 		}
 	}
-	# Vite fingerprints production asset filenames, so assets can use a one-year immutable cache policy.
-	# Keep the SPA shell, runtime config, API responses, and unversioned public files uncached.
+	# Only Vite's fingerprinted assets may be cached.
 	@immutable_assets {
 		path /assets/*
 		file
@@ -101,7 +95,6 @@
 	}
 	header @dynamic_responses Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate"
 	import security_headers
-	# Caddy handles proxy failures and missing files through a separate error route.
 	handle_errors {
 		import security_headers
 		header Cache-Control "no-store"

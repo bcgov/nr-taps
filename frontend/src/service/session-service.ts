@@ -6,7 +6,6 @@ export type RoleScope = { type: 'DISTRICT' | 'REGION' | 'FOREST_CLIENT'; value: 
 
 export type RoleGrant = { role: string; scopes: RoleScope[] }
 
-/** What `/api/me` reports. The backend decides capabilities; the browser only displays them. */
 export type Session = {
   userId: string
   displayName: string
@@ -20,7 +19,6 @@ export type Session = {
 
 export class SessionUnavailableError extends Error {}
 
-/** Returns null when there is no usable sign-in, after removing a token the API rejected. */
 export async function fetchSession(): Promise<Session | null> {
   const oidcUser = await getOidcUser()
   if (!oidcUser) return null

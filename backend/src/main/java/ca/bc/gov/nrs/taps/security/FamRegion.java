@@ -3,13 +3,7 @@ package ca.bc.gov.nrs.taps.security;
 import java.util.Arrays;
 import java.util.Optional;
 
-/**
- * Proposed FAM region scope values and their corresponding region codes. GAS's archived
- * {@code ForestRegionCodes} includes these codes, and legacy record checks compare an appraisal's
- * administrative district or its {@code ORG_UNIT.ROLLUP_REGION_NO} with the user's org units.
- * Before querying live records, verify the name-to-code mapping against {@code ORG_UNIT}, resolve
- * district rollups from that table, and decide how retired RCO, RNI and RSI records should match.
- */
+/** Proposed rollup codes; verify against ORG_UNIT before using live records. */
 public enum FamRegion {
   CARIBOO("RCB"),
   KOOTENAY_BOUNDARY("RKB"),

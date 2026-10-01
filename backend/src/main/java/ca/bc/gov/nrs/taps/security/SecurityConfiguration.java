@@ -9,10 +9,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
-// Future business endpoints must check @PreAuthorize("hasAuthority('...')") and, before touching a
-// record, TapsUser.can(capability, recordScope). /api/me needs only a valid sign-in, so a user
-// without TAPS roles can still be told how to request access. Other paths are denied until their
-// route and record policies are implemented.
+// New business routes must enforce both capability and record scope.
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfiguration {

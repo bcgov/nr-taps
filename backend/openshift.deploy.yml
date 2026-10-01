@@ -63,7 +63,7 @@ objects:
               volumeMounts:
                 - name: tmp
                   mountPath: /tmp
-              # Allow Service endpoint removal before Spring starts graceful shutdown.
+              # Wait for Service endpoint removal before shutdown.
               lifecycle:
                 preStop:
                   exec:

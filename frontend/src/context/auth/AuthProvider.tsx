@@ -30,7 +30,7 @@ export default function AuthProvider({
   }, [])
 
   useEffect(() => {
-    // The callback must save the new OIDC user before /api/me reads or renews the stored session.
+    // Load /api/me only after the callback has stored the user.
     if (!deferSessionLoad) void reloadSession()
     return () => {
       requestRef.current += 1
@@ -48,7 +48,7 @@ export default function AuthProvider({
   }, [])
 
   const logout = useCallback(async () => {
-    // Revoke navigation immediately, including when a prior session request is still pending.
+    // Invalidate pending session requests before logout.
     requestRef.current += 1
     setState({ kind: 'signed-out' })
     try {
