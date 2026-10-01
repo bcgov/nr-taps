@@ -4,23 +4,31 @@ on:
   pull_request:
     types: [closed]
 
+# Cancel any deployment before removing the preview.
 concurrency:
-  # PR open and close use the same group, allowing only one at a time
-  group: ${{ github.event.number }}
+  group: pr-${{ github.event.number }}
   cancel-in-progress: true
 
 permissions: {}
 
 jobs:
   cleanup:
-    name: Cleanup and Image Promotion
-    uses: bcgov/quickstart-openshift-helpers/.github/workflows/.pr-close.yml@a11ad3d1b9288fb40757c4314a62eb86ff227931 # v1.2.1
-    permissions:
-      packages: write
-    secrets:
-      oc_namespace: ${{ secrets.oc_namespace }}
-      oc_token: ${{ secrets.oc_token }}
-    with:
-      cleanup: label
-      packages: backend frontend migrations
-
+    name: Remove DEV preview
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require the DEV namespace for preview cleanup
+        env:
+          OC_NAMESPACE: ${{ secrets.oc_namespace }}
+        run: |
+          if [[ "$OC_NAMESPACE" != *-dev ]]; then
+            echo '::error title=Wrong OpenShift namespace::Preview cleanup requires a DEV namespace ending in -dev.'
+            exit 1
+          fi
+      - uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
+        with:
+          oc_namespace: ${{ secrets.oc_namespace }}
+          oc_token: ${{ secrets.oc_token }}
+          oc_server: ${{ vars.OC_SERVER }}
+          commands: |
+            oc delete deployment,service,route,networkpolicy -l app=${{ github.event.repository.name }}-${{ github.event.number }} --ignore-not-found

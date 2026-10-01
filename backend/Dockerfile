@@ -1,35 +1,15 @@
-# Build
-FROM node:24.20.0-slim AS build
-
-# Copy, build static files; see .dockerignore for exclusions
+FROM maven:3.9.9-amazoncorretto-21-alpine AS build
 WORKDIR /app
-COPY . ./
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
-RUN npm run deploy
+COPY pom.xml .
+COPY src src
+RUN mvn -B -DskipTests package
 
-# Dependencies
-FROM node:24.20.0-slim AS dependencies
-
-# Copy, build static files; see .dockerignore for exclusions
+FROM eclipse-temurin:21.0.12_8-jdk-alpine-3.23
 WORKDIR /app
-COPY . ./
-ENV PRISMA_CLI_BINARY_TARGETS=debian-openssl-3.0.x
-RUN npm ci --ignore-scripts --no-update-notifier --omit=dev
-
-# Deploy using minimal Distroless image
-FROM gcr.io/distroless/nodejs24-debian12:nonroot
-ENV NODE_ENV=production
-
-# Copy app and dependencies
-WORKDIR /app
-COPY --from=dependencies /app/node_modules ./node_modules
-COPY --from=build /app/generated ./generated
-COPY --from=build /app/dist ./dist
-
-# Boilerplate, not used in OpenShift/Kubernetes
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=3s CMD curl -f http://localhost:3000/api
-
-# Nonroot user; Node 24 automatically respects cgroup memory limits
-USER nonroot
-CMD ["/app/dist/main"]
+COPY --from=build /app/target/taps-backend-0.0.1-SNAPSHOT.jar app.jar
+ENV HOME=/tmp JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=70.0"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=5 \
+    CMD wget -q -O /dev/null http://127.0.0.1:8080/actuator/health/liveness || exit 1
+EXPOSE 8080
+USER 1001
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

@@ -1,0 +1,22 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 60s
+
+taps:
+  auth:
+    issuer-uri: ${TAPS_OIDC_ISSUER_URI:}
+    client-id: ${TAPS_OIDC_CLIENT_ID:}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info

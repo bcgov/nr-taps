@@ -1,11 +1,9 @@
-// A custom theme for this app, see: https://getbootstrap.com/docs/5.3/customize/sass/#maps-and-loops
-$primary: #ffffff;
+$primary: #234075;
 $secondary: #385a8a;
 $success: #234720;
 $warning: #81692c;
 $danger: #712024;
 
-// Import Bootstrap and Bootstrap Icons
 @import '../../node_modules/bootstrap/scss/bootstrap';
 $bootstrap-icons-font-src:
   url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff2')
@@ -13,3 +11,12 @@ $bootstrap-icons-font-src:
   url('../../node_modules/bootstrap-icons/font/fonts/bootstrap-icons.woff')
     format('woff');
 @import '../../node_modules/bootstrap-icons/font/bootstrap-icons.scss';
+
+.taps-content {
+  max-width: 56rem;
+}
+
+.taps-page-list > li {
+  border-bottom: 1px solid #dee2e6;
+  padding: 1rem 0;
+}

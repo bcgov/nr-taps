@@ -1,18 +1,60 @@
-# Listen only on high ports (3000, 3001, 3003).
 {
 	metrics
 	auto_https off
-	admin 0.0.0.0:3003
-	order coraza_waf first
+	admin 127.0.0.1:3003
+	# Apply security headers before WAF rejection.
+	order coraza_waf after header
+	log default {
+		# WAF messages can contain credentials; use the sanitized audit log.
+		exclude http.handlers.waf
+		format filter {
+			wrap console
+			fields {
+				# Queries and headers may contain SSO credentials.
+				request>uri regexp \?.*$ ""
+				request>headers delete
+				resp_headers delete
+			}
+		}
+	}
+}
+(security_headers) {
+	header {
+		-Server
+		X-Frame-Options "SAMEORIGIN"
+		X-XSS-Protection "1;mode=block"
+		X-Content-Type-Options "nosniff"
+		Strict-Transport-Security "max-age=31536000"
+		Content-Security-Policy "default-src 'self' https://*.gov.bc.ca;
+			script-src 'self';
+			style-src 'self' https://fonts.googleapis.com https://use.fontawesome.com 'unsafe-inline';
+			font-src 'self' https://fonts.gstatic.com https://www2.gov.bc.ca;
+			img-src 'self' data: https://fonts.googleapis.com https://www.w3.org https://*.gov.bc.ca https://*.tile.openstreetmap.org;
+			frame-ancestors 'self';
+			form-action 'self';
+			block-all-mixed-content;
+			connect-src 'self' https://loginproxy.gov.bc.ca https://*.loginproxy.gov.bc.ca;"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "fullscreen=(self), camera=(), microphone=()"
+		Cross-Origin-Resource-Policy "same-origin"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Embedder-Policy "require-corp"
+	}
 }
 :3000 {
 	log {
 		output stdout
-		format console
+		format filter {
+			wrap console
+			fields {
+				request>uri regexp \?.*$ ""
+				request>headers delete
+				resp_headers delete
+			}
+		}
 		level {$LOG_LEVEL}
 	}
 
-	# Enable Coraza WAF
 	coraza_waf {
 		directives `
 		Include /etc/caddy/coraza.conf
@@ -23,37 +65,40 @@
 	encode zstd gzip
 	file_server
 	@spa_router {
-		not path /api*
+		not path /api* /assets/*
 		file {
 			try_files {path} /index.html
 		}
 	}
 	rewrite @spa_router {http.matchers.file.relative}
-	# Proxy requests to API service
 	reverse_proxy /api* {$BACKEND_URL} {
 		header_up Host {http.reverse_proxy.upstream.hostport}
 		header_up X-Real-IP {remote_host}
+		# Do not retain connections to terminating backend pods.
+		transport http {
+			keepalive off
+		}
 	}
-	header {
-		-Server
-		X-Frame-Options "SAMEORIGIN"
-		X-XSS-Protection "1;mode=block"
-		Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate"
-		X-Content-Type-Options "nosniff"
-		Strict-Transport-Security "max-age=31536000"
-		Content-Security-Policy "default-src 'self' https://*.gov.bc.ca;
-			script-src 'self' https://*.gov.bc.ca;
-			style-src 'self' https://fonts.googleapis.com https://use.fontawesome.com 'unsafe-inline'; 
-			font-src 'self' https://fonts.gstatic.com; 
-			img-src 'self' data: https://fonts.googleapis.com https://www.w3.org https://*.gov.bc.ca https://*.tile.openstreetmap.org;
-			frame-ancestors 'self'; 
-			form-action 'self';
-			block-all-mixed-content;
-			connect-src 'self' https://*.gov.bc.ca wss://*.gov.bc.ca;"
-		Referrer-Policy "same-origin"
-		Permissions-Policy "fullscreen=(self), camera=(), microphone=()"
-		Cross-Origin-Resource-Policy "same-origin"
-		Cross-Origin-Opener-Policy "same-origin"
+	# Only Vite's fingerprinted assets may be cached.
+	@immutable_assets {
+		path /assets/*
+		file
+	}
+	header @immutable_assets Cache-Control "public, max-age=31536000, immutable"
+	@missing_assets {
+		path /assets/*
+		not file
+	}
+	header @missing_assets Cache-Control "no-store"
+	@dynamic_responses {
+		not path /assets/*
+	}
+	header @dynamic_responses Cache-Control "no-store, no-cache, must-revalidate, proxy-revalidate"
+	import security_headers
+	handle_errors {
+		import security_headers
+		header Cache-Control "no-store"
+		respond "" {err.status_code}
 	}
 }
 :3001 {

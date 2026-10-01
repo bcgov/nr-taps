@@ -1,94 +1,56 @@
-import type { FC } from 'react'
-import type { AxiosResponse } from '~/axios'
-import type UserDto from '@/interfaces/UserDto'
-import { useEffect, useState } from 'react'
-import { Table, Modal, Button } from 'react-bootstrap'
-import apiService from '@/service/api-service'
+import { Button } from 'react-bootstrap'
+import { Link } from '@tanstack/react-router'
+import { applications, type ApplicationId } from '@/application-catalogue'
+import { useAuth } from '@/context/auth/AuthContext'
+import { describeGrant } from '@/context/auth/capabilities'
+import SessionStatus, { NoRoleNotice } from '@/components/SessionStatus'
 
-type ModalProps = {
-  show: boolean
-  onHide: () => void
-  user?: UserDto
-}
-
-const ModalComponent: FC<ModalProps> = ({ show, onHide, user }) => {
-  return (
-    <Modal
-      show={show}
-      onHide={onHide}
-      size="lg"
-      aria-labelledby="contained-modal-title-vcenter"
-      centered
-    >
-      <Modal.Header closeButton>
-        <Modal.Title id="contained-modal-title-vcenter">Row Details</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>{JSON.stringify(user)}</Modal.Body>
-      <Modal.Footer>
-        <Button onClick={onHide}>Close</Button>
-      </Modal.Footer>
-    </Modal>
-  )
-}
-
-const Dashboard: FC = () => {
-  const [data, setData] = useState<any>([])
-  const [selectedUser, setSelectedUser] = useState<UserDto | undefined>(undefined)
-
-  useEffect(() => {
-    apiService
-      .getAxiosInstance()
-      .get('/v1/users')
-      .then((response: AxiosResponse) => {
-        const users: UserDto[] = []
-        for (const user of response.data) {
-          const userDto = {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-          }
-          users.push(userDto)
-        }
-        setData(users)
-      })
-      .catch((error) => {
-        console.error(error)
-      })
-  }, [])
-
-  const handleClose = () => {
-    setSelectedUser(undefined)
-  }
+export default function Dashboard() {
+  const { state, can, logout } = useAuth()
 
   return (
-    <div className="min-vh-45 mh-45 mw-50 ml-4">
-      <Table striped bordered hover>
-        <thead>
-          <tr>
-            <th>Employee ID</th>
-            <th>Employee Name</th>
-            <th>Employee Email</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((user: UserDto) => (
-            <tr key={user.id}>
-              <td>{user.id}</td>
-              <td>{user.name}</td>
-              <td>{user.email}</td>
-              <td className="text-center">
-                <Button variant="secondary" size="sm" onClick={() => setSelectedUser(user)}>
-                  View Details
-                </Button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </Table>
-      <ModalComponent show={!!selectedUser} onHide={handleClose} user={selectedUser} />
-    </div>
+    <main className="container taps-content">
+      <h1>TAPS</h1>
+      <p>Timber appraisal services</p>
+      <SessionStatus />
+      {state.kind === 'signed-in' && (
+        <>
+          <p>
+            Signed in as {state.session.displayName}
+            {state.session.businessName && ` for ${state.session.businessName}`}.
+          </p>
+          {state.session.roles.length ? (
+            <>
+              <h2 className="h5">Your TAPS access</h2>
+              <ul>
+                {state.session.roles.map((grant) => {
+                  const label = describeGrant(grant)
+                  return <li key={label}>{label}</li>
+                })}
+              </ul>
+              <div className="row g-3 mb-4">
+                {(Object.keys(applications) as ApplicationId[])
+                  .filter((application) => applications[application].capabilities.some(can))
+                  .map((application) => (
+                    <div className="col-sm-6" key={application}>
+                      <div className="card h-100">
+                        <div className="card-body">
+                          <h2 className="h4">
+                            <Link to={`/${application}`}>{applications[application].title}</Link>
+                          </h2>
+                          <p className="mb-0">{applications[application].description}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </>
+          ) : (
+            <NoRoleNotice />
+          )}
+          <Button onClick={() => void logout()}>Sign out</Button>
+        </>
+      )}
+    </main>
   )
 }
-
-export default Dashboard

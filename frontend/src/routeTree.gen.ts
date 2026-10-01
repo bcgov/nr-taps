@@ -10,33 +10,102 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthCallbackRouteImport } from './routes/authCallback'
+import { Route as EcasIndexRouteImport } from './routes/ecas.index'
+import { Route as EcasScreenIdRouteImport } from './routes/ecas.$screenId'
+import { Route as GasIndexRouteImport } from './routes/gas.index'
+import { Route as GasScreenIdRouteImport } from './routes/gas.$screenId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/authCallback',
+  path: '/authCallback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EcasIndexRoute = EcasIndexRouteImport.update({
+  id: '/ecas/',
+  path: '/ecas/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EcasScreenIdRoute = EcasScreenIdRouteImport.update({
+  id: '/ecas/$screenId',
+  path: '/ecas/$screenId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GasIndexRoute = GasIndexRouteImport.update({
+  id: '/gas/',
+  path: '/gas/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GasScreenIdRoute = GasScreenIdRouteImport.update({
+  id: '/gas/$screenId',
+  path: '/gas/$screenId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/authCallback': typeof AuthCallbackRoute
+  '/ecas/$screenId': typeof EcasScreenIdRoute
+  '/gas/$screenId': typeof GasScreenIdRoute
+  '/ecas/': typeof EcasIndexRoute
+  '/gas/': typeof GasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/authCallback': typeof AuthCallbackRoute
+  '/ecas/$screenId': typeof EcasScreenIdRoute
+  '/gas/$screenId': typeof GasScreenIdRoute
+  '/ecas': typeof EcasIndexRoute
+  '/gas': typeof GasIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/authCallback': typeof AuthCallbackRoute
+  '/ecas/$screenId': typeof EcasScreenIdRoute
+  '/gas/$screenId': typeof GasScreenIdRoute
+  '/ecas/': typeof EcasIndexRoute
+  '/gas/': typeof GasIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/authCallback'
+    | '/ecas/$screenId'
+    | '/gas/$screenId'
+    | '/ecas/'
+    | '/gas/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/authCallback'
+    | '/ecas/$screenId'
+    | '/gas/$screenId'
+    | '/ecas'
+    | '/gas'
+  id:
+    | '__root__'
+    | '/'
+    | '/authCallback'
+    | '/ecas/$screenId'
+    | '/gas/$screenId'
+    | '/ecas/'
+    | '/gas/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  EcasScreenIdRoute: typeof EcasScreenIdRoute
+  GasScreenIdRoute: typeof GasScreenIdRoute
+  EcasIndexRoute: typeof EcasIndexRoute
+  GasIndexRoute: typeof GasIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +117,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/authCallback': {
+      id: '/authCallback'
+      path: '/authCallback'
+      fullPath: '/authCallback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ecas/': {
+      id: '/ecas/'
+      path: '/ecas'
+      fullPath: '/ecas/'
+      preLoaderRoute: typeof EcasIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ecas/$screenId': {
+      id: '/ecas/$screenId'
+      path: '/ecas/$screenId'
+      fullPath: '/ecas/$screenId'
+      preLoaderRoute: typeof EcasScreenIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gas/': {
+      id: '/gas/'
+      path: '/gas'
+      fullPath: '/gas/'
+      preLoaderRoute: typeof GasIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gas/$screenId': {
+      id: '/gas/$screenId'
+      path: '/gas/$screenId'
+      fullPath: '/gas/$screenId'
+      preLoaderRoute: typeof GasScreenIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  EcasScreenIdRoute: EcasScreenIdRoute,
+  GasScreenIdRoute: GasScreenIdRoute,
+  EcasIndexRoute: EcasIndexRoute,
+  GasIndexRoute: GasIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

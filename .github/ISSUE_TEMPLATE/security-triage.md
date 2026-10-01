@@ -1,25 +1,30 @@
 ---
 name: Security Vulnerability Triage
 about: Track and triage dependency or container vulnerability remediation.
-title: '[SECURITY] CVE-XXX: Package Name - Severity/SLA'
+title: "[SECURITY] CVE-XXX: Package Name - Severity"
 labels: security
-assignees: ''
+assignees: ""
 ---
 
-## Vulnerability Details
-- **CVE ID**: 
-- **Package**: 
-- **Vulnerability Link**: 
-- **CVSS Score**: 
-- **EPSS Score**: 
+Use this template for published advisories and public-safe remediation details. Follow the [security reporting policy](https://github.com/bcgov/nr-taps/security/policy) for undisclosed vulnerabilities. Do not include credentials, private logs or personal data.
 
-## SLA Triage
-- [ ] Critical (24h)
-- [ ] High (1w)
-- [ ] Medium (2w)
-- [ ] Low (Next scheduled release)
+## Vulnerability Details
+
+- **CVE ID**:
+- **Package**:
+- **Vulnerability Link**:
+- **CVSS Score**:
+- **EPSS Score**:
+
+## Severity
+
+- [ ] Critical
+- [ ] High
+- [ ] Medium
+- [ ] Low
 
 ## Remediation Plan
+
 - [ ] Upgrade dependency version
 - [ ] Apply code fix / workaround
 - [ ] Document exception
