@@ -37,7 +37,7 @@ jobs:
         env:
           DEPLOY_ENV: ${{ inputs.environment }}
           DEPLOY_TARGET: ${{ inputs.target }}
-          OC_SERVER: ${{ vars.oc_server }}
+          OC_SERVER: ${{ vars.OC_SERVER }}
           OC_APPS_DOMAIN: ${{ vars.OC_APPS_DOMAIN }}
           OC_NAMESPACE: ${{ secrets.oc_namespace }}
           OC_TOKEN: ${{ secrets.oc_token }}
@@ -85,7 +85,7 @@ jobs:
           lite_mode: false
           overwrite: true
           oc_namespace: ${{ secrets.oc_namespace }}
-          oc_server: ${{ vars.oc_server }}
+          oc_server: ${{ vars.OC_SERVER }}
           oc_token: ${{ secrets.oc_token }}
           parameters: >-
             -p NAME="${{ github.event.repository.name }}"
@@ -111,7 +111,7 @@ jobs:
           lite_mode: false
           overwrite: true
           oc_namespace: ${{ secrets.oc_namespace }}
-          oc_server: ${{ vars.oc_server }}
+          oc_server: ${{ vars.OC_SERVER }}
           oc_token: ${{ secrets.oc_token }}
           # DEV and TEST CSS realms use the test SiteMinder. A future PROD path must use logon7.
           parameters: >-
@@ -126,7 +126,7 @@ jobs:
           file: frontend/openshift.route.yml
           overwrite: true
           oc_namespace: ${{ secrets.oc_namespace }}
-          oc_server: ${{ vars.oc_server }}
+          oc_server: ${{ vars.OC_SERVER }}
           oc_token: ${{ secrets.oc_token }}
           parameters: >-
             -p NAME="${{ github.event.repository.name }}"
