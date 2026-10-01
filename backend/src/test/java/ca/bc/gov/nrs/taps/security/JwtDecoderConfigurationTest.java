@@ -62,6 +62,7 @@ class JwtDecoderConfigurationTest {
         Jwt token =
             Jwt.withTokenValue("token")
                 .header("alg", "RS256")
+                .expiresAt(Instant.now().plusSeconds(300))
                 .claim("azp", "taps-client")
                 .claim("typ", "Bearer")
                 .claim("identity_provider", "azureidir")
@@ -76,6 +77,21 @@ class JwtDecoderConfigurationTest {
             .isTrue();
       }
     }
+  }
+
+  @Test
+  void anAccessTokenMustHaveAnExpiration() {
+    Jwt token =
+        Jwt.withTokenValue("token")
+            .header("alg", "RS256")
+            .subject("user-123")
+            .claim("azp", "taps-client")
+            .claim("typ", "Bearer")
+            .claim("identity_provider", "azureidir")
+            .build();
+
+    assertThat(JwtDecoderConfiguration.clientTokenValidator("taps-client").validate(token).hasErrors())
+        .isTrue();
   }
 
   private Jwt token(String clientId, String type, String identityProvider) {

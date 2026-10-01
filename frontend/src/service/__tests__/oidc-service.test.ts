@@ -5,6 +5,7 @@ const oidc = vi.hoisted(() => ({
   getUser: vi.fn<() => Promise<User | null>>(),
   signinSilent: vi.fn<() => Promise<User | null>>(),
   removeUser: vi.fn<() => Promise<void>>(),
+  signinRedirect: vi.fn<() => Promise<void>>(),
   signinRedirectCallback: vi.fn<() => Promise<User>>(),
   ErrorResponse: class extends Error {
     error: string
@@ -21,6 +22,7 @@ vi.mock('oidc-client-ts', () => ({
     getUser = oidc.getUser
     signinSilent = oidc.signinSilent
     removeUser = oidc.removeUser
+    signinRedirect = oidc.signinRedirect
     signinRedirectCallback = oidc.signinRedirectCallback
   },
   WebStorageStateStore: class {},
@@ -162,4 +164,102 @@ test('ends only the Keycloak session when SiteMinder logoff is not configured', 
   )
   expect(keycloak.searchParams.get('client_id')).toBe('taps-test')
   expect(oidc.removeUser).toHaveBeenCalled()
+})
+
+test('discards credentials written by a refresh that finishes after logout', async () => {
+  let storedUser: User | null = expiringUser
+  const refresh = Promise.withResolvers<User | null>()
+  oidc.getUser.mockImplementation(async () => storedUser)
+  oidc.removeUser.mockImplementation(async () => {
+    storedUser = null
+  })
+  // oidc-client-ts writes the refreshed user before resolving signinSilent.
+  oidc.signinSilent.mockImplementation(async () => {
+    storedUser = await refresh.promise
+    return storedUser
+  })
+  const { getOidcUser, logout } = await import('@/service/oidc-service')
+  const pending = getOidcUser()
+  await vi.waitFor(() => expect(oidc.signinSilent).toHaveBeenCalledOnce())
+
+  await logout(vi.fn())
+  refresh.resolve(renewedUser)
+
+  await expect(pending).resolves.toBeNull()
+  expect(storedUser).toBeNull()
+  await expect(getOidcUser()).resolves.toBeNull()
+})
+
+test('does not renew an old storage read after logout', async () => {
+  const storage = Promise.withResolvers<User | null>()
+  oidc.getUser.mockReturnValueOnce(storage.promise).mockResolvedValueOnce(expiringUser)
+  const { getOidcUser, logout } = await import('@/service/oidc-service')
+  const pending = getOidcUser()
+
+  await logout(vi.fn())
+  storage.resolve(expiringUser)
+
+  await expect(pending).resolves.toBeNull()
+  expect(oidc.signinSilent).not.toHaveBeenCalled()
+})
+
+test('discards a callback that finishes after local session clearing', async () => {
+  let storedUser: User | null = null
+  const callback = Promise.withResolvers<User>()
+  oidc.signinRedirectCallback.mockImplementation(async () => {
+    storedUser = await callback.promise
+    return storedUser
+  })
+  oidc.removeUser.mockImplementation(async () => {
+    storedUser = null
+  })
+  const { completeLogin, clearLogin } = await import('@/service/oidc-service')
+  const pending = completeLogin()
+  const rejected = expect(pending).rejects.toThrow('session ended')
+
+  await clearLogin()
+  callback.resolve(renewedUser)
+
+  await rejected
+  expect(storedUser).toBeNull()
+})
+
+test('clears a session that expires without a refresh token', async () => {
+  oidc.getUser.mockResolvedValue({ ...expiringUser, refresh_token: undefined } as User)
+  const { getOidcUser } = await import('@/service/oidc-service')
+
+  await expect(getOidcUser()).resolves.toBeNull()
+  expect(oidc.removeUser).toHaveBeenCalledOnce()
+  expect(oidc.signinSilent).not.toHaveBeenCalled()
+})
+
+test('shares sign out across simultaneous callers', async () => {
+  const navigate = vi.fn<(url: string) => void>()
+  const { logout } = await import('@/service/oidc-service')
+
+  await Promise.all([logout(navigate), logout(navigate)])
+
+  expect(oidc.removeUser).toHaveBeenCalledOnce()
+  expect(navigate).toHaveBeenCalledOnce()
+})
+
+test('waits for an old renewal to be discarded before starting another login', async () => {
+  const refresh = Promise.withResolvers<User | null>()
+  oidc.signinSilent.mockReturnValue(refresh.promise)
+  const { getOidcUser, logout, startLogin } = await import('@/service/oidc-service')
+  const pending = getOidcUser()
+  await vi.waitFor(() => expect(oidc.signinSilent).toHaveBeenCalledOnce())
+  await logout(vi.fn())
+
+  const login = startLogin('business-bceid')
+  expect(oidc.signinRedirect).not.toHaveBeenCalled()
+  refresh.resolve(renewedUser)
+  await Promise.all([pending, login])
+
+  expect(oidc.removeUser.mock.invocationCallOrder.at(-1)).toBeLessThan(
+    oidc.signinRedirect.mock.invocationCallOrder[0],
+  )
+  expect(oidc.signinRedirect).toHaveBeenCalledWith({
+    extraQueryParams: { kc_idp_hint: 'bceidbusiness' },
+  })
 })

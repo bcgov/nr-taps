@@ -51,7 +51,7 @@ jobs:
     if: needs.deploy.result == 'success'
     uses: ./.github/workflows/reusable-tests.yml
     with:
-      target: ${{ github.event.number }}
+      target: ${{ needs.deploy.outputs.route_slot }}
 
   results:
     name: PR Results

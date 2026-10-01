@@ -116,6 +116,24 @@ class CurrentUserControllerTest {
         .andExpect(status().isForbidden());
   }
 
+  @Test
+  void aTokenWithoutExpirationCannotCreateAnApplicationSession() throws Exception {
+    when(jwtDecoder.decode("token"))
+        .thenReturn(
+            Jwt.withTokenValue("token")
+                .header("alg", "RS256")
+                .subject("user-123")
+                .claim("azp", "taps")
+                .claim("typ", "Bearer")
+                .claim("identity_provider", "azureidir")
+                .claim("idir_username", "jsmith")
+                .claim("client_roles", List.of("TAPS_ADMIN"))
+                .build());
+
+    mvc.perform(get("/api/me").header("Authorization", "Bearer token"))
+        .andExpect(status().isUnauthorized());
+  }
+
   private void signIn(Map<String, Object> claims) {
     Instant now = Instant.now();
     when(jwtDecoder.decode("token"))

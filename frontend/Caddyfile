@@ -29,14 +29,14 @@
 		X-Content-Type-Options "nosniff"
 		Strict-Transport-Security "max-age=31536000"
 		Content-Security-Policy "default-src 'self' https://*.gov.bc.ca;
-			script-src 'self' https://*.gov.bc.ca;
+			script-src 'self';
 			style-src 'self' https://fonts.googleapis.com https://use.fontawesome.com 'unsafe-inline';
 			font-src 'self' https://fonts.gstatic.com https://www2.gov.bc.ca;
 			img-src 'self' data: https://fonts.googleapis.com https://www.w3.org https://*.gov.bc.ca https://*.tile.openstreetmap.org;
 			frame-ancestors 'self';
 			form-action 'self';
 			block-all-mixed-content;
-			connect-src 'self' https://*.gov.bc.ca wss://*.gov.bc.ca;"
+			connect-src 'self' https://loginproxy.gov.bc.ca https://*.loginproxy.gov.bc.ca;"
 		Referrer-Policy "no-referrer"
 		Permissions-Policy "fullscreen=(self), camera=(), microphone=()"
 		Cross-Origin-Resource-Policy "same-origin"
@@ -79,6 +79,10 @@
 	reverse_proxy /api* {$BACKEND_URL} {
 		header_up Host {http.reverse_proxy.upstream.hostport}
 		header_up X-Real-IP {remote_host}
+		# Avoid keeping requests pinned to a backend pod after its Service endpoint is removed.
+		transport http {
+			keepalive off
+		}
 	}
 	# Vite fingerprints production asset filenames, so assets can use a one-year immutable cache policy.
 	# Keep the SPA shell, runtime config, API responses, and unversioned public files uncached.

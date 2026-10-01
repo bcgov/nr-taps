@@ -52,9 +52,38 @@ jobs:
           npm run test:unit -- --run
           npm run build
 
+  trivy:
+    name: Repository Security Scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Scan dependencies, secrets and configuration
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scanners: vuln,secret,misconfig
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          trivyignores: .github/.trivyignore
+          skip-dirs: '**/node_modules,**/coverage,**/dist,.git'
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: '0'
+      - name: Publish findings to GitHub Security
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+
   results:
     name: Analysis Results
-    needs: [backend, frontend]
+    needs: [backend, frontend, trivy]
     if: always()
     runs-on: ubuntu-slim
     steps:

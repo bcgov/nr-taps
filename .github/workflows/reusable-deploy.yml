@@ -17,6 +17,10 @@ on:
         required: true
       oc_token:
         required: true
+    outputs:
+      route_slot:
+        description: Public route slot for smoke checks and registered SSO callbacks
+        value: ${{ jobs.validate.outputs.route_slot }}
 
 permissions: {}
 
@@ -25,8 +29,11 @@ jobs:
     name: Check deployment settings
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-24.04
+    outputs:
+      route_slot: ${{ steps.settings.outputs.route_slot }}
     steps:
       - name: Require OpenShift and FAM configuration
+        id: settings
         env:
           DEPLOY_ENV: ${{ inputs.environment }}
           DEPLOY_TARGET: ${{ inputs.target }}
@@ -53,6 +60,13 @@ jobs:
             echo "::error title=Wrong OpenShift namespace::oc_namespace must be the ${DEPLOY_ENV} namespace, ending in -${DEPLOY_ENV}."
             exit 1
           fi
+          # Keep DEV hosts within the registered 0-49 CSS redirect range.
+          if [[ "$DEPLOY_ENV" == dev ]]; then
+            route_slot=$((10#$DEPLOY_TARGET % 50))
+          else
+            route_slot=test
+          fi
+          echo "route_slot=$route_slot" >> "$GITHUB_OUTPUT"
 
   backend:
     name: Deploy backend
@@ -82,7 +96,7 @@ jobs:
 
   frontend:
     name: Deploy frontend and route
-    needs: [backend]
+    needs: [validate, backend]
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-24.04
     permissions:
@@ -117,4 +131,5 @@ jobs:
           parameters: >-
             -p NAME="${{ github.event.repository.name }}"
             -p ZONE="${{ inputs.target }}"
+            -p SLOT="${{ needs.validate.outputs.route_slot }}"
             -p DOMAIN="${{ vars.OC_APPS_DOMAIN }}"

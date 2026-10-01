@@ -42,7 +42,8 @@ public class JwtDecoderConfiguration {
   static OAuth2TokenValidator<Jwt> clientTokenValidator(String clientId) {
     return jwt -> {
       // Read raw values: getClaimAsString can coerce malformed claims or throw for object values.
-      if (clientId.equals(jwt.getClaim("azp"))
+      if (jwt.getExpiresAt() != null
+          && clientId.equals(jwt.getClaim("azp"))
           && "Bearer".equals(jwt.getClaim("typ"))
           && jwt.getClaim("identity_provider") instanceof String provider
           && IdentityProvider.fromClaim(provider).isPresent()) {

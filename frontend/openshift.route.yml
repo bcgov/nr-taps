@@ -5,6 +5,9 @@ parameters:
     required: true
   - name: ZONE
     required: true
+  - name: SLOT
+    description: DEV preview slot 0-49, or test
+    required: true
   - name: DOMAIN
     description: OpenShift apps domain, without scheme
     required: true
@@ -12,11 +15,11 @@ objects:
   - apiVersion: route.openshift.io/v1
     kind: Route
     metadata:
-      name: ${NAME}-${ZONE}-frontend
+      name: ${NAME}-${SLOT}-frontend
       labels:
         app: ${NAME}-${ZONE}
     spec:
-      host: ${NAME}-${ZONE}.${DOMAIN}
+      host: ${NAME}-${SLOT}.${DOMAIN}
       to:
         kind: Service
         name: ${NAME}-${ZONE}-frontend

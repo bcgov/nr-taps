@@ -30,6 +30,7 @@ objects:
             deployment: ${NAME}-${ZONE}-backend
         spec:
           automountServiceAccountToken: false
+          terminationGracePeriodSeconds: 90
           containers:
             - name: backend
               image: ghcr.io/bcgov/${NAME}/backend:${IMAGE_TAG}
@@ -38,6 +39,8 @@ objects:
                 - name: http
                   containerPort: 8080
               env:
+                - name: TZ
+                  value: America/Vancouver
                 - name: TAPS_OIDC_ISSUER_URI
                   value: ${OIDC_ISSUER_URI}
                 - name: TAPS_OIDC_CLIENT_ID
@@ -60,6 +63,11 @@ objects:
               volumeMounts:
                 - name: tmp
                   mountPath: /tmp
+              # Allow Service endpoint removal before Spring starts graceful shutdown.
+              lifecycle:
+                preStop:
+                  exec:
+                    command: [sleep, '10']
               startupProbe:
                 httpGet:
                   path: /actuator/health/liveness
