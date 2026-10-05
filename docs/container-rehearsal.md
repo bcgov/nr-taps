@@ -14,7 +14,7 @@ The script prints its output directory (logs, HTTP responses, result). Each run 
 
 ## What it checks
 
-- Both images build.
+- Both images build. The backend build fails if the runtime JDK lacks current B.C. time zone rules.
 - Both servers and the frontend seed step run as UID `1000740000`, GID `0`, with capabilities dropped and no privilege escalation.
 - Read-only root filesystems. The backend gets a writable `/tmp`; the frontend gets `/srv`, `/tmp/caddy` and `/tmp/coraza`, as in its OpenShift template.
 - Synthetic OIDC settings reach `config.js`. The issuer is on the reserved `.invalid` domain, so no real provider is called.
@@ -27,4 +27,4 @@ A small root helper makes the test volume group-writable, like Kubernetes `fsGro
 
 The setup covers arbitrary-UID Caddy/Coraza, a separate health port, selective caching, no backend keepalive and Spring graceful shutdown.
 
-Oracle stays off here. Real logins, database grants, SCC, network policies, TLS and rolling updates need DEV/TEST.
+Oracle stays off here (no `oracle` profile). Real logins, database grants, SCC, network policies, TLS and rolling updates need DEV/TEST.

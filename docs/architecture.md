@@ -22,18 +22,18 @@ flowchart LR
 - The browser is a public OIDC client, so there is no secret in the SPA.
 - FAM writes role assignments into Keycloak. The API authorizes from the validated token and doesn't call FAM per request.
 - The frontend writes `/config.js` from environment values at startup, so one image runs in DEV and TEST.
-- Oracle is off by default. When it's on, the backend won't start unless it can connect.
+- Oracle reads run only with the backend's `oracle` Spring profile, which is off by default. With it on, the backend won't start unless it can connect.
 
-| Component      | Built                                                                 | Not yet                                    |
-| -------------- | --------------------------------------------------------------------- | ------------------------------------------ |
-| Frontend       | Session, login, Carbon shell, ECAS/GAS read pages, synthetic preview  | Editing forms, workflow, inactivity warning |
-| Caddy / Coraza | Static assets, API proxy, CSP and security headers, WAF, health port  | Testing in DEV/TEST                        |
-| Backend        | JWT validation, grants, scoped read endpoints, `/api/me`, health probes | Write endpoints, workflow, transactions  |
-| FAM / SSO      | Role and scope model                                                  | TAPS clients and role assignments          |
-| Oracle         | Read adapters, disposable-Oracle tests                                | Proxy access, real-data checks             |
-| OpenShift / CI | Image builds, DEV/TEST templates, smoke tests, Trivy                  | Namespaces, credentials, sizing            |
+| Component      | Built                                                                   | Not yet                                     |
+| -------------- | ----------------------------------------------------------------------- | ------------------------------------------- |
+| Frontend       | Session, login, Carbon shell, ECAS/GAS read pages, synthetic preview    | Editing forms, workflow, inactivity warning |
+| Caddy / Coraza | Static assets, API proxy, CSP and security headers, WAF, health port    | Testing in DEV/TEST                         |
+| Backend        | JWT validation, grants, scoped read endpoints, `/api/me`, health probes | Write endpoints, workflow, transactions     |
+| FAM / SSO      | Role and scope model                                                    | TAPS clients and role assignments           |
+| Oracle         | Read adapters, disposable-Oracle tests                                  | Proxy access, real-data checks              |
+| OpenShift / CI | Image builds, CI tests, DEV/TEST templates, smoke tests, Trivy, ZAP     | Namespaces, credentials, sizing             |
 
-There is no service-client API, email, report engine, file scanner or scheduled job yet.
+There is no service-client API, email, report engine, file scanner or scheduled batch job yet.
 
 ## Frontend
 
@@ -47,6 +47,8 @@ The UI uses Carbon for the header, navigation, tables and side drawer. TanStack 
 | Pictograms          | `@carbon/pictograms-react`              |
 
 Use Carbon icons and pictograms unless Carbon has nothing suitable. Keep the official BC Gov branding.
+
+After a redeploy, an open tab can ask for code chunks that no longer exist. The app then reloads to pick up the new build, at most once a minute.
 
 ## Authentication
 
@@ -70,7 +72,7 @@ sequenceDiagram
 
 Only IDIR MFA and Business BCeID are supported. [Authentication and authorization](access-and-identity.md) covers token checks and grant formats.
 
-Logout clears local credentials, then chains SiteMinder logoff to Keycloak end-session. Only one token refresh runs at a time, and a late refresh or callback can't restore a session after logout. `invalid_grant`, or a session that can't renew, signs the user out. Network errors keep credentials so the user can retry. The inactivity warning is not built yet.
+Logout clears local credentials, then chains SiteMinder logoff to Keycloak end-session. Only one token refresh runs at a time, and a late refresh or callback can't restore a session after logout. A 401 from the API, `invalid_grant`, or a token that can't be renewed signs the user out straight away. Network errors keep credentials so the user can retry. Sign-in returns the user to the page they started from; only same-origin paths are accepted. The inactivity warning is not built yet.
 
 ## Authorization
 
@@ -91,7 +93,7 @@ New endpoints need their own authorization rules and tests before they're enable
 
 ## Oracle access
 
-Current endpoints run SELECTs and the inbox's existing client-name function. No legacy write package is called. The readers only register when Oracle is on, and code-list HTTP routes aren't exposed yet. Calculation, write, workflow and bulk-run procedures stay out until their side effects are reviewed.
+Current endpoints run SELECTs and the inbox's existing client-name function. No legacy write package is called. The readers and their routes only register with the `oracle` profile. Calculation, write, workflow and bulk-run procedures stay out until their side effects are reviewed.
 
 - [Oracle read foundation](oracle-read-foundation.md): legacy query rules and mappings.
 - [Oracle read runtime](oracle-read-runtime.md): settings, grants and health.
@@ -102,21 +104,24 @@ Port legacy screens with their ECAS/GAS business behavior against the same table
 
 ```mermaid
 flowchart LR
-    PR["Pull request"] --> Quality["Analysis<br/>tests + Trivy"]
+    PR["Pull request"] --> Quality["Analysis<br/>tests, coverage, Trivy"]
     PR --> Build["Build images<br/>PR and SHA tags"]
+    PR --> Tests["Backend and<br/>frontend tests"]
     Build --> DEV["DEV preview<br/>deploy + smoke"]
+    Tests --> DEV
     DEV --> Review["Review"]
     Quality --> Review
     Review --> Merge["Merge to main"]
     Merge --> TEST["TEST<br/>PR images, smoke, tag test"]
-    Close["PR closed"] --> Cleanup["Remove DEV preview"]
+    Close["PR closed"] --> Cleanup["Remove its preview<br/>and closed-PR leftovers"]
+    Weekly["Weekly schedule"] --> Sweep["Remove week-old previews<br/>ZAP scan of TEST"]
     TEST -.-> PROD["PROD disabled"]
 ```
 
-DEV previews use route slot `PR number modulo 50`, which caps SSO callbacks at 50 hosts. PRs in the same slot share a hostname, and the latest deploy owns the Route. Names and labels keep the real PR number, so cleanup never deletes a Route now owned by a newer PR. Branch protection is set in the repository settings.
+DEV previews use route slot `PR number modulo 50`, which caps SSO callbacks at 50 hosts. PRs in the same slot share a hostname, and the latest deploy owns the Route. The Route is named by slot (`nr-taps-<slot>-frontend`), but Deployments, Services and labels use the real PR number (`nr-taps-backend-<PR>`, `nr-taps-frontend-<PR>`), so cleanup never deletes a Route now owned by a newer PR. Branch protection is set in the repository settings.
 
-Pods don't mount service-account tokens, drop all capabilities, block privilege escalation and use a read-only root filesystem with writable temp volumes. Network policies allow router-to-frontend and same-preview frontend-to-backend traffic. Replicas and resources start small.
+Pods don't mount service-account tokens, drop all capabilities, block privilege escalation and use a read-only root filesystem with writable temp volumes. Network policies allow router-to-frontend and same-preview frontend-to-backend traffic. The frontend runs 2 replicas and the backend scales from 1 to 3 on CPU. The backend image runs an exploded jar with a 60% max heap and exits on out-of-memory so the pod restarts.
 
 Spring's 60-second graceful shutdown plus a 10-second preStop fits in the 90-second termination budget. Caddy turns off upstream connection pooling so requests don't stick to a draining pod. Liveness and readiness use Spring's app state, so a shared database outage doesn't take every pod out. `/actuator/health` includes the database when Oracle is on.
 
-See [deployment configuration](deployment-configuration.md) for SSO and GitHub settings.
+See [deployment configuration](deployment-configuration.md) for SSO, GitHub settings and OpenShift names.

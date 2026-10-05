@@ -1,6 +1,6 @@
 # Local authenticated read rehearsal
 
-Runs the production frontend and backend images with a disposable Oracle Free database and a small test OIDC issuer. The backend uses the real Spring Security JWT decoder. Needs Docker, Bash, Python 3 and enough memory for Oracle plus the app.
+Runs the production frontend and backend images with a disposable Oracle Free database and a small test OIDC issuer. The backend uses the real Spring Security JWT decoder and the `oracle` profile, with `SPRING_DATASOURCE_URL` pointing at the fixture database over plain TCP. Needs Docker, Bash, Python 3 and enough memory for Oracle plus the app.
 
 The test issuer and fixtures are local-only and aren't in any app image or OpenShift template. Keys and passwords are generated per run. Never use real credentials or a shared database with it.
 
@@ -38,7 +38,7 @@ Click the normal sign-in button, pick a synthetic user, and select **Sign in to 
 | Omineca appraiser | Omineca records; opening Cariboo worksheet `101` returns 404. |
 | Licensee viewer | ECAS client-scoped access; no GAS worksheets. |
 | Signed in without a TAPS role | Access-request view only. |
-| Expired access token | Backend rejects it and the frontend clears the session. |
+| Expired access token | Backend rejects it and the frontend signs the user out straight away. |
 
 Suggested checks:
 

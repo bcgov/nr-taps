@@ -10,6 +10,8 @@ Tokens and OIDC state live in browser session storage. Logout clears them and ch
 
 The API checks the token signature, issuer, lifetime, expiry, client (`azp`), type (`typ`) and identity provider. Roles come from CSS `client_roles`, or from the client's Keycloak `resource_access` entry when `client_roles` is missing. Role-to-capability mappings live in [TapsRole.java](../backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsRole.java).
 
+Signing keys come from the issuer's JWKS endpoint with 10-second connect and 15-second read timeouts, one retry and a cache that refreshes ahead of expiry, so a slow key fetch doesn't fail a request.
+
 These grant nothing: malformed claims, unknown roles, wrong providers, FAM management roles and `FAM:` metadata roles. Role names, provider names and scope values are case sensitive.
 
 ## Scope format
@@ -29,7 +31,7 @@ ECAS draft and scenario visibility is a separate status rule, applied per grant 
 
 ## Enforcement
 
-`GET /api/me` returns the user's identity, grants, capabilities, forest clients and `readApiEnabled`. A user with no TAPS role gets an empty access list. Health probes are public. The read routes below need `TAPS_ORACLE_ENABLED=true` and the listed capability. All other paths are denied.
+`GET /api/me` returns the user's identity, grants, capabilities, forest clients and `readApiEnabled`. A user with no TAPS role gets an empty access list. Health probes are public. The read routes below need the backend's `oracle` profile and the listed capability. All other paths are denied.
 
 | Routes                                     | Capability             |
 | ------------------------------------------ | ---------------------- |

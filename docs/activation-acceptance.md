@@ -12,7 +12,7 @@ For each check, record the commit, image tag, environment, result and any follow
 - [ ] The database team approves the proxy account, service, TLS trust, owners/synonyms and SELECT/EXECUTE grants. The read screens run no DML or DDL, even though the account will later get write grants.
 - [ ] Set `database_host`, `database_service_name`, `database_user`, `database_password` and `keystore_secret` (see [deployment configuration](deployment-configuration.md)). Don't print them.
 
-First deploy with `TAPS_ORACLE_ENABLED=false`. Check that anonymous `/api/me` returns 401, a signed-in user gets `readApiEnabled: false`, and the UI says reads are unavailable.
+First deploy with `TAPS_ORACLE_ENABLED=false`, so the backend runs without the `oracle` profile. Check that anonymous `/api/me` returns 401, a signed-in user gets `readApiEnabled: false`, and the UI says reads are unavailable.
 
 ## 2. Check the schema
 
@@ -25,7 +25,7 @@ Never load the local fixture DDL into a shared database.
 
 ## 3. Turn on DEV reads and compare with legacy
 
-Set `TAPS_ORACLE_ENABLED=true` and deploy. The backend must connect before it starts. Then compare TAPS with the legacy apps on real data:
+Set `TAPS_ORACLE_ENABLED=true` and deploy. The workflow starts the backend with the `oracle` Spring profile, and the backend must connect before it starts. Then compare TAPS with the legacy apps on real data:
 
 | Area | Check |
 | --- | --- |
@@ -64,12 +64,12 @@ Read-only status checks:
 
 ```sh
 : "${taps_namespace:?Set the approved DEV or TEST namespace}"
-: "${taps_resource:?Set the deployment prefix, such as nr-taps-test}"
-oc -n "$taps_namespace" get deployment "$taps_resource-backend" "$taps_resource-frontend"
-oc -n "$taps_namespace" get deployment "$taps_resource-backend" -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
-oc -n "$taps_namespace" get deployment "$taps_resource-frontend" -o jsonpath='{.spec.template.spec.initContainers[0].image}{"\n"}{.spec.template.spec.containers[0].image}{"\n"}'
-oc -n "$taps_namespace" rollout status "deployment/$taps_resource-backend" --timeout=120s
-oc -n "$taps_namespace" rollout status "deployment/$taps_resource-frontend" --timeout=120s
+: "${taps_zone:?Set the zone, a PR number or test}"
+oc -n "$taps_namespace" get deployment "nr-taps-backend-$taps_zone" "nr-taps-frontend-$taps_zone"
+oc -n "$taps_namespace" get deployment "nr-taps-backend-$taps_zone" -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+oc -n "$taps_namespace" get deployment "nr-taps-frontend-$taps_zone" -o jsonpath='{.spec.template.spec.initContainers[0].image}{"\n"}{.spec.template.spec.containers[0].image}{"\n"}'
+oc -n "$taps_namespace" rollout status "deployment/nr-taps-backend-$taps_zone" --timeout=120s
+oc -n "$taps_namespace" rollout status "deployment/nr-taps-frontend-$taps_zone" --timeout=120s
 ```
 
 Keep ECAS and GAS2 running until each unported feature has a migration and rollback plan.

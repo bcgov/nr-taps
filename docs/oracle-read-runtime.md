@@ -1,44 +1,59 @@
 # Oracle read runtime and access inventory
 
-Oracle reads are off by default (`TAPS_ORACLE_ENABLED=false`): no datasource, business routes
-denied, and `/api/me` returns `readApiEnabled: false`. When enabled, the app registers the readers
-and must open a connection before startup completes. Sign-in is required either way.
+Oracle reads run only with the `oracle` Spring profile, which is off by default. Without it there's
+no datasource, business routes are denied, and `/api/me` returns `readApiEnabled: false`. With it,
+the app registers the readers and must open a connection before startup completes. Sign-in is
+required either way.
 
 The setup is Spring Boot with Undertow, JDBC/Hikari, startup pool validation,
 secrets from the environment and state-based health probes. TAPS stays on Spring Boot 3.5.16 and
 Java 21, with Jackson pinned to
-[2.21.7](https://github.com/FasterXML/jackson/wiki/Jackson-Release-2.21.7) for security fixes.
+[2.21.7](https://github.com/FasterXML/jackson/wiki/Jackson-Release-2.21.7) for security fixes and
+the Oracle driver pinned to `ojdbc11` 21.3.0.0. That driver rejects passwords longer than 30
+characters, so keep the proxy account password within that.
 
 Query rules are in [Oracle read foundation](oracle-read-foundation.md) and response shapes in
 [legacy read contracts](legacy-read-contracts.md).
 
 ## Configuration
 
-OpenShift sets these from the database secrets (see
-[deployment configuration](deployment-configuration.md)); locally the rehearsal scripts do. Keep
-credentials out of Git, images and frontend config. The JDBC URL must start with
-`jdbc:oracle:thin:@` and must not contain credentials.
+The profile's settings are in
+[application-oracle.yml](../backend/src/main/resources/application-oracle.yml). OpenShift sets the
+variables from the database secrets (see [deployment configuration](deployment-configuration.md));
+locally the rehearsal scripts do, and [backend/.env.example](../backend/.env.example) lists them.
+Keep credentials out of Git, images, frontend config and the JDBC URL.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `TAPS_ORACLE_ENABLED` | `false` | Turns on the datasource, readers and routes. |
-| `TAPS_ORACLE_JDBC_URL` | Empty | Required when enabled. |
-| `TAPS_ORACLE_USERNAME` | Empty | Required when enabled. Proxy account. |
-| `TAPS_ORACLE_PASSWORD` | Empty | Required when enabled. |
-| `TAPS_ORACLE_MAXIMUM_POOL_SIZE` | `10` | 1-30 per replica. |
-| `TAPS_ORACLE_MINIMUM_IDLE` | `1` | 0 to the pool maximum. |
-| `TAPS_ORACLE_CONNECTION_TIMEOUT_MS` | `10000` | Pool wait, 1000-60000. |
-| `TAPS_ORACLE_CONNECT_TIMEOUT_MS` | `10000` | Network connect, 1000-60000. |
-| `TAPS_ORACLE_READ_TIMEOUT_MS` | `30000` | Socket read, 1000-120000. |
-| `TAPS_ORACLE_QUERY_TIMEOUT_SECONDS` | `20` | Statement timeout, 1-60. |
-| `TAPS_ORACLE_TRUSTSTORE_PATH` | Empty | OpenShift sets `/cert/jssecacerts`. |
-| `TAPS_ORACLE_TRUSTSTORE_TYPE` | `JKS` | Required with a truststore path. |
-| `TAPS_ORACLE_TRUSTSTORE_PASSWORD` | Empty | Required with a truststore path. OpenShift uses `keystore_secret`. |
+| `SPRING_PROFILES_ACTIVE` | Empty | Include `oracle` to turn on the datasource, readers and routes. |
+| `DATABASE_HOST` | None | Required for TCPS. |
+| `DATABASE_PORT` | `1543` | TCPS port. |
+| `DATABASE_SERVICE_NAME` | None | Required for TCPS. |
+| `DATABASE_USER` | None | Required with `oracle`. Proxy account. |
+| `DATABASE_PASSWORD` | None | Required with `oracle`. |
+| `KEYSTORE_SECRET` | None | Required with `oracle`, even over TCP. Truststore password; OpenShift uses `keystore_secret`. |
+| `TRUSTSTORE_PATH` | `/cert/jssecacerts` | JKS truststore written by the init container. |
+| `DATABASE_CONNECT_TIMEOUT_MS` | `10000` | Network connect. |
+| `DATABASE_READ_TIMEOUT_MS` | `30000` | Socket read. |
+| `DATABASE_QUERY_TIMEOUT_SECONDS` | `20` | Statement timeout. |
+| `SPRING_DATASOURCE_URL` | TCPS descriptor | Local only. Replaces the descriptor for a plain-TCP database. |
+| `TAPS_HTTP_WORKER_THREADS` | `64` | Undertow workers. Reads hold one while Oracle answers. |
+| `APP_LOG_LEVEL` | `INFO` | TAPS log level. |
+| `TAPS_FAILURE_DIAGNOSTICS_LOG_LEVEL` | `INFO` | `DEBUG` logs database codes for read failures (see below). |
 
-The JDBC URL picks TCP or TCPS. TCPS trusts the certificate the init container
-imports for the host, with no extra DN check and no way to skip verification. Only the local test
-database uses TCP. Idle connections close after 10 minutes and connections live at most 30
-minutes. Size the pool for the replica count and the proxy account's connection limit.
+OpenShift always uses TCPS. It trusts the certificate the init container imports for the host,
+with no extra DN check. Only local test databases use TCP. The driver's default NIO transport
+ignores the read timeout, so the profile sets `oracle.jdbc.javaNetNio=false`.
+
+The shared database only accepts `TLS_RSA_WITH_AES_256_CBC_SHA` after the listener hands off a
+TCPS connection, and Java 21.0.12 disables `TLS_RSA_*` suites. At startup TAPS removes
+`TLS_RSA_*` from the JVM's disabled list and leaves the other Java defaults
+([OracleTlsCompatibility](../backend/src/main/java/ca/bc/gov/nrs/taps/configuration/OracleTlsCompatibility.java)).
+Drop this once the database supports ECDHE.
+
+The Hikari pool holds at most 10 connections with 1 idle, and a request waits up to 30 seconds for
+one. Idle connections close after 10 minutes and connections live at most 30 minutes. Size the pool
+for the replica count (the backend scales to 3) and the proxy account's connection limit.
 
 `/actuator/health` includes datasource health. Liveness and readiness use app state,
 so a database outage doesn't restart every pod. Read failures return 503. Turning Oracle on doesn't
@@ -68,9 +83,15 @@ filters.
 Pages are zero-based. IDs and rates are strings, dates are ISO strings and missing values are null.
 Search returns every mark/permit row, so don't dedupe by ID. `MY_TO_DO` listing isn't built.
 
-Errors return only `code` and `message`: `INVALID_REQUEST` (400), `AUTHENTICATION_REQUIRED` (401),
-`ACCESS_DENIED` (403), `NOT_FOUND` (404) and `READ_UNAVAILABLE` (503). Missing and inaccessible
-records both return 404. No SQL, grants or stack traces are exposed. Other business paths are denied.
+Errors are `application/problem+json` with `title`, `detail`, `status` and a `code` that clients
+match on: `INVALID_REQUEST` (400), `AUTHENTICATION_REQUIRED` (401), `ACCESS_DENIED` (403),
+`NOT_FOUND` (404) and `READ_UNAVAILABLE` (503). Missing and inaccessible records both return 404.
+No SQL, grants or stack traces are exposed. Other business paths are denied.
+
+To diagnose 503s, set `TAPS_FAILURE_DIAGNOSTICS_LOG_LEVEL=DEBUG`. The
+`ca.bc.gov.nrs.taps.audit.failure` logger then records the method, route with IDs masked, failure
+types, SQLState and vendor error code. It never logs exception messages, which can carry SQL or
+connection details.
 
 ## Database privileges
 
@@ -114,11 +135,11 @@ DDL, schema ownership or `ANY` privilege.
 With Java 21 and Docker:
 
 ```sh
-mvn -Poracle-it verify
+mvn -B -Poracle-it verify
 ```
 
 This runs the readers and HTTP layer against a disposable Oracle Free container with a synthetic
-schema. The normal test suite needs no database. See
+schema. CI doesn't run it. The normal test suite needs no database. See
 [OracleReadIT](../backend/src/test/java/ca/bc/gov/nrs/taps/integration/OracleReadIT.java) and the
 [fixture schema](../backend/src/test/resources/oracle/schema.sql). Never load the fixture into a
 shared database.
