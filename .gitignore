@@ -1,3 +1,7 @@
+### macOS / local worktrees ###
+.DS_Store
+.wt-*/
+
 ### Generated ###
 # Created by https://www.toptal.com/developers/gitignore/api/node,java,python,go
 # Edit at https://www.toptal.com/developers/gitignore?templates=node,java,python,go
@@ -386,6 +390,7 @@ pyrightconfig.json
 **/application-prod.properties
 **/application-secrets.properties
 **/application-*.yml
+!backend/src/main/resources/application-oracle.yml
 **/bootstrap-local.yml
 **/bootstrap-prod.yml
 # Other common credential/config files
@@ -408,6 +413,11 @@ specs
 # Prisma 7 generated client
 backend/generated/
 .copilot-memory
+
+# Frontend tooling output
+frontend/.tanstack/
+frontend/playwright-report/
+frontend/test-results/
 
 # Local credentials and work notes
 .env.*

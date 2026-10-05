@@ -17,6 +17,7 @@ jobs:
   smoke:
     name: Public route and protected API
     runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - name: Wait for application
         env:
@@ -26,8 +27,8 @@ jobs:
           set -euo pipefail
           EXPECTED_FRONTEND_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}/frontend:${IMAGE_TAG}"
           EXPECTED_BACKEND_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}/backend:${IMAGE_TAG}"
-          response_headers=$(mktemp -d)
-          trap 'rm -f "$response_headers/page" "$response_headers/api" "$response_headers/config"; rmdir "$response_headers"' EXIT
+          responses=$(mktemp -d)
+          trap 'rm -rf "$responses"' EXIT
           header_value() {
             awk -v name="$1:" 'tolower($1) == name {sub(/\r$/, ""); print $2}' "$2"
           }
@@ -39,11 +40,12 @@ jobs:
             matches_frontend "$1" && [[ "$(header_value x-taps-backend-image "$1")" == "$EXPECTED_BACKEND_IMAGE" ]]
           }
           for attempt in {1..30}; do
-            page_status=$(curl -sS -D "$response_headers/page" -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/" || true)
-            api_status=$(curl -sS -D "$response_headers/api" -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/api/me" || true)
-            config_status=$(curl -sS -D "$response_headers/config" -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/config.js" || true)
-            if [ "$page_status" = 200 ] && [ "$api_status" = 401 ] && [ "$config_status" = 200 ] \
-              && matches_frontend "$response_headers/page" && matches_images "$response_headers/api" && matches_frontend "$response_headers/config"; then
+            page_status=$(curl --ipv4 -sS -D "$responses/page" -o "$responses/page.html" -w '%{http_code}' --max-time 10 "$BASE_URL/" || true)
+            api_status=$(curl --ipv4 -sS -D "$responses/api" -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/api/me" || true)
+            config_status=$(curl --ipv4 -sS -D "$responses/config" -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/config.js" || true)
+            if [ "$page_status" = 200 ] && grep -q '<div id="root"' "$responses/page.html" \
+              && [ "$api_status" = 401 ] && [ "$config_status" = 200 ] \
+              && matches_frontend "$responses/page" && matches_images "$responses/api" && matches_frontend "$responses/config"; then
               exit 0
             fi
             echo "Waiting for the expected image pair (page=$page_status api=$api_status config=$config_status, attempt $attempt/30)"

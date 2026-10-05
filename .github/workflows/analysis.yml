@@ -4,92 +4,155 @@ on:
   push:
     branches: [main]
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft]
+  schedule:
+    - cron: "0 11 * * 0" # 3 AM PST = 12 PM UDT, runs sundays
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions: {}
 
 jobs:
-  backend:
+  backend-tests:
     name: Backend Tests
+    if: (! github.event.pull_request.draft)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      SONAR_TOKEN: ${{ github.event_name == 'push' && secrets.sonar_token_backend || '' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Java 21.0.12 (Temurin) + Maven cache
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21.0.12'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Maven verify
+        working-directory: backend
+        run: mvn -B -DskipITs verify
+
+      - name: SonarCloud scan
+        if: github.event_name == 'push' && env.SONAR_TOKEN != ''
+        working-directory: backend
+        run: |
+          mvn -B sonar:sonar \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.organization=bcgov-sonarcloud \
+            -Dsonar.projectKey=nr-taps_backend \
+            -Dsonar.token="$SONAR_TOKEN"
+
+  frontend-tests:
+    name: Frontend Tests
+    if: (! github.event.pull_request.draft)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: bcgov/action-test-and-analyse@8f699e3fd3fadd9a6adf6f4b1f2638ef7ecfefb9 # v2.0.0
         with:
-          persist-credentials: false
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-          cache-dependency-path: backend/pom.xml
-      - name: Maven verify
-        working-directory: backend
-        run: mvn -B -DskipITs verify
+          commands: |
+            npm ci
+            npm run typecheck
+            npm run lint
+            npm run format:check
+            # pr-open.yml runs the suite on PRs; keep the dependency and supply scans here.
+            if [ "${GITHUB_EVENT_NAME}" != "pull_request" ]; then
+              npm run test:cov
+            fi
+          dir: frontend
+          node_version: "24"
+          sonar_args: >
+            -Dsonar.exclusions=**/coverage/**,**/node_modules/**,**/*spec.ts,**/*.test.ts,**/*.test.tsx,**/*.support.ts,**/*.support.tsx,**/e2e/**
+            -Dsonar.organization=bcgov-sonarcloud
+            -Dsonar.projectKey=nr-taps_frontend
+            -Dsonar.sources=src
+            -Dsonar.test.inclusions=**/*spec.ts,**/*.test.ts,**/*.test.tsx,**/*.support.ts,**/*.support.tsx
+            -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
+          sonar_token: ${{ github.event_name == 'push' && secrets.sonar_token_frontend || '' }}
+          dep_scan: warn
+          supply_scan: true
+          triggers: ('frontend/')
 
-  frontend:
-    name: Frontend Tests
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Test local rehearsal issuer
-        run: node --test scripts/local-read-issuer.test.mjs
-      - name: Check React frontend
-        working-directory: frontend
-        run: |
-          npm ci
-          npm run lint
-          npm run format:check
-          npm run typecheck
-          npm run test:unit -- --run
-          npm run build
-
-  trivy:
-    name: Repository Security Scan
+  script-tests:
+    name: Script Tests
+    if: (! github.event.pull_request.draft)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: read
-      security-events: write
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - name: Scan dependencies, secrets and configuration
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Test local rehearsal issuer
+        run: node --test scripts/local-read-issuer.test.mjs
+
+  trivy:
+    name: Trivy Security Scan
+    if: (! github.event.pull_request.draft)
+    permissions:
+      contents: read
+      security-events: write
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Cache Trivy DB
+        uses: actions/cache@v5
+        with:
+          path: .trivycache
+          key: ${{ runner.os }}-trivy-v0.36.0-cache-v1
+          restore-keys: |
+            ${{ runner.os }}-trivy-
+
+      - name: Run Trivy vulnerability scanner in repo mode
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          scan-type: fs
-          scanners: vuln,secret,misconfig
-          severity: CRITICAL,HIGH
+          format: "sarif"
+          output: "trivy-results.sarif"
           ignore-unfixed: true
-          trivyignores: .github/.trivyignore
-          skip-dirs: '**/node_modules,**/coverage,**/dist,.git'
-          format: sarif
-          output: trivy-results.sarif
-          exit-code: '0'
-      - name: Publish findings to GitHub Security
+          scan-type: "fs"
+          scanners: "vuln,secret,misconfig"
+          severity: "CRITICAL,HIGH"
+          # Publish findings without failing this workflow.
+          exit-code: "0"
+          trivyignores: ".github/.trivyignore"
+          cache-dir: .trivycache
+          skip-dirs: "**/node_modules,**/coverage,**/dist,.git"
+
+      - name: Upload Trivy scan results to GitHub Security tab
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: trivy-results.sarif
+          sarif_file: "trivy-results.sarif"
 
   results:
     name: Analysis Results
-    needs: [backend, frontend, trivy]
-    if: always()
+    needs: [backend-tests, frontend-tests, script-tests, trivy]
+    if: always() && (! github.event.pull_request.draft)
     runs-on: ubuntu-slim
+    timeout-minutes: 1
     steps:
-      - name: Check all results
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
-        run: exit 1
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: echo "At least one job has failed." && exit 1
+      - run: echo "Success!"
