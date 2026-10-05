@@ -24,11 +24,13 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-@WebMvcTest(controllers = {ReadController.class, CurrentUserController.class}, properties = {
-    "taps.oracle.enabled=true", "taps.auth.client-id=taps"})
+@WebMvcTest(controllers = {ReadController.class, CurrentUserController.class},
+    properties = "taps.auth.client-id=taps")
+@ActiveProfiles("oracle")
 @Import({SecurityConfiguration.class, TapsAuthenticationConverter.class, JsonConfiguration.class})
 class ReadControllerTest {
   @Autowired MockMvc mvc;
@@ -45,13 +47,18 @@ class ReadControllerTest {
   @Test
   void anonymousAndUnderprivilegedRequestsStopBeforeReaders() throws Exception {
     mvc.perform(get("/api/gas/worksheets")).andExpect(status().isUnauthorized())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.status").value(401))
+        .andExpect(jsonPath("$.title").value("Authentication required"))
         .andExpect(jsonPath("$.code").value("AUTHENTICATION_REQUIRED"));
     signIn("TAPS_LICENSEE_VIEWER_FOREST_CLIENT-00001018", "bceidbusiness");
     for (String path : List.of("/api/gas/worksheets", "/api/gas/worksheets/APPRAISED/123",
         "/api/gas/appraised/by-ecas/123", "/api/gas/licences/A00001/marks",
         "/api/gas/licence-information?timberMark=AB1234")) {
       mvc.perform(get(path).header("Authorization", "Bearer token"))
-          .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+          .andExpect(status().isForbidden())
+          .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+          .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
     signIn("", "azureidir");
     mvc.perform(post("/api/ecas/inbox").header("Authorization", "Bearer token")

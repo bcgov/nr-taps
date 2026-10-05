@@ -6,7 +6,7 @@ import ca.bc.gov.nrs.taps.read.oracle.OracleEcasAttachments;
 import ca.bc.gov.nrs.taps.security.TapsUser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@ConditionalOnProperty(name = "taps.oracle.enabled", havingValue = "true")
+@Profile("oracle")
 public class AttachmentController {
   private static final Logger LOG = LoggerFactory.getLogger(AttachmentController.class);
   private final OracleEcasAttachments attachments;
@@ -35,7 +35,7 @@ public class AttachmentController {
       return attachments.forSubmission(user, id, page).orElseThrow(ReadController.ReadNotFoundException::new);
     } catch (DataAccessException | IllegalArgumentException | IllegalStateException exception) {
       LOG.warn("event=taps_attachment_read_failed failureType={}", exception.getClass().getSimpleName());
-      throw new ReadController.ReadUnavailableException();
+      throw new ReadController.ReadUnavailableException(exception);
     }
   }
 }

@@ -1,7 +1,7 @@
 package ca.bc.gov.nrs.taps.security;
 
 import ca.bc.gov.nrs.taps.api.ApiError;
-import ca.bc.gov.nrs.taps.configuration.OracleActivation;
+import ca.bc.gov.nrs.taps.configuration.OracleProfile;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
@@ -22,7 +22,7 @@ public class SecurityConfiguration {
   SecurityFilterChain securityFilterChain(
       HttpSecurity http, TapsAuthenticationConverter authenticationConverter,
       ObjectMapper mapper, Environment environment) throws Exception {
-    boolean readApiEnabled = OracleActivation.enabled(environment);
+    boolean readApiEnabled = OracleProfile.active(environment);
     return http
         .csrf(AbstractHttpConfigurer::disable)
         .httpBasic(AbstractHttpConfigurer::disable)
@@ -47,16 +47,16 @@ public class SecurityConfiguration {
           requests.anyRequest().denyAll();
         })
         .exceptionHandling(errors -> errors
-            .authenticationEntryPoint((request, response, exception) -> ApiError.write(response,
-                mapper, 401, "AUTHENTICATION_REQUIRED", "Sign in to continue."))
-            .accessDeniedHandler((request, response, exception) -> ApiError.write(response,
-                mapper, 403, "ACCESS_DENIED", "You do not have access to this operation.")))
+            .authenticationEntryPoint((request, response, exception) ->
+                ApiError.AUTHENTICATION_REQUIRED.write(response, mapper))
+            .accessDeniedHandler((request, response, exception) ->
+                ApiError.ACCESS_DENIED.write(response, mapper)))
         .oauth2ResourceServer(oauth2 -> oauth2
             .jwt(jwt -> jwt.jwtAuthenticationConverter(authenticationConverter))
-            .authenticationEntryPoint((request, response, exception) -> ApiError.write(response,
-                mapper, 401, "AUTHENTICATION_REQUIRED", "Sign in to continue."))
-            .accessDeniedHandler((request, response, exception) -> ApiError.write(response,
-                mapper, 403, "ACCESS_DENIED", "You do not have access to this operation.")))
+            .authenticationEntryPoint((request, response, exception) ->
+                ApiError.AUTHENTICATION_REQUIRED.write(response, mapper))
+            .accessDeniedHandler((request, response, exception) ->
+                ApiError.ACCESS_DENIED.write(response, mapper)))
         .build();
   }
 }

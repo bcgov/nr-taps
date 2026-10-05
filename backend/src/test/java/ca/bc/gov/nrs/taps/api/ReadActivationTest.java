@@ -19,8 +19,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-// Spring's boolean conversion accepts "yes"; the Oracle beans only accept "true".
-@SpringBootTest(properties = {"taps.oracle.enabled=yes", "taps.auth.client-id=taps"})
+// Without the oracle profile the read routes and the session flag stay off together.
+@SpringBootTest(properties = "taps.auth.client-id=taps")
 @AutoConfigureMockMvc
 class ReadActivationTest {
   @Autowired private MockMvc mvc;
@@ -45,7 +45,7 @@ class ReadActivationTest {
   }
 
   @Test
-  void routesAndSessionAgreeWithTheOracleBeanCondition() throws Exception {
+  void routesAndSessionAgreeWithTheOracleProfile() throws Exception {
     mvc.perform(get("/api/me").header("Authorization", "Bearer token"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.readApiEnabled").value(false));

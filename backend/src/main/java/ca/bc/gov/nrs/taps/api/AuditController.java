@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@ConditionalOnProperty(name = "taps.oracle.enabled", havingValue = "true")
+@Profile("oracle")
 @PreAuthorize("hasAuthority('ECAS_SUBMISSION_VIEW')")
 public class AuditController {
   private static final Logger LOG = LoggerFactory.getLogger(AuditController.class);
@@ -53,7 +53,7 @@ public class AuditController {
       return operation.get().orElseThrow(ReadController.ReadNotFoundException::new);
     } catch (DataAccessException | IllegalArgumentException | IllegalStateException exception) {
       LOG.warn("event=taps_oracle_audit_failed failureType={}", exception.getClass().getSimpleName());
-      throw new ReadController.ReadUnavailableException();
+      throw new ReadController.ReadUnavailableException(exception);
     }
   }
 }

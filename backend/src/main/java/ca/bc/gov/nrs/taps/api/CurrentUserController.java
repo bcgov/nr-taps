@@ -1,6 +1,6 @@
 package ca.bc.gov.nrs.taps.api;
 
-import ca.bc.gov.nrs.taps.configuration.OracleActivation;
+import ca.bc.gov.nrs.taps.configuration.OracleProfile;
 import ca.bc.gov.nrs.taps.security.FamRoleName;
 import ca.bc.gov.nrs.taps.security.IdentityProvider;
 import ca.bc.gov.nrs.taps.security.TapsCapability;
@@ -16,7 +16,7 @@ public class CurrentUserController {
   private final boolean readApiEnabled;
 
   public CurrentUserController(Environment environment) {
-    this.readApiEnabled = OracleActivation.enabled(environment);
+    this.readApiEnabled = OracleProfile.active(environment);
   }
 
   @GetMapping("/api/me")

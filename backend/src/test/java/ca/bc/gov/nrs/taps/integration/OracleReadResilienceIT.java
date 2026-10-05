@@ -87,16 +87,19 @@ class OracleReadResilienceIT {
     });
     issuerServer.start();
     issuer = "http://127.0.0.1:" + issuerServer.getAddress().getPort() + "/oidc";
+    // The fixture database is plain TCP, so the TCPS descriptor is replaced as for local runs.
     application = (ServletWebServerApplicationContext) new SpringApplicationBuilder(TapsApplication.class)
         .initializers(context -> TestPropertyValues.of(
             "server.address=127.0.0.1", "server.port=0", "spring.main.banner-mode=off",
             "taps.auth.issuer-uri=" + issuer, "taps.auth.client-id=" + CLIENT,
-            "taps.oracle.enabled=true", "taps.oracle.jdbc-url=" + ORACLE.getJdbcUrl(),
-            "taps.oracle.username=" + ORACLE.getUsername(), "taps.oracle.password=" + ORACLE.getPassword(),
-            "taps.oracle.maximum-pool-size=2", "taps.oracle.minimum-idle=0",
-            "taps.oracle.connection-timeout-ms=1000", "taps.oracle.connect-timeout-ms=1000",
-            "taps.oracle.read-timeout-ms=2000", "taps.oracle.query-timeout-seconds=1")
-            .applyTo(context.getEnvironment())).run();
+            "spring.datasource.url=" + ORACLE.getJdbcUrl(),
+            "spring.datasource.username=" + ORACLE.getUsername(),
+            "spring.datasource.password=" + ORACLE.getPassword(), "KEYSTORE_SECRET=unused",
+            "spring.datasource.hikari.maximum-pool-size=2", "spring.datasource.hikari.minimum-idle=0",
+            "spring.datasource.hikari.connection-timeout=1000", "spring.datasource.hikari.validation-timeout=1000",
+            "DATABASE_CONNECT_TIMEOUT_MS=1000", "DATABASE_READ_TIMEOUT_MS=2000",
+            "DATABASE_QUERY_TIMEOUT_SECONDS=1")
+            .applyTo(context.getEnvironment())).run("--spring.profiles.active=oracle");
     base = "http://127.0.0.1:" + application.getWebServer().getPort();
     pool = application.getBean(HikariDataSource.class);
     mapper = application.getBean(ObjectMapper.class);

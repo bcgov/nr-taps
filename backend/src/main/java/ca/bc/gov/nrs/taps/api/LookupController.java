@@ -10,7 +10,7 @@ import ca.bc.gov.nrs.taps.security.TapsUser;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataAccessException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** Search choices only; these lists don't grant access to records. */
 @RestController
-@ConditionalOnProperty(name = "taps.oracle.enabled", havingValue = "true")
+@Profile("oracle")
 public class LookupController {
   private static final Logger LOG = LoggerFactory.getLogger(LookupController.class);
   private final OracleCodeLists codes;
@@ -76,6 +76,6 @@ public class LookupController {
 
   private static ReadController.ReadUnavailableException unavailable(DataAccessException exception) {
     LOG.warn("event=taps_oracle_lookup_failed failureType={}", exception.getClass().getSimpleName());
-    return new ReadController.ReadUnavailableException();
+    return new ReadController.ReadUnavailableException(exception);
   }
 }

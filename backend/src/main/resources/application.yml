@@ -1,31 +1,31 @@
 server:
   port: 8080
+  forward-headers-strategy: framework
   shutdown: graceful
   undertow:
     max-http-post-size: 64KB
+    threads:
+      # Undertow defaults to 8 workers per I/O thread, only 16 on a 2-CPU pod. Reads hold a worker
+      # while Oracle answers, so keep headroom for health probes and short requests.
+      worker: ${TAPS_HTTP_WORKER_THREADS:64}
 
 spring:
+  application:
+    name: taps-backend
+  # Oracle reads start only with the oracle profile (application-oracle.yml).
   autoconfigure:
-    exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
   lifecycle:
     timeout-per-shutdown-phase: 60s
 
+logging:
+  level:
+    ca.bc.gov.nrs.taps: ${APP_LOG_LEVEL:INFO}
+    ca.bc.gov.nrs.taps.audit.failure: ${TAPS_FAILURE_DIAGNOSTICS_LOG_LEVEL:INFO}
+
 taps:
   image-reference: ${TAPS_IMAGE_REFERENCE:local}
-  oracle:
-    enabled: ${TAPS_ORACLE_ENABLED:false}
-    jdbc-url: ${TAPS_ORACLE_JDBC_URL:}
-    username: ${TAPS_ORACLE_USERNAME:}
-    password: ${TAPS_ORACLE_PASSWORD:}
-    maximum-pool-size: ${TAPS_ORACLE_MAXIMUM_POOL_SIZE:10}
-    minimum-idle: ${TAPS_ORACLE_MINIMUM_IDLE:1}
-    connection-timeout-ms: ${TAPS_ORACLE_CONNECTION_TIMEOUT_MS:10000}
-    connect-timeout-ms: ${TAPS_ORACLE_CONNECT_TIMEOUT_MS:10000}
-    read-timeout-ms: ${TAPS_ORACLE_READ_TIMEOUT_MS:30000}
-    query-timeout-seconds: ${TAPS_ORACLE_QUERY_TIMEOUT_SECONDS:20}
-    truststore-path: ${TAPS_ORACLE_TRUSTSTORE_PATH:}
-    truststore-type: ${TAPS_ORACLE_TRUSTSTORE_TYPE:JKS}
-    truststore-password: ${TAPS_ORACLE_TRUSTSTORE_PASSWORD:}
   auth:
     issuer-uri: ${TAPS_OIDC_ISSUER_URI:}
     client-id: ${TAPS_OIDC_CLIENT_ID:}
@@ -39,10 +39,6 @@ management:
       group:
         liveness:
           include: livenessState
-        readiness:
-          # A database outage shouldn't take every replica out of service.
-          # Startup still checks Oracle, and /actuator/health reports it.
-          include: readinessState
   endpoints:
     web:
       exposure:

@@ -17,6 +17,9 @@
 
   <properties>
     <java.version>21</java.version>
+    <jacoco.version>0.8.15</jacoco.version>
+    <ojdbc.version>21.3.0.0</ojdbc.version>
+    <!-- Remove once the Spring Boot BOM includes these security fixes. -->
     <jackson-bom.version>2.21.7</jackson-bom.version>
     <log4j2.version>2.25.5</log4j2.version>
   </properties>
@@ -59,6 +62,7 @@
     <dependency>
       <groupId>com.oracle.database.jdbc</groupId>
       <artifactId>ojdbc11</artifactId>
+      <version>${ojdbc.version}</version>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -84,6 +88,15 @@
   </dependencies>
 
   <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
@@ -91,7 +104,37 @@
       </plugin>
     </plugins>
   </build>
+
   <profiles>
+    <profile>
+      <id>coverage</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.jacoco</groupId>
+            <artifactId>jacoco-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>prepare-agent</id>
+                <goals>
+                  <goal>prepare-agent</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>coverage-report</id>
+                <phase>prepare-package</phase>
+                <goals>
+                  <goal>report</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>oracle-it</id>
       <build>

@@ -445,11 +445,12 @@ class OracleReadIT {
     try (var context = new SpringApplicationBuilder(TapsApplication.class, SyntheticAuthentication.class)
         .initializers(application -> TestPropertyValues.of(
             "server.address=127.0.0.1", "server.port=0",
-            "taps.oracle.enabled=true", "taps.oracle.jdbc-url=" + ORACLE.getJdbcUrl(),
-            "taps.oracle.username=" + ORACLE.getUsername(), "taps.oracle.password=" + ORACLE.getPassword(),
-            "taps.oracle.maximum-pool-size=2", "taps.oracle.minimum-idle=0",
+            "spring.datasource.url=" + ORACLE.getJdbcUrl(),
+            "spring.datasource.username=" + ORACLE.getUsername(),
+            "spring.datasource.password=" + ORACLE.getPassword(), "KEYSTORE_SECRET=unused",
+            "spring.datasource.hikari.maximum-pool-size=2", "spring.datasource.hikari.minimum-idle=0",
             "taps.auth.client-id=taps", "taps.auth.issuer-uri=https://synthetic.invalid/realms/taps")
-            .applyTo(application)).run()) {
+            .applyTo(application)).run("--spring.profiles.active=oracle")) {
       var mvc = MockMvcBuilders.webAppContextSetup((WebApplicationContext) context)
           .apply(springSecurity()).build();
       mvc.perform(get("/api/gas/worksheets")).andExpect(status().isUnauthorized());
