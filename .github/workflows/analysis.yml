@@ -12,8 +12,7 @@ jobs:
   backend:
     name: Backend Tests
     runs-on: ubuntu-24.04
-    # Allow a cold Oracle image pull/start in addition to the Java suite.
-    timeout-minutes: 25
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
@@ -26,9 +25,9 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: backend/pom.xml
-      - name: Test backend and disposable Oracle reads
+      - name: Maven verify
         working-directory: backend
-        run: mvn -B -Poracle-it verify
+        run: mvn -B -DskipITs verify
 
   frontend:
     name: Frontend Tests

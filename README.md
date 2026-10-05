@@ -70,7 +70,7 @@ npm run test:unit -- --run
 npm run build
 ```
 
-The Analysis workflow runs these on every PR, plus an advisory Trivy scan that reports to GitHub Security.
+The Analysis workflow runs these on every PR, except the Oracle integration tests, plus an advisory Trivy scan that reports to GitHub Security.
 
 ## Deployment
 
