@@ -4,29 +4,39 @@ on:
   workflow_call:
     inputs:
       environment:
+        description: GitHub/OpenShift environment, dev or test
         required: true
         type: string
       target:
+        description: Deployment target, a PR number for dev or test for test
         required: true
         type: string
       tag:
+        description: Container tag
         required: true
         type: string
     secrets:
       oc_namespace:
+        description: OpenShift namespace
         required: true
       oc_token:
+        description: OpenShift token
         required: true
       # Read from the dev/test environment only, so TEST can't fall back to a DEV value.
       database_host:
+        description: Oracle host
         required: false
       database_service_name:
+        description: Oracle service name
         required: false
       database_user:
+        description: Oracle DATABASE_USER
         required: false
       database_password:
+        description: Oracle DATABASE_PASSWORD
         required: false
       keystore_secret:
+        description: Oracle keystore passphrase
         required: false
     outputs:
       route_slot:
@@ -38,11 +48,14 @@ permissions: {}
 jobs:
   validate:
     name: Check deployment settings
-    environment: ${{ inputs.environment }}
+    environment:
+      name: ${{ inputs.environment }}
+      deployment: false
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     outputs:
       route_slot: ${{ steps.settings.outputs.route_slot }}
-      oracle_enabled: ${{ steps.settings.outputs.oracle_enabled }}
+      spring_profiles_active: ${{ steps.settings.outputs.spring_profiles_active }}
     steps:
       - name: Require OpenShift and FAM configuration
         id: settings
@@ -82,6 +95,7 @@ jobs:
             echo '::error title=Invalid Oracle setting::TAPS_ORACLE_ENABLED must be true or false.'
             exit 1
           fi
+          spring_profiles_active=
           if [[ "$oracle_enabled" == true ]]; then
             for setting in DATABASE_HOST DATABASE_SERVICE_NAME DATABASE_USER DATABASE_PASSWORD KEYSTORE_SECRET; do
               if [ -z "${!setting}" ]; then
@@ -89,8 +103,9 @@ jobs:
                 exit 1
               fi
             done
+            spring_profiles_active=oracle
           fi
-          echo "oracle_enabled=$oracle_enabled" >> "$GITHUB_OUTPUT"
+          echo "spring_profiles_active=$spring_profiles_active" >> "$GITHUB_OUTPUT"
           # Missing environment secrets fall back to the caller's DEV secrets.
           if [[ "$OC_NAMESPACE" != *-"$DEPLOY_ENV" ]]; then
             echo "::error title=Wrong OpenShift namespace::oc_namespace must be the ${DEPLOY_ENV} namespace, ending in -${DEPLOY_ENV}."
@@ -107,16 +122,21 @@ jobs:
   backend:
     name: Deploy backend
     needs: [validate]
-    environment: ${{ inputs.environment }}
+    environment:
+      name: ${{ inputs.environment }}
+      deployment: false
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+
       - uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
         env:
+          SPRING_PROFILES_ACTIVE: ${{ needs.validate.outputs.spring_profiles_active }}
           DATABASE_HOST: ${{ secrets.database_host }}
           DATABASE_SERVICE_NAME: ${{ secrets.database_service_name }}
           DATABASE_USER: ${{ secrets.database_user }}
@@ -133,26 +153,32 @@ jobs:
             -p NAME="${{ github.event.repository.name }}"
             -p ZONE="${{ inputs.target }}"
             -p IMAGE_TAG="${{ inputs.tag }}"
-            -p ORACLE_ENABLED="${{ needs.validate.outputs.oracle_enabled }}"
+            -p ROLLOUT_TRIGGER="${{ github.run_id }}-${{ github.run_attempt }}"
+            -p SPRING_PROFILES_ACTIVE="$SPRING_PROFILES_ACTIVE"
+            -p TAPS_FAILURE_DIAGNOSTICS_LOG_LEVEL="${{ (inputs.environment == 'dev' || inputs.environment == 'test') && 'DEBUG' || 'INFO' }}"
+            -p TAPS_OIDC_ISSUER_URI="${{ vars.TAPS_OIDC_ISSUER_URI }}"
+            -p TAPS_OIDC_CLIENT_ID="${{ vars.TAPS_OIDC_CLIENT_ID }}"
             -p DATABASE_HOST="$DATABASE_HOST"
             -p DATABASE_SERVICE_NAME="$DATABASE_SERVICE_NAME"
             -p DATABASE_USER="$DATABASE_USER"
             -p DATABASE_PASSWORD="$DATABASE_PASSWORD"
             -p KEYSTORE_SECRET="$KEYSTORE_SECRET"
-            -p OIDC_ISSUER_URI="${{ vars.TAPS_OIDC_ISSUER_URI }}"
-            -p OIDC_CLIENT_ID="${{ vars.TAPS_OIDC_CLIENT_ID }}"
 
   frontend:
     name: Deploy frontend and route
     needs: [validate, backend]
-    environment: ${{ inputs.environment }}
+    environment:
+      name: ${{ inputs.environment }}
+      deployment: false
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+
       - uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
         with:
           file: frontend/openshift.deploy.yml
@@ -165,10 +191,15 @@ jobs:
             -p NAME="${{ github.event.repository.name }}"
             -p ZONE="${{ inputs.target }}"
             -p IMAGE_TAG="${{ inputs.tag }}"
-            -p OIDC_ISSUER_URI="${{ vars.TAPS_OIDC_ISSUER_URI }}"
-            -p OIDC_CLIENT_ID="${{ vars.TAPS_OIDC_CLIENT_ID }}"
-            -p OIDC_SITEMINDER_LOGOUT_URL="${{ vars.TAPS_OIDC_SITEMINDER_LOGOUT_URL || 'https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi' }}"
-      - uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
+            -p ROLLOUT_TRIGGER="${{ github.run_id }}-${{ github.run_attempt }}"
+            -p VITE_OIDC_ISSUER_URI="${{ vars.TAPS_OIDC_ISSUER_URI }}"
+            -p VITE_OIDC_CLIENT_ID="${{ vars.TAPS_OIDC_CLIENT_ID }}"
+            -p VITE_OIDC_IDIR_HINT="${{ vars.TAPS_OIDC_IDIR_HINT || 'azureidir' }}"
+            -p VITE_OIDC_BCEID_HINT="${{ vars.TAPS_OIDC_BCEID_HINT || 'bceidbusiness' }}"
+            -p VITE_OIDC_SITEMINDER_LOGOUT_URL="${{ vars.TAPS_OIDC_SITEMINDER_LOGOUT_URL || 'https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi' }}"
+
+      - name: Route
+        uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
         with:
           file: frontend/openshift.route.yml
           overwrite: true
@@ -180,3 +211,23 @@ jobs:
             -p ZONE="${{ inputs.target }}"
             -p SLOT="${{ needs.validate.outputs.route_slot }}"
             -p DOMAIN="${{ vars.OC_APPS_DOMAIN }}"
+
+  deployment-result:
+    name: Record deployment result
+    needs: [validate, backend, frontend]
+    # Only targets that passed validation get a deployment record.
+    if: ${{ always() && needs.validate.result == 'success' }}
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-slim
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Fail incomplete deployments
+        if: ${{ needs.backend.result != 'success' || needs.frontend.result != 'success' }}
+        run: |
+          echo "Backend deployment result: ${{ needs.backend.result }}"
+          echo "Frontend deployment result: ${{ needs.frontend.result }}"
+          exit 1
+
+      - name: Confirm deployment
+        run: echo "Backend and frontend deployments succeeded."

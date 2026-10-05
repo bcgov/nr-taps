@@ -58,15 +58,15 @@ docker run --rm --user "$runtime_uid:0" --read-only --cap-drop ALL --security-op
 created_containers+=("$backend")
 docker run -d --name "$backend" --network "$run_id" --network-alias backend \
   --user "$runtime_uid:0" --read-only --cap-drop ALL --security-opt no-new-privileges \
-  --memory 768m --cpus 1 --tmpfs /tmp:rw,nosuid,nodev,mode=1777,size=128m \
-  -p 127.0.0.1::8080 -e TZ=America/Vancouver -e TAPS_ORACLE_ENABLED=false \
+  --memory 800m --cpus 1 --tmpfs /tmp:rw,nosuid,nodev,mode=1777,size=128m \
+  -p 127.0.0.1::8080 -e TZ=America/Vancouver -e SPRING_PROFILES_ACTIVE= -e APP_LOG_LEVEL=INFO \
   -e "TAPS_IMAGE_REFERENCE=$backend_image" \
   -e "TAPS_OIDC_ISSUER_URI=$issuer" -e "TAPS_OIDC_CLIENT_ID=$client" \
   "$backend_image" >/dev/null
 created_containers+=("$frontend")
 docker run -d --name "$frontend" --network "$run_id" \
   --user "$runtime_uid:0" --read-only --cap-drop ALL --security-opt no-new-privileges \
-  --memory 256m --cpus 1 \
+  --memory 128m --cpus 1 \
   --mount "type=volume,src=$volume,dst=/srv,volume-nocopy" \
   --tmpfs "/tmp/caddy:rw,nosuid,nodev,mode=0770,uid=$runtime_uid,gid=0,size=32m" \
   --tmpfs "/tmp/coraza:rw,nosuid,nodev,mode=0770,uid=$runtime_uid,gid=0,size=32m" \
@@ -74,6 +74,7 @@ docker run -d --name "$frontend" --network "$run_id" \
   -e "TAPS_IMAGE_REFERENCE=$frontend_image" \
   -e XDG_CONFIG_HOME=/tmp/caddy -e XDG_DATA_HOME=/tmp/caddy -e TMPDIR=/tmp/caddy \
   -e "VITE_OIDC_ISSUER_URI=$issuer" -e "VITE_OIDC_CLIENT_ID=$client" \
+  -e VITE_OIDC_IDIR_HINT=azureidir -e VITE_OIDC_BCEID_HINT=bceidbusiness \
   -e VITE_OIDC_SITEMINDER_LOGOUT_URL=https://sso.example.invalid/logoff \
   "$frontend_image" >/dev/null
 
@@ -116,6 +117,7 @@ check_http spa-route "$frontend_url/ecas/ECAS05" 200 no-store
 check_http runtime-config "$frontend_url/config.js" 200 no-store
 grep -Fq "$issuer" "$output_dir/runtime-config.body"
 grep -Fq "$client" "$output_dir/runtime-config.body"
+grep -Fq 'VITE_OIDC_BCEID_HINT: "bceidbusiness"' "$output_dir/runtime-config.body"
 check_http anonymous-api "$frontend_url/api/me" 401 no-store backend
 check_http anonymous-read-api "$frontend_url/api/gas/worksheets" 401 no-store backend
 check_http missing-asset "$frontend_url/assets/does-not-exist.js" 404 no-store

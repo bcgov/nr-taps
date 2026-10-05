@@ -76,15 +76,18 @@ python3 - "$state_dir" "$repo_dir" "$issuer" <<'PY'
 from pathlib import Path
 import secrets, sys
 output, repo, issuer = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
-password = 'TapsTest' + secrets.token_hex(12)
+password = 'TapsTest' + secrets.token_hex(10)
 (output / 'oracle.env').write_text('ORACLE_PASSWORD=TapsSystem' + secrets.token_hex(12) + '\nAPP_USER=taps_fixture\nAPP_USER_PASSWORD=' + password + '\n')
 (output / 'fixture-password').write_text(password)
+# Plain TCP to the disposable database. The TCPS host, service and truststore values are
+# unused, but the oracle profile's placeholders must resolve.
 (output / 'backend.env').write_text('\n'.join([
- 'TAPS_ORACLE_ENABLED=true', 'TAPS_ORACLE_JDBC_URL=jdbc:oracle:thin:@oracle:1521/FREEPDB1',
- 'TAPS_ORACLE_USERNAME=taps_fixture', 'TAPS_ORACLE_PASSWORD=' + password,
- 'TAPS_ORACLE_MAXIMUM_POOL_SIZE=2', 'TAPS_ORACLE_MINIMUM_IDLE=0',
- 'TAPS_ORACLE_CONNECTION_TIMEOUT_MS=1000', 'TAPS_ORACLE_CONNECT_TIMEOUT_MS=1000',
- 'TAPS_ORACLE_READ_TIMEOUT_MS=3000', 'TAPS_ORACLE_QUERY_TIMEOUT_SECONDS=2',
+ 'SPRING_PROFILES_ACTIVE=oracle', 'SPRING_DATASOURCE_URL=jdbc:oracle:thin:@oracle:1521/FREEPDB1',
+ 'DATABASE_USER=taps_fixture', 'DATABASE_PASSWORD=' + password,
+ 'DATABASE_HOST=unused.invalid', 'DATABASE_SERVICE_NAME=unused', 'KEYSTORE_SECRET=unused',
+ 'SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE=2', 'SPRING_DATASOURCE_HIKARI_MINIMUMIDLE=0',
+ 'SPRING_DATASOURCE_HIKARI_CONNECTIONTIMEOUT=1000',
+ 'DATABASE_CONNECT_TIMEOUT_MS=1000', 'DATABASE_READ_TIMEOUT_MS=3000',
  'TAPS_OIDC_ISSUER_URI=' + issuer, 'TAPS_OIDC_CLIENT_ID=taps-local-read',
 ]) + '\n')
 caddy = (repo / 'frontend/Caddyfile').read_text()

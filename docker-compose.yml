@@ -1,21 +1,81 @@
+# Local dev: backend on 8080, Vite on 3000; `--profile caddy` serves the production frontend on 3005.
+# Set TAPS_OIDC_ISSUER_URI/TAPS_OIDC_CLIENT_ID (shell or root .env) and copy frontend/.env.example
+# to frontend/.env. Oracle stays off unless SPRING_PROFILES_ACTIVE=oracle and DATABASE_* are set.
+
+x-var:
+  - &java-image maven:3.9.9-amazoncorretto-21-alpine
+  - &node-image node:24-alpine
+
 services:
   backend:
-    build: ./backend
+    image: *java-image
+    working_dir: /app
+    entrypoint: sh -c "mvn -DskipTests spring-boot:run"
     environment:
+      TZ: America/Vancouver
       TAPS_OIDC_ISSUER_URI: ${TAPS_OIDC_ISSUER_URI}
       TAPS_OIDC_CLIENT_ID: ${TAPS_OIDC_CLIENT_ID}
-    ports:
-      - "8080:8080"
+      # Passed through only when set in the shell, so unset values keep the backend defaults.
+      SPRING_PROFILES_ACTIVE:
+      SPRING_DATASOURCE_URL:
+      DATABASE_HOST:
+      DATABASE_SERVICE_NAME:
+      DATABASE_USER:
+      DATABASE_PASSWORD:
+      KEYSTORE_SECRET:
+      TRUSTSTORE_PATH:
+      APP_LOG_LEVEL:
+    ports: ["8080:8080"]
+    volumes:
+      - ./backend:/app
+      - maven-cache:/root/.m2
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health/readiness"]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 5
 
   frontend:
+    image: *node-image
+    working_dir: /app
+    entrypoint: sh -c "npm ci --ignore-scripts && npm run dev"
+    environment:
+      VITE_DEV_HOST: 0.0.0.0
+      VITE_DEV_PORT: 3000
+      VITE_DEV_BACKEND_TARGET: http://backend:8080
+      NODE_ENV: development
+    ports: ["3000:3000"]
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000"]
+      interval: 30s
+      timeout: 5s
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  caddy:
+    profiles: ["caddy"]
     build: ./frontend
+    env_file:
+      - path: ./frontend/.env
+        required: false
     environment:
       BACKEND_URL: http://backend:8080
-      VITE_OIDC_ISSUER_URI: ${TAPS_OIDC_ISSUER_URI}
-      VITE_OIDC_CLIENT_ID: ${TAPS_OIDC_CLIENT_ID}
-      VITE_OIDC_SITEMINDER_LOGOUT_URL: ${TAPS_OIDC_SITEMINDER_LOGOUT_URL:-https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi}
       LOG_LEVEL: INFO
-    ports:
-      - "3000:3000"
+      XDG_CONFIG_HOME: /tmp/caddy
+      XDG_DATA_HOME: /tmp/caddy
+    ports: ["3005:3000"]
+    volumes:
+      - ./frontend/Caddyfile:/etc/caddy/Caddyfile:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3001/health"]
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+
+volumes:
+  maven-cache:

@@ -1,15 +1,22 @@
+---
+# Named by slot, not zone: a newer PR in the same DEV slot takes the route over, and closing
+# the older PR leaves it alone because the app label has moved to the newer PR.
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: nr-taps-frontend-route
 parameters:
   - name: NAME
-    required: true
+    description: App name prefix used by the main deployment
+    value: nr-taps
   - name: ZONE
+    description: PR number or 'test'; must match the main deployment
     required: true
   - name: SLOT
-    description: DEV preview slot 0-49, or test
+    description: Route hostname slot, PR % 50 for DEV previews, or test
     required: true
   - name: DOMAIN
-    description: OpenShift apps domain, without scheme
+    description: Cluster apps domain, without scheme or leading dot
     required: true
 objects:
   - apiVersion: route.openshift.io/v1
@@ -17,12 +24,17 @@ objects:
     metadata:
       name: ${NAME}-${SLOT}-frontend
       labels:
-        app: ${NAME}-${ZONE}
+        app: ${NAME}-frontend-${ZONE}
+        app.kubernetes.io/name: ${NAME}-frontend
+        app.kubernetes.io/instance: ${ZONE}
+      annotations:
+        haproxy.router.openshift.io/timeout: 300s
+        router.openshift.io/cookie-same-site: Lax
     spec:
       host: ${NAME}-${SLOT}.${DOMAIN}
       to:
         kind: Service
-        name: ${NAME}-${ZONE}-frontend
+        name: ${NAME}-frontend-${ZONE}
       port:
         targetPort: http
       tls:
