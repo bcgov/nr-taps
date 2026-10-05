@@ -1,26 +1,28 @@
-import { Button } from 'react-bootstrap'
+import { Button, InlineLoading, Tile } from '@carbon/react'
 import { useAuth } from '@/context/auth/AuthContext'
 import { isOidcConfigured } from '@/service/oidc-service'
+import AppNotification from './AppNotification'
 
 export function NoRoleNotice() {
   return (
-    <p role="status">
-      You do not have TAPS access yet. Ask your TAPS access administrator to grant you access, then
-      sign in again.
-    </p>
+    <AppNotification
+      title="TAPS access pending"
+      subtitle="You do not have TAPS access yet. Ask your TAPS access administrator to grant you access, then sign in again."
+    />
   )
 }
 
 export default function SessionStatus() {
   const { state, login, logout, reloadSession } = useAuth()
-  if (state.kind === 'loading') return <p role="status">Loading your session…</p>
+  if (state.kind === 'loading')
+    return <InlineLoading role="status" aria-live="polite" description="Loading your session…" />
   if (state.kind === 'error') {
     return (
       <>
-        <p role="alert">{state.message}</p>
-        <div className="d-flex flex-wrap gap-2">
+        <AppNotification kind="error" title="Session unavailable" subtitle={state.message} />
+        <div className="taps-actions">
           <Button onClick={() => void reloadSession()}>Try again</Button>
-          <Button variant="secondary" onClick={() => void logout()}>
+          <Button kind="secondary" onClick={() => void logout()}>
             Sign out
           </Button>
         </div>
@@ -28,16 +30,26 @@ export default function SessionStatus() {
     )
   }
   if (state.kind === 'signed-in') return null
-  if (!isOidcConfigured()) return <p>Sign in is not configured for this environment.</p>
+  if (!isOidcConfigured())
+    return (
+      <AppNotification
+        title="Sign in unavailable"
+        subtitle="Sign in is not configured for this environment."
+      />
+    )
   return (
-    <>
-      <p>Sign in to access TAPS.</p>
-      <div className="d-flex flex-wrap gap-2">
+    <Tile className="taps-sign-in">
+      <h2>Sign in to access TAPS.</h2>
+      <p>
+        Access appraisal data submissions, worksheets and stumpage rates with your government or
+        business account.
+      </p>
+      <div className="taps-actions">
         <Button onClick={() => void login('idir')}>Sign in with IDIR</Button>
-        <Button variant="secondary" onClick={() => void login('business-bceid')}>
+        <Button kind="secondary" onClick={() => void login('business-bceid')}>
           Sign in with Business BCeID
         </Button>
       </div>
-    </>
+    </Tile>
   )
 }

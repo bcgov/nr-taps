@@ -1,0 +1,68 @@
+package ca.bc.gov.nrs.taps.read.oracle;
+
+/**
+ * Provisional ownership for historic and non-appraised worksheets, following the legacy search view:
+ * licence and client from HVA/HVX and the A-link client; organization from HVA, then road/private
+ * for non-appraised. Ambiguous ownership fails instead of picking one.
+ */
+final class OtherWorksheetScopeSql {
+  private OtherWorksheetScopeSql() {}
+
+  static final String HISTORIC = source("""
+      SELECT W.HISTORIC_APPRAISED_WRKSHEET_ID AS WORKSHEET_ID,
+             W.TIMBER_MARK, W.APPRAISAL_METHOD_CODE,
+             W.APPRAISAL_EFFECTIVE_DATE AS EFFECTIVE_DATE, W.EXPIRY_DATE,
+             W.APPRAISAL_STATUS_CODE AS STATUS_CODE,
+             CAST(NULL AS VARCHAR2(3)) AS REFERENCE_TYPE,
+             W.RATE_CALC_METHOD_CODE, W.TOTAL_OBLIGATION_ADJUSTMNT_IND,
+             W.ADJUST_QUARTERLY_IND, W.CEASE_ADJUSTMENT_DATE, W.ACTIVE_IND, W.POLICY_VERSION,
+      """, "HISTORIC_APPRAISED_WORKSHEET", """
+      (SELECT DISTINCT HVA.FOREST_DISTRICT
+         FROM HARVESTING_AUTHORITY HVA
+         JOIN HARVESTING_HAULING_XREF HVX ON HVX.HVA_SKEY = HVA.HVA_SKEY
+        WHERE HVX.TIMBER_MARK = W.TIMBER_MARK)
+      """);
+
+  static final String NON_APPRAISED = source("""
+      SELECT W.NON_APPRAISED_WORKSHEET_ID AS WORKSHEET_ID,
+             W.TIMBER_MARK, W.APPRAISAL_METHOD_CODE, W.EFFECTIVE_DATE, W.EXPIRY_DATE,
+             W.NON_APPRAISED_STATUS_CODE AS STATUS_CODE,
+             W.WORKSHEET_REFERENCE_TYPE_CODE AS REFERENCE_TYPE,
+             W.SDM_DECLARATION_ACCEPTANCE_DT, W.TSB_NUMBER_CODE,
+             W.APPRAISAL_FOREST_ZONE_CODE, W.NON_APPRAISED_RATE_TYPE_CODE,
+             W.RATE_ADJUSTMENT_TYPE_CODE,
+      """, "NON_APPRAISED_WORKSHEET", """
+      (SELECT DISTINCT COALESCE(HVA.FOREST_DISTRICT, BRM.FOREST_DISTRICT, PMC.FOREST_DISTRICT)
+         FROM HAULING_AUTHORITY HA
+         LEFT JOIN HARVESTING_HAULING_XREF HVX ON HVX.TIMBER_MARK = HA.TIMBER_MARK
+         LEFT JOIN HARVESTING_AUTHORITY HVA ON HVA.HVA_SKEY = HVX.HVA_SKEY
+         LEFT JOIN BLANKET_ROAD_MARK BRM ON BRM.TIMBER_MARK = HA.TIMBER_MARK
+         LEFT JOIN PRIVATE_MARK_CERTIFICATE PMC ON PMC.TIMBER_MARK = HA.TIMBER_MARK
+        WHERE HA.TIMBER_MARK = W.TIMBER_MARK)
+      """);
+
+  // All fragments are constants, not request input.
+  private static String source(String fields, String table, String district) {
+    return """
+        SELECT P.*, DISTRICT.ORG_UNIT_CODE AS ADMIN_DISTRICT_CODE,
+               REGION.ORG_UNIT_CODE AS ROLLUP_REGION_CODE
+          FROM (
+        %s
+               (SELECT DISTINCT HVA.FOREST_FILE_ID
+                  FROM HARVESTING_AUTHORITY HVA
+                  JOIN HARVESTING_HAULING_XREF HVX ON HVX.HVA_SKEY = HVA.HVA_SKEY
+                 WHERE HVX.TIMBER_MARK = W.TIMBER_MARK) AS LICENSE,
+               (SELECT DISTINCT FFC.CLIENT_NUMBER
+                  FROM FOREST_FILE_CLIENT FFC
+                  JOIN HARVESTING_AUTHORITY HVA ON HVA.FOREST_FILE_ID = FFC.FOREST_FILE_ID
+                  JOIN HARVESTING_HAULING_XREF HVX ON HVX.HVA_SKEY = HVA.HVA_SKEY
+                 WHERE HVX.TIMBER_MARK = W.TIMBER_MARK
+                   AND FFC.FOREST_FILE_CLIENT_TYPE_CODE = 'A') AS CLIENT_NUMBER,
+        %s AS FOREST_DISTRICT
+            FROM %s W
+               ) P
+          LEFT JOIN ORG_UNIT DISTRICT ON DISTRICT.ORG_UNIT_NO = P.FOREST_DISTRICT
+          LEFT JOIN ORG_UNIT REGION ON REGION.ORG_UNIT_NO = DISTRICT.ROLLUP_REGION_NO
+        """.formatted(fields, district, table);
+  }
+}

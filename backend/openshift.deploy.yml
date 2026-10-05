@@ -6,12 +6,41 @@ parameters:
   - name: ZONE
     required: true
   - name: IMAGE_TAG
+    description: PR number or commit SHA image tag
     required: true
+  - name: ORACLE_ENABLED
+    description: Enable Oracle read APIs only after the database secrets and grants are ready
+    value: 'false'
+  # Database settings come from the GitHub environment secrets, as in nr-lexis.
+  - name: DATABASE_HOST
+    value: ''
+  - name: DATABASE_PORT
+    value: '1543'
+  - name: DATABASE_SERVICE_NAME
+    value: ''
+  - name: DATABASE_USER
+    value: ''
+  - name: DATABASE_PASSWORD
+    value: ''
+  - name: KEYSTORE_SECRET
+    description: Passphrase for the truststore generated from the database certificate
+    value: ''
   - name: OIDC_ISSUER_URI
     required: true
   - name: OIDC_CLIENT_ID
     required: true
 objects:
+  - apiVersion: v1
+    kind: Secret
+    metadata:
+      name: ${NAME}-${ZONE}-oracle
+      labels:
+        app: ${NAME}-${ZONE}
+    type: Opaque
+    stringData:
+      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      KEYSTORE_SECRET: ${KEYSTORE_SECRET}
   - apiVersion: apps/v1
     kind: Deployment
     metadata:
@@ -31,6 +60,47 @@ objects:
         spec:
           automountServiceAccountToken: false
           terminationGracePeriodSeconds: 90
+          initContainers:
+            # Same truststore init as nr-lexis; writes /cert/jssecacerts.
+            - name: oracle-cert
+              image: ghcr.io/bcgov/nr-forest-client/common:prod
+              imagePullPolicy: Always
+              command:
+                - sh
+                - -c
+                - 'if [ "$TAPS_ORACLE_ENABLED" = true ]; then exec sh /app/startup.sh; fi'
+              env:
+                - name: TAPS_ORACLE_ENABLED
+                  value: ${ORACLE_ENABLED}
+                - name: ORACLEDB_HOST
+                  value: ${DATABASE_HOST}
+                - name: ORACLEDB_PORT
+                  value: ${DATABASE_PORT}
+                - name: ORACLEDB_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${NAME}-${ZONE}-oracle
+                      key: KEYSTORE_SECRET
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - name: oracle-cert
+                  mountPath: /cert
+                - name: init-tmp
+                  mountPath: /tmp
           containers:
             - name: backend
               image: ghcr.io/bcgov/${NAME}/backend:${IMAGE_TAG}
@@ -41,10 +111,35 @@ objects:
               env:
                 - name: TZ
                   value: America/Vancouver
+                - name: TAPS_IMAGE_REFERENCE
+                  value: ghcr.io/bcgov/${NAME}/backend:${IMAGE_TAG}
                 - name: TAPS_OIDC_ISSUER_URI
                   value: ${OIDC_ISSUER_URI}
                 - name: TAPS_OIDC_CLIENT_ID
                   value: ${OIDC_CLIENT_ID}
+                - name: TAPS_ORACLE_ENABLED
+                  value: ${ORACLE_ENABLED}
+                - name: TAPS_ORACLE_JDBC_URL
+                  value: jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)(HOST=${DATABASE_HOST})(PORT=${DATABASE_PORT}))(CONNECT_DATA=(SERVICE_NAME=${DATABASE_SERVICE_NAME})(SERVER=DEDICATED)))
+                - name: TAPS_ORACLE_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${NAME}-${ZONE}-oracle
+                      key: DATABASE_USER
+                - name: TAPS_ORACLE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${NAME}-${ZONE}-oracle
+                      key: DATABASE_PASSWORD
+                - name: TAPS_ORACLE_TRUSTSTORE_PATH
+                  value: /cert/jssecacerts
+                - name: TAPS_ORACLE_TRUSTSTORE_TYPE
+                  value: JKS
+                - name: TAPS_ORACLE_TRUSTSTORE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${NAME}-${ZONE}-oracle
+                      key: KEYSTORE_SECRET
               resources:
                 requests:
                   cpu: 100m
@@ -63,6 +158,9 @@ objects:
               volumeMounts:
                 - name: tmp
                   mountPath: /tmp
+                - name: oracle-cert
+                  mountPath: /cert
+                  readOnly: true
               # Wait for Service endpoint removal before shutdown.
               lifecycle:
                 preStop:
@@ -88,6 +186,11 @@ objects:
                 failureThreshold: 3
           volumes:
             - name: tmp
+              emptyDir: {}
+            - name: init-tmp
+              emptyDir: {}
+            # Rebuilt on each start so a rotated certificate is picked up.
+            - name: oracle-cert
               emptyDir: {}
   - apiVersion: v1
     kind: Service

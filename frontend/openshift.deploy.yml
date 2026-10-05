@@ -6,6 +6,7 @@ parameters:
   - name: ZONE
     required: true
   - name: IMAGE_TAG
+    description: PR number or commit SHA image tag
     required: true
   - name: OIDC_ISSUER_URI
     required: true
@@ -69,6 +70,8 @@ objects:
                   value: INFO
                 - name: BACKEND_URL
                   value: http://${NAME}-${ZONE}-backend:8080
+                - name: TAPS_IMAGE_REFERENCE
+                  value: ghcr.io/bcgov/${NAME}/frontend:${IMAGE_TAG}
                 - name: VITE_OIDC_ISSUER_URI
                   value: ${OIDC_ISSUER_URI}
                 - name: VITE_OIDC_CLIENT_ID

@@ -1,0 +1,16 @@
+.taps-reference-draft {
+  border-block-start: 1px solid var(--cds-border-subtle-01);
+  margin-block-start: 1.5rem;
+  padding-block-start: 1.5rem;
+
+  > p,
+  form > p {
+    margin-block: 1rem;
+  }
+}
+
+.taps-reference-draft__fields {
+  display: grid;
+  gap: 1.5rem;
+  margin-block: 1.5rem;
+}

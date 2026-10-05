@@ -6,6 +6,10 @@ on:
       target:
         required: true
         type: string
+      tag:
+        description: Image tag both deployments must report
+        required: true
+        type: string
 
 permissions: {}
 
@@ -17,15 +21,32 @@ jobs:
       - name: Wait for application
         env:
           BASE_URL: https://${{ github.event.repository.name }}-${{ inputs.target }}.${{ vars.OC_APPS_DOMAIN }}
+          IMAGE_TAG: ${{ inputs.tag }}
         run: |
+          set -euo pipefail
+          EXPECTED_FRONTEND_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}/frontend:${IMAGE_TAG}"
+          EXPECTED_BACKEND_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}/backend:${IMAGE_TAG}"
+          response_headers=$(mktemp -d)
+          trap 'rm -f "$response_headers/page" "$response_headers/api" "$response_headers/config"; rmdir "$response_headers"' EXIT
+          header_value() {
+            awk -v name="$1:" 'tolower($1) == name {sub(/\r$/, ""); print $2}' "$2"
+          }
+          # Caddy adds x-taps-image; x-taps-backend-image comes from the backend.
+          matches_frontend() {
+            [[ "$(header_value x-taps-image "$1")" == "$EXPECTED_FRONTEND_IMAGE" ]]
+          }
+          matches_images() {
+            matches_frontend "$1" && [[ "$(header_value x-taps-backend-image "$1")" == "$EXPECTED_BACKEND_IMAGE" ]]
+          }
           for attempt in {1..30}; do
-            page_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/" || true)
-            api_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/api/me" || true)
-            config_status=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/config.js" || true)
-            if [ "$page_status" = 200 ] && [ "$api_status" = 401 ] && [ "$config_status" = 200 ]; then
+            page_status=$(curl -sS -D "$response_headers/page" -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/" || true)
+            api_status=$(curl -sS -D "$response_headers/api" -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/api/me" || true)
+            config_status=$(curl -sS -D "$response_headers/config" -o /dev/null -w '%{http_code}' --max-time 10 "$BASE_URL/config.js" || true)
+            if [ "$page_status" = 200 ] && [ "$api_status" = 401 ] && [ "$config_status" = 200 ] \
+              && matches_frontend "$response_headers/page" && matches_images "$response_headers/api" && matches_frontend "$response_headers/config"; then
               exit 0
             fi
-            echo "Waiting for route (page=$page_status api=$api_status config=$config_status, attempt $attempt/30)"
+            echo "Waiting for the expected image pair (page=$page_status api=$api_status config=$config_status, attempt $attempt/30)"
             sleep 10
           done
           exit 1

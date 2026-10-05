@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { renderRoute, screen, staffSession, userEvent } from '@/test-utils'
+import { renderRoute, screen, staffSession, userEvent, within } from '@/test-utils'
 
 const oidc = vi.hoisted(() => ({
   AUTH_CALLBACK_PATH: '/authCallback',
@@ -13,6 +13,7 @@ const oidc = vi.hoisted(() => ({
 vi.mock('@/service/oidc-service', () => oidc)
 
 const fetch = vi.fn()
+const page = () => within(screen.getByRole('main'))
 
 function withCapabilities(capabilities: string[]) {
   fetch.mockResolvedValue({
@@ -36,8 +37,8 @@ test('shows separate application entry points only when a server capability allo
 
   await renderRoute()
 
-  expect(await screen.findByRole('link', { name: 'ECAS' })).toBeInTheDocument()
-  expect(screen.queryByRole('link', { name: 'GAS' })).not.toBeInTheDocument()
+  expect(await page().findByRole('link', { name: 'ECAS' })).toBeInTheDocument()
+  expect(page().queryByRole('link', { name: 'GAS' })).not.toBeInTheDocument()
 })
 
 test('opens the ECAS inbox and profile shells from its own navigation', async () => {
@@ -45,13 +46,13 @@ test('opens the ECAS inbox and profile shells from its own navigation', async ()
   withCapabilities(['ECAS_SUBMISSION_VIEW'])
   const { router } = await renderRoute('/ecas')
 
-  expect(await screen.findByRole('link', { name: 'Inbox Search' })).toHaveAttribute(
+  expect(await page().findByRole('link', { name: 'Inbox Search' })).toHaveAttribute(
     'href',
     '/ecas/ECAS05',
   )
-  expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/ecas/ECAS88')
-  expect(screen.queryByRole('link', { name: 'Appraisal Search' })).not.toBeInTheDocument()
-  await user.click(screen.getByRole('link', { name: 'Inbox Search' }))
+  expect(page().getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/ecas/ECAS88')
+  expect(page().queryByRole('link', { name: 'Appraisal Search' })).not.toBeInTheDocument()
+  await user.click(page().getByRole('link', { name: 'Inbox Search' }))
 
   expect(await screen.findByRole('heading', { name: 'Inbox Search' })).toBeInTheDocument()
   expect(router.state.location.pathname).toBe('/ecas/ECAS05')
@@ -65,9 +66,9 @@ test('does not expose ministry worksheet pages to a client-report-only session',
 
   expect(await screen.findByRole('heading', { name: 'GAS' })).toBeInTheDocument()
   expect(screen.getByRole('status')).toHaveTextContent('Your GAS pages will appear here')
-  expect(screen.queryByRole('link', { name: 'Appraisal Search' })).not.toBeInTheDocument()
+  expect(page().queryByRole('link', { name: 'Appraisal Search' })).not.toBeInTheDocument()
   expect(
-    screen.queryByRole('link', { name: 'Summary - Appraised Worksheet' }),
+    page().queryByRole('link', { name: 'Summary - Appraised Worksheet' }),
   ).not.toBeInTheDocument()
 })
 
@@ -144,3 +145,21 @@ test('returns 404 for screens outside the small verified catalogue', async () =>
 
   expect(await screen.findByRole('heading', { name: '404' })).toBeInTheDocument()
 })
+
+test.each(['/ecas/ECAS05', '/gas/showAppraisalSearch'])(
+  'enables the real read page only when the server advertises it: %s',
+  async (path) => {
+    fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ ...staffSession, readApiEnabled: true }),
+    })
+    await renderRoute(path)
+    expect(await screen.findByRole('button', { name: 'Search' })).toBeInTheDocument()
+    expect(
+      screen.queryByText('This page is being modernized. It is not available yet.'),
+    ).not.toBeInTheDocument()
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual(
+      path.startsWith('/ecas') ? ['/api/me', '/api/ecas/lookups'] : ['/api/me'],
+    )
+  },
+)

@@ -52,6 +52,7 @@ jobs:
     uses: ./.github/workflows/reusable-tests.yml
     with:
       target: ${{ needs.deploy.outputs.route_slot }}
+      tag: ${{ github.event.pull_request.head.sha }}
 
   results:
     name: PR Results

@@ -1,43 +1,43 @@
 # TAPS architecture
 
-TAPS modernizes the Electronic Commerce Appraisal System (ECAS) and General Appraisal System (GAS2) with FAM authentication and authorization, Spring Boot and React, Gold OpenShift hosting, and GitHub Actions CI/CD. The existing Oracle schema and data remain in place, accessed through an application proxy account.
+TAPS replaces the Electronic Commerce Appraisal System (ECAS) and the General Appraisal System (GAS2). ECAS and GAS share sign-in, session and authorization but keep separate navigation. The existing Oracle schema and data stay in place and are reached through an application proxy account.
 
-The initial implementation shares sign-in, session state and authorization while retaining separate ECAS and GAS navigation.
-
-## Runtime and trust boundaries
-
-The foundation implements the application and deployment templates. Oracle connectivity through the application proxy account remains to be implemented; environment configuration and deployed acceptance are required before release.
+## Runtime
 
 ```mermaid
 flowchart LR
-    User["User<br/>IDIR or Business BCeID"] -->|HTTPS| Route["OpenShift edge TLS Route"]
+    User["User<br/>IDIR or Business BCeID"] -->|HTTPS| Route["OpenShift Route<br/>edge TLS"]
     subgraph Gold["Gold OpenShift"]
         Route --> Frontend["Caddy + Coraza<br/>React SPA :3000"]
-        Frontend -->|"Private /api proxy<br/>Bearer access token"| Backend["Spring Boot + Undertow :8080<br/>GET /api/me"]
+        Frontend -->|"/api proxy<br/>bearer token"| Backend["Spring Boot :8080"]
     end
-    User -->|"Code + PKCE<br/>refresh and logout"| SSO["BC Gov SSO<br/>Keycloak standard realm"]
-    SSO -->|"Federated sign-in"| IDP["IDIR MFA<br/>Business BCeID"]
-    FAM["FAM access management"] -->|"Application role assignments"| SSO
-    Backend -->|"JWK signing keys"| SSO
-    Backend -.->|"Planned Spring JDBC<br/>application proxy account"| Oracle[("Existing ECAS / GAS2 Oracle schema<br/>tables, packages and data")]
+    User -->|"Code + PKCE"| SSO["BC Gov SSO<br/>Keycloak"]
+    SSO --> IDP["IDIR MFA<br/>Business BCeID"]
+    FAM["FAM"] -->|"Role assignments"| SSO
+    Backend -->|"JWKS"| SSO
+    Backend -.->|"JDBC, off by default"| Oracle[("Existing ECAS / GAS2<br/>Oracle schema")]
 ```
 
-Only the frontend has a public Route. Caddy serves the SPA, applies browser security headers and Coraza rules, and proxies API traffic to the private backend Service. The browser obtains its own access token using a public client; a client secret is not placed in the SPA. FAM provisions role assignments in CSS/Keycloak; the API authorizes from the validated token, without calling FAM for every request.
+- Only the frontend has a public Route. Caddy serves the SPA, sets security headers, runs Coraza WAF rules and proxies `/api` to the private backend Service.
+- The browser is a public OIDC client, so there is no secret in the SPA.
+- FAM writes role assignments into Keycloak. The API authorizes from the validated token and doesn't call FAM per request.
+- The frontend writes `/config.js` from environment values at startup, so one image runs in DEV and TEST.
+- Oracle is off by default. When it's on, the backend won't start unless it can connect.
 
-| Component                  | Implemented responsibility                                                                                              | Deferred responsibility                                                                           |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| React frontend             | Shared session, IDIR/Business BCeID login, accepted-grant display, capability-gated ECAS/GAS links and five page shells | Carbon components/theming, working forms, searches, record views and inactivity-warning UX        |
-| Caddy / Coraza             | Static assets, API proxy, CSP/security headers, credential-safe log configuration, WAF and health endpoint              | Container/WAF runtime acceptance in DEV/TEST                                                      |
-| Spring Boot / Undertow     | JWT validation, principal/grant conversion, capability and record-scope helpers, `/api/me`, health probes               | Business endpoints, authoritative record ownership, workflow validation and transactions          |
-| FAM / BC Gov SSO           | Integration and role-assignment model supported by the application                                                      | TAPS clients, approved role definitions/assignments and credentialed acceptance                   |
-| Oracle                     | Existing ECAS/GAS2 schema, tables, data and package contracts to be reused                                              | Driver, approved proxy access, connection configuration and repository queries                    |
-| GitHub Actions / OpenShift | Image build, DEV preview/TEST deployment templates, smoke checks, quality checks and advisory security scan             | Provisioned namespaces, deployment credentials, actual CI/rollout evidence and operational sizing |
+| Component      | Built                                                                 | Not yet                                    |
+| -------------- | --------------------------------------------------------------------- | ------------------------------------------ |
+| Frontend       | Session, login, Carbon shell, ECAS/GAS read pages, synthetic preview  | Editing forms, workflow, inactivity warning |
+| Caddy / Coraza | Static assets, API proxy, CSP and security headers, WAF, health port  | Testing in DEV/TEST                        |
+| Backend        | JWT validation, grants, scoped read endpoints, `/api/me`, health probes | Write endpoints, workflow, transactions  |
+| FAM / SSO      | Role and scope model                                                  | TAPS clients and role assignments          |
+| Oracle         | Read adapters, disposable-Oracle tests                                | Proxy access, real-data checks             |
+| OpenShift / CI | Image builds, DEV/TEST templates, smoke tests, Trivy                  | Namespaces, credentials, sizing            |
 
-No service-client API, mail delivery, report engine, file scanner or scheduled business process is configured in this foundation. Add those integrations when their TAPS requirements and ownership are established.
+There is no service-client API, email, report engine, file scanner or scheduled job yet.
 
-## Frontend design system
+## Frontend
 
-Carbon Design System is the target UI framework, following the LEXIS interface. The current React scaffold uses Bootstrap and BC Gov components; Carbon integration remains to be implemented. TanStack Router continues to handle application routing.
+The UI uses Carbon and follows LEXIS for the header, navigation, tables and side drawer. TanStack Router handles routing. See [UI foundation](ui-foundation.md).
 
 | UI concern          | Carbon package / component              |
 | ------------------- | --------------------------------------- |
@@ -46,11 +46,9 @@ Carbon Design System is the target UI framework, following the LEXIS interface. 
 | Icons               | `@carbon/icons-react`                   |
 | Pictograms          | `@carbon/pictograms-react`              |
 
-Follow LEXIS's responsive drawer and focus-management pattern. Prefer Carbon icons and pictograms over other icon libraries or hand-drawn SVGs; use alternatives only when Carbon has no suitable asset. Retain official BC Gov branding assets.
+Use Carbon icons and pictograms unless Carbon has nothing suitable. Keep the official BC Gov branding.
 
 ## Authentication
-
-The supported account types are **IDIR MFA and Business BCeID**. Basic BCeID is unsupported. See [authentication and authorization](access-and-identity.md) for token validation, grant formats and scope enforcement.
 
 ```mermaid
 sequenceDiagram
@@ -58,75 +56,67 @@ sequenceDiagram
     participant S as BC Gov SSO
     participant I as IDIR MFA / Business BCeID
     participant B as TAPS API
-    U->>S: Authorization request, PKCE challenge and provider hint
+    U->>S: Auth request with PKCE and provider hint
     S->>I: Federated sign-in
-    I-->>S: Authenticated identity
-    S-->>U: Return to /authCallback with one-time code
+    I-->>S: Identity
+    S-->>U: Redirect to /authCallback with code
     U->>S: Exchange code and PKCE verifier
     S-->>U: Access, ID and refresh tokens
-    U->>B: GET /api/me with bearer access token
-    B->>B: Verify signature, issuer, lifetime, exp, azp, typ and provider
-    B->>B: Accept compatible TAPS grants with valid scopes
-    B-->>U: Identity, role grants, capabilities and forest clients
-    Note over U,S: Tokens and OIDC state use sessionStorage
-    Note over U,S: One shared refresh and late writes discarded after logout
+    U->>B: GET /api/me with bearer token
+    B->>B: Validate token, accept TAPS grants
+    B-->>U: Identity, grants, capabilities, readApiEnabled
+    Note over U,S: Tokens live in sessionStorage
 ```
 
-The API requires a token signed by the configured issuer, a present expiry, the configured client in `azp`, bearer token type, a supported provider and a usable provider-specific user identity. Realm roles and other clients' roles confer no TAPS access. Unknown/malformed grants, missing required scopes and FAM management/metadata roles confer no application permission.
+Only IDIR MFA and Business BCeID are supported. [Authentication and authorization](access-and-identity.md) covers token checks and grant formats.
 
-A valid sign-in without a TAPS role receives an empty access list from `/api/me`, allowing the UI to explain how to request access. Public health probes are available; other application paths default to denied until their route policy is implemented. The API is stateless and bearer-only; it does not authenticate from browser cookies or HTTP Basic.
-
-Logout removes local credentials and chains the configured SiteMinder logoff to Keycloak end-session. Session generation checks prevent an in-flight storage read, refresh or callback from restoring a cleared session. `invalid_grant` and an unrenewable expiring session end local access; transport/temporary SSO failures preserve stored credentials for retry. The full application inactivity-warning/logout policy is still to be implemented and accepted.
+Logout clears local credentials, then chains SiteMinder logoff to Keycloak end-session. Only one token refresh runs at a time, and a late refresh or callback can't restore a session after logout. `invalid_grant`, or a session that can't renew, signs the user out. Network errors keep credentials so the user can retry. The inactivity warning is not built yet.
 
 ## Authorization
 
-The backend derives capabilities from [TapsRole](../backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsRole.java). The browser uses the capability union for presentation. The backend must authorize every operation independently.
-
 ```mermaid
 flowchart TD
-    Token["Validated TAPS user token"] --> Grants["Accepted grants<br/>role + compatible provider + required scope"]
-    Grants --> UI["Capability union<br/>navigation and page gates"]
-    Grants --> Check["Future business operation<br/>capability and record scope from the same grant"]
-    Record["Authoritative database record<br/>client, district and rollup region"] -.-> Check
-    Check --> Policy["Operation-specific validation<br/>transaction and concurrency controls"]
-    Policy --> Result["Allow only when all applicable checks pass"]
+    Token["Validated token"] --> Grants["Accepted grants<br/>role + provider + scope"]
+    Grants --> UI["Capabilities<br/>navigation and page gates"]
+    Grants --> Check["Read check<br/>capability and scope from one grant"]
+    Record["Record ownership<br/>client, district, region"] --> Check
+    Check --> Result["Scope applied in SQL<br/>before counts, pages and child rows"]
 ```
 
-[RoleGrant](../backend/src/main/java/ca/bc/gov/nrs/taps/security/RoleGrant.java) accepts one scope dimension per scoped role: district, current FAM region, or an eight-digit forest-client number. Multiple grants may authorize different places and actions. [TapsUser](../backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsUser.java) checks that one grant supplies both the requested capability and the relevant record scope. Broad read access cannot expand a separate scoped write grant.
+The backend derives capabilities from [TapsRole](../backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsRole.java) and authorizes every operation. The browser uses capabilities only for display. [RoleGrant](../backend/src/main/java/ca/bc/gov/nrs/taps/security/RoleGrant.java) holds one scope per scoped role: a district, a FAM region or an eight-digit forest-client number. [TapsUser](../backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsUser.java) requires one grant to supply both the capability and the record's scope, so a broad read grant can't widen a scoped write grant.
 
-The record-scope helper is tested with synthetic records, but has no database-backed consumers yet. When adding endpoints, load scope from the record and its authoritative parents/relationships; enforce scope in lists, counts, reports and direct-ID reads. Validate linked-resource scope on creation. State-changing operations also need operation-specific validation and concurrency checks under the transaction or lock. A role or visible button alone is insufficient.
+The Oracle readers apply scope in SQL before counts, pages, direct lookups and child rows. The ADS and per-family ownership mappings are provisional until checked against real data.
 
-The current role mappings support the access scaffold. New endpoints require validated authorization and acceptance tests before they are enabled. Record implemented integration differences in [technical legacy divergences](intentional-legacy-divergences.md).
+New endpoints need their own authorization rules and tests before they're enabled. Writes also need linked-resource scope checks and transaction and concurrency controls. Record integration differences in [technical legacy divergences](intentional-legacy-divergences.md).
 
-## Existing Oracle access
+## Oracle access
 
-TAPS will use an application proxy account with approved privileges to access the existing Oracle schema, tables and stored procedures. The data and record identifiers remain in place; no data migration is planned.
+Current endpoints run SELECTs and the inbox's existing client-name function. No legacy write package is called. The readers only register when Oracle is on, and code-list HTTP routes aren't exposed yet. Calculation, write, workflow and bulk-run procedures stay out until their side effects are reviewed.
 
-Start with low-risk, parameterized lookup reads once proxy access is available. Preserve projection, effective/expiry filters, ordering and null/date semantics when implementing queries. Keep calculation, write, workflow and bulk-run procedure calls until their side effects and transaction contracts have been reviewed.
+- [Oracle read foundation](oracle-read-foundation.md): legacy query rules and mappings.
+- [Oracle read runtime](oracle-read-runtime.md): settings, grants and health.
 
-Port legacy screens and application logic to React and Spring Boot while preserving ECAS/GAS business behavior against the existing tables. Browser RPC and organization-context handoffs can become server-side coordination. Similar screen names do not establish equivalent behavior, and an unported screen has not been retired.
+Port legacy screens with their ECAS/GAS business behavior against the same tables. A legacy screen stays in use until it is ported.
 
 ## Delivery and operations
 
-DEV uses public slots `PR number modulo 50`, while workload names and ownership labels retain the actual PR number. This bounds SSO callbacks to 50 hosts. PRs that share a slot share its hostname; the latest deployment owns the reused Route. Cleanup selects the closed PR's labels, so it does not delete a reused Route owned by a newer PR.
-
 ```mermaid
 flowchart LR
-    PR["Pull request"] --> Quality["Analysis<br/>Java/React checks + advisory Trivy"]
-    PR --> Build["Build frontend/backend<br/>PR and immutable head-SHA image tags"]
-    Build --> DEV["DEV preview<br/>validate settings, deploy, smoke"]
-    DEV --> Review["Review + configured repository checks"]
+    PR["Pull request"] --> Quality["Analysis<br/>tests + Trivy"]
+    PR --> Build["Build images<br/>PR and SHA tags"]
+    Build --> DEV["DEV preview<br/>deploy + smoke"]
+    DEV --> Review["Review"]
     Quality --> Review
     Review --> Merge["Merge to main"]
-    Merge --> TEST["Deploy accepted PR images to TEST<br/>smoke and tag test"]
-    Close["PR closed"] --> Cleanup["DEV-only cleanup<br/>actual PR ownership labels"]
-    TEST -.-> PROD["PROD disabled<br/>separate reviewed promotion required"]
+    Merge --> TEST["TEST<br/>PR images, smoke, tag test"]
+    Close["PR closed"] --> Cleanup["Remove DEV preview"]
+    TEST -.-> PROD["PROD disabled"]
 ```
 
-The diagram shows the delivery lifecycle; Analysis and image builds are separate workflows/jobs. Repository branch-protection requirements must be configured separately. Current merge delivery uses PR-numbered images; synchronize the branch and rebuild after `main` advances before treating an older green PR image as the accepted candidate.
+DEV previews use route slot `PR number modulo 50`, which caps SSO callbacks at 50 hosts. PRs in the same slot share a hostname, and the latest deploy owns the Route. Names and labels keep the real PR number, so cleanup never deletes a Route now owned by a newer PR. Branch protection is set in the repository settings.
 
-Pods disable service-account token mounting, privilege escalation and Linux capabilities, and use read-only root filesystems with writable temporary volumes. Ingress policies permit router-to-frontend and same-preview frontend-to-backend traffic. Starter replicas/resources are small; HA, quotas, metrics and scale choices require evidence from the provisioned environment.
+Pods don't mount service-account tokens, drop all capabilities, block privilege escalation and use a read-only root filesystem with writable temp volumes. Network policies allow router-to-frontend and same-preview frontend-to-backend traffic. Replicas and resources start small.
 
-Spring's 60-second graceful shutdown plus a 10-second preStop fits within the 90-second pod termination budget. Caddy disables upstream connection pooling to avoid pinning requests to a draining pod. These settings are configuration/local-process proof, not deployed rolling-availability acceptance.
+Spring's 60-second graceful shutdown plus a 10-second preStop fits in the 90-second termination budget. Caddy turns off upstream connection pooling so requests don't stick to a draining pod. As in LEXIS, liveness and readiness use Spring's app state, so a shared database outage doesn't take every pod out. `/actuator/health` includes the database when Oracle is on.
 
-See [deployment configuration](deployment-configuration.md) for SSO request fields, callbacks and GitHub variables/secrets, and the [README](../README.md) for development and checks.
+See [deployment configuration](deployment-configuration.md) for SSO and GitHub settings.

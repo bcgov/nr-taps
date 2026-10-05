@@ -1,12 +1,31 @@
 server:
   port: 8080
   shutdown: graceful
+  undertow:
+    max-http-post-size: 64KB
 
 spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
   lifecycle:
     timeout-per-shutdown-phase: 60s
 
 taps:
+  image-reference: ${TAPS_IMAGE_REFERENCE:local}
+  oracle:
+    enabled: ${TAPS_ORACLE_ENABLED:false}
+    jdbc-url: ${TAPS_ORACLE_JDBC_URL:}
+    username: ${TAPS_ORACLE_USERNAME:}
+    password: ${TAPS_ORACLE_PASSWORD:}
+    maximum-pool-size: ${TAPS_ORACLE_MAXIMUM_POOL_SIZE:10}
+    minimum-idle: ${TAPS_ORACLE_MINIMUM_IDLE:1}
+    connection-timeout-ms: ${TAPS_ORACLE_CONNECTION_TIMEOUT_MS:10000}
+    connect-timeout-ms: ${TAPS_ORACLE_CONNECT_TIMEOUT_MS:10000}
+    read-timeout-ms: ${TAPS_ORACLE_READ_TIMEOUT_MS:30000}
+    query-timeout-seconds: ${TAPS_ORACLE_QUERY_TIMEOUT_SECONDS:20}
+    truststore-path: ${TAPS_ORACLE_TRUSTSTORE_PATH:}
+    truststore-type: ${TAPS_ORACLE_TRUSTSTORE_TYPE:JKS}
+    truststore-password: ${TAPS_ORACLE_TRUSTSTORE_PASSWORD:}
   auth:
     issuer-uri: ${TAPS_OIDC_ISSUER_URI:}
     client-id: ${TAPS_OIDC_CLIENT_ID:}
@@ -16,6 +35,14 @@ management:
     health:
       probes:
         enabled: true
+      show-details: never
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          # As in nr-lexis, a database outage shouldn't take every replica out of service.
+          # Startup still checks Oracle, and /actuator/health reports it.
+          include: readinessState
   endpoints:
     web:
       exposure:

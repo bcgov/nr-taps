@@ -1,5 +1,4 @@
 import { defineConfig } from 'vite'
-import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { tanstackRouter } from '@tanstack/router-plugin/vite'
 
@@ -29,9 +28,6 @@ export default defineConfig({
   resolve: {
     // https://vitejs.dev/config/shared-options.html#resolve-alias
     tsconfigPaths: true,
-    alias: {
-      '~bootstrap': fileURLToPath(new URL('./node_modules/bootstrap', import.meta.url)),
-    },
     extensions: ['.js', '.json', '.jsx', '.mjs', '.ts', '.tsx', '.vue'],
   },
   build: {
@@ -44,11 +40,7 @@ export default defineConfig({
   },
   css: {
     preprocessorOptions: {
-      scss: {
-        // Silence deprecation warnings caused by Bootstrap SCSS
-        // which is out of our control.
-        silenceDeprecations: ['color-functions', 'global-builtin', 'import'],
-      },
+      scss: { quietDeps: true },
     },
   },
 })

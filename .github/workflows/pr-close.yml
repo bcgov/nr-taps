@@ -31,4 +31,4 @@ jobs:
           oc_token: ${{ secrets.oc_token }}
           oc_server: ${{ vars.OC_SERVER }}
           commands: |
-            oc delete deployment,service,route,networkpolicy -l app=${{ github.event.repository.name }}-${{ github.event.number }} --ignore-not-found
+            oc delete deployment,service,route,networkpolicy,secret -l app=${{ github.event.repository.name }}-${{ github.event.number }} --ignore-not-found

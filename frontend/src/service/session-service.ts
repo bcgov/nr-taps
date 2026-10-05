@@ -7,6 +7,7 @@ export type RoleScope = { type: 'DISTRICT' | 'REGION' | 'FOREST_CLIENT'; value: 
 export type RoleGrant = { role: string; scopes: RoleScope[] }
 
 export type Session = {
+  readApiEnabled?: boolean
   userId: string
   displayName: string
   email: string | null

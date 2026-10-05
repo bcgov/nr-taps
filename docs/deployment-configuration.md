@@ -1,8 +1,8 @@
 # SSO and deployment configuration
 
-Configure the application-specific SSO clients, OpenShift namespaces and deployment credentials for each environment. Keep namespace allocations, request tracking and local setup notes outside the repository.
+Each environment needs its own SSO client, OpenShift namespace and deploy credentials. Keep namespace details and request tracking out of the repository.
 
-## Starting the SSO request
+## SSO request
 
 | Request field         | TAPS choice                                                         |
 | --------------------- | ------------------------------------------------------------------- |
@@ -12,26 +12,22 @@ Configure the application-specific SSO clients, OpenShift namespaces and deploym
 | Flow                  | Authorization code with PKCE                                        |
 | Identity providers    | IDIR MFA and Business BCeID                                         |
 | Basic BCeID           | Disabled                                                            |
-| Environments          | DEV and TEST initially; PROD is a separate later deployment gate    |
-| Browser client secret | None; do not create or inject a confidential secret into the SPA    |
+| Environments          | DEV and TEST for now; PROD later                                    |
+| Browser client secret | None                                                                |
 
-Copy the installation JSON's public `resource` client ID for each environment; the request/integration number is not the client ID. The application's browser issuer/client and backend issuer/client must match. Manage application role assignments through FAM.
+The client ID is the `resource` value in each environment's installation JSON, not the request number. Frontend and backend must use the same issuer and client. Manage role assignments in FAM. Provider hints are `azureidir` and `bceidbusiness`.
 
-The current implementation uses `azureidir` and `bceidbusiness` provider hints. Confirm the actual approved providers and public client metadata before live acceptance.
+Keycloak logout doesn't end the SiteMinder session behind Business BCeID, so sign-out goes to SiteMinder `logoff.cgi` first and then to Keycloak logout. DEV and TEST use `https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi`. PROD must use `https://logon7.gov.bc.ca/clp-cgi/logoff.cgi`.
 
 ## Redirects and origins
 
-Register the exact callbacks and corresponding origins/post-logout returns. The prepared DEV host range is bounded to 50 slots; PR number modulo 50 chooses the public hostname.
-
-| Environment                   | Callback URI                                                     | Origin / post-logout return                         |
+| Environment                   | Callback URI                                                     | Origin / post-logout redirect                       |
 | ----------------------------- | ---------------------------------------------------------------- | --------------------------------------------------- |
 | Local development, DEV client | `http://localhost:3000/authCallback`                             | `http://localhost:3000`                             |
 | DEV slots 0-49                | `https://nr-taps-<slot>.apps.gold.devops.gov.bc.ca/authCallback` | `https://nr-taps-<slot>.apps.gold.devops.gov.bc.ca` |
 | TEST                          | `https://nr-taps-test.apps.gold.devops.gov.bc.ca/authCallback`   | `https://nr-taps-test.apps.gold.devops.gov.bc.ca`   |
 
-`<slot>` is notation, not a value to submit. Supply each exact host from 0 through 49 according to the CSS request format. The frontend runtime config uses `window.location.origin`, so it returns to the host where sign-in began. DEV clients/redirects also need the local callback if local sign-in is expected.
-
-Generate the DEV values for a request form without credentials:
+The DEV slot is `PR number modulo 50`. List every host from 0 to 49 in the request:
 
 ```sh
 for slot in $(seq 0 49); do
@@ -40,30 +36,36 @@ for slot in $(seq 0 49); do
 done
 ```
 
-No PROD hostname, certificate or redirect is operationally accepted by this document. Add them only with the reviewed PROD deployment path.
+The frontend uses `window.location.origin`, so sign-in returns to the host it started on. There is no PROD hostname or redirect yet.
 
-## GitHub Actions variables and secrets
+## GitHub variables and secrets
 
-Create `dev` and `test` GitHub Environments. Restrict TEST deployment to `main`. Public values go in Actions variables; credentials go in secrets. Use TAPS-specific clients and least-privilege deployment credentials.
+Create `dev` and `test` GitHub Environments and restrict `test` to `main`.
 
-| Scope                                    | Name                              | Required value / availability                                                |
-| ---------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------- |
-| Repository variable                      | `OC_SERVER`                       | `https://api.gold.devops.gov.bc.ca:6443`                                     |
-| Repository variable                      | `OC_APPS_DOMAIN`                  | `apps.gold.devops.gov.bc.ca`                                                 |
-| DEV environment variable                 | `TAPS_OIDC_ISSUER_URI`            | `https://dev.loginproxy.gov.bc.ca/auth/realms/standard`                      |
-| TEST environment variable                | `TAPS_OIDC_ISSUER_URI`            | `https://test.loginproxy.gov.bc.ca/auth/realms/standard`                     |
-| DEV/TEST environment variable            | `TAPS_OIDC_CLIENT_ID`             | Public TAPS `resource` value for that CSS environment                        |
-| DEV/TEST environment variable            | `TAPS_OIDC_SITEMINDER_LOGOUT_URL` | `https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi`; also the workflow default |
-| Repository secret for current DEV caller | `oc_namespace`                    | The provisioned DEV namespace, ending in `-dev`                              |
-| Repository secret for current DEV caller | `oc_token`                        | Least-privilege DEV deployment service token                                 |
-| TEST environment secret                  | `oc_namespace`                    | The provisioned TEST namespace, ending in `-test`                            |
-| TEST environment secret                  | `oc_token`                        | Separate least-privilege TEST deployment service token                       |
+| Scope                         | Name                              | Value                                                                |
+| ----------------------------- | --------------------------------- | -------------------------------------------------------------------- |
+| Repository variable           | `OC_SERVER`                       | `https://api.gold.devops.gov.bc.ca:6443`                             |
+| Repository variable           | `OC_APPS_DOMAIN`                  | `apps.gold.devops.gov.bc.ca`                                         |
+| DEV environment variable      | `TAPS_OIDC_ISSUER_URI`            | `https://dev.loginproxy.gov.bc.ca/auth/realms/standard`              |
+| TEST environment variable     | `TAPS_OIDC_ISSUER_URI`            | `https://test.loginproxy.gov.bc.ca/auth/realms/standard`             |
+| DEV/TEST environment variable | `TAPS_OIDC_CLIENT_ID`             | TAPS `resource` value for that environment                           |
+| DEV/TEST environment variable | `TAPS_OIDC_SITEMINDER_LOGOUT_URL` | Optional; defaults to `https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi` |
+| DEV/TEST environment variable | `TAPS_ORACLE_ENABLED`             | `true` or `false`; unset means `false`                               |
+| Repository secret (DEV)       | `oc_namespace`, `oc_token`        | DEV namespace (ends in `-dev`) and deploy token                      |
+| TEST environment secret       | `oc_namespace`, `oc_token`        | TEST namespace (ends in `-test`) and a separate deploy token         |
+| DEV/TEST environment secret   | `database_host`                   | Oracle TCPS host                                                     |
+| DEV/TEST environment secret   | `database_service_name`           | Oracle service name                                                  |
+| DEV/TEST environment secret   | `database_user`                   | Proxy account                                                        |
+| DEV/TEST environment secret   | `database_password`               | Proxy account password                                               |
+| DEV/TEST environment secret   | `keystore_secret`                 | Passphrase for the generated truststore                              |
 
-The current DEV workflow/cleanup caller passes repository-scoped DEV secrets. TEST jobs select TEST environment secrets, and validation requires the namespace suffix to match the environment so missing TEST credentials cannot silently fall back to DEV. Keep the environment-specific OIDC values in their environment rather than adding a repository-level fallback.
+- The database secrets are only required when `TAPS_ORACLE_ENABLED=true`. They're read from the `dev` or `test` environment only; callers don't pass them.
+- TEST jobs use the `test` environment secrets. The deploy check requires the namespace suffix to match the environment, so a missing TEST secret fails instead of falling back to the DEV repository secret.
+- Keep OIDC values in their environment, with no repository-level fallback.
+- Limit each deploy token to this app in its own namespace. Both namespaces must be able to pull the GHCR images.
+- There is no `TAPS_OIDC_CLIENT_SECRET`.
 
-There is no `TAPS_OIDC_CLIENT_SECRET` input. A CSS API credential used by FAM to administer integrations is a separate FAM operational credential and does not belong in TAPS's public browser configuration.
-
-Example public-variable commands, once access is authorized:
+Set the public variables with `gh`:
 
 ```sh
 gh variable set OC_SERVER --repo bcgov/nr-taps --body 'https://api.gold.devops.gov.bc.ca:6443'
@@ -72,15 +74,27 @@ gh variable set TAPS_OIDC_ISSUER_URI --repo bcgov/nr-taps --env dev --body 'http
 gh variable set TAPS_OIDC_ISSUER_URI --repo bcgov/nr-taps --env test --body 'https://test.loginproxy.gov.bc.ca/auth/realms/standard'
 ```
 
-Set the real public client IDs after registration. Use GitHub's secret entry or `gh secret set` with secure interactive/stdin entry for deployment tokens; keep values out of command history, logs and Git. Secret listings expose names, not stored values.
+Enter secrets through the GitHub UI or `gh secret set` from a prompt or stdin, so they stay out of shell history.
 
-## Acceptance order
+## Oracle connection
 
-1. Confirm SSO request/providers, DEV/TEST public clients and exact callback/origin lists.
-2. Confirm GitHub variables, TEST branch restriction and the provisioned namespace/token pairs.
-3. Build the images and deploy DEV; the automated smoke checks the public shell/config and anonymous `/api/me` denial.
-4. Verify accepted grants and negative cases for both providers against the environment's approved FAM configuration.
-5. Check real login, token renewal, logout/re-login and no-role behavior. Then verify record-scope/workflow rules as business endpoints are ported.
-6. Perform TEST rollout, security-findings review and actual rolling-availability acceptance. PROD remains disabled.
+Oracle reads are off unless `TAPS_ORACLE_ENABLED` is `true`. The deploy workflow rejects any other value and, when it's on, requires all five database secrets. With Oracle on, the backend won't start if credentials are missing or the database is unreachable.
 
-Local tests, a created GitHub Environment or a submitted SSO request are not evidence of deployed application acceptance.
+The wiring follows nr-lexis:
+
+- The backend template creates Secret `${NAME}-${ZONE}-oracle` (`nr-taps-<PR>-oracle` in DEV, `nr-taps-test-oracle` in TEST) with keys `DATABASE_USER`, `DATABASE_PASSWORD` and `KEYSTORE_SECRET`. PR cleanup deletes it.
+- The JDBC URL is a TCPS descriptor built from `database_host`, port 1543 and `database_service_name`.
+- An init container (`ghcr.io/bcgov/nr-forest-client/common:prod`) reads the database certificate and writes a JKS truststore to `/cert/jssecacerts`, protected by `keystore_secret`. The backend mounts it read-only. With Oracle off, the init container exits straight away.
+
+Readiness uses Spring's `readinessState`, not the database, so a shared Oracle outage doesn't pull every replica. `/actuator/health` reports database status separately. See [Oracle read runtime](oracle-read-runtime.md) for grants, timeouts and pool settings.
+
+## Rollout order
+
+1. Run the [production-container rehearsal](container-rehearsal.md) locally.
+2. Get the SSO clients and callbacks registered.
+3. Set the GitHub variables, secrets and TEST branch restriction.
+4. Deploy DEV and check the smoke test passes.
+5. Test real login, renewal, logout, re-login and the no-role view for both providers.
+6. Deploy TEST. PROD stays disabled.
+
+To turn on Oracle reads, follow the [activation checklist](activation-acceptance.md).

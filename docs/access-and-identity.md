@@ -2,32 +2,42 @@
 
 ## SSO configuration
 
-TAPS uses a public OpenID Connect browser client with authorization code and PKCE. Supported providers are **IDIR MFA and Business BCeID**; Basic BCeID is unsupported. Provider hints are `azureidir` and `bceidbusiness`. See [deployment configuration](deployment-configuration.md) for issuer, client and redirect settings.
+TAPS uses a public OpenID Connect browser client with authorization code and PKCE. Supported providers are **IDIR MFA and Business BCeID**, with provider hints `azureidir` and `bceidbusiness`. Basic BCeID is not supported. See [deployment configuration](deployment-configuration.md) for issuer, client and redirect settings.
 
-Tokens and OIDC state use browser session storage. Logout clears local credentials and chains SiteMinder logoff to Keycloak end-session. The backend accepts bearer tokens rather than browser cookies.
+Tokens and OIDC state live in browser session storage. Logout clears them and chains SiteMinder logoff to Keycloak end-session. The backend accepts bearer tokens only, not cookies.
 
 ## Token and grant validation
 
-The API validates the token signature, issuer, lifetime, expiry, client (`azp`), type (`typ`) and identity provider. Roles come from CSS `client_roles`, or the configured client's Keycloak `resource_access` entry when `client_roles` is absent. Malformed claims grant no access.
+The API checks the token signature, issuer, lifetime, expiry, client (`azp`), type (`typ`) and identity provider. Roles come from CSS `client_roles`, or from the client's Keycloak `resource_access` entry when `client_roles` is missing. Role-to-capability mappings live in [TapsRole.java](../backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsRole.java).
 
-Role-to-capability mappings are defined in [TapsRole.java](../backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsRole.java). These mappings are part of the current access scaffold. New application endpoints require validated authorization rules and acceptance tests before they are enabled.
-
-FAM management roles and `FAM:` metadata roles confer no application permissions. Role names, provider names and scope values are case sensitive.
+These grant nothing: malformed claims, unknown roles, wrong providers, FAM management roles and `FAM:` metadata roles. Role names, provider names and scope values are case sensitive.
 
 ## Scope format
 
-| Scope         | FAM marker          | Synthetic example                                |
+| Scope         | FAM marker          | Example (synthetic)                              |
 | ------------- | ------------------- | ------------------------------------------------ |
 | District      | `HAS_DISTRICT_ROLE` | `TAPS_VIEWER_DISTRICT-DZZ`                       |
 | Region        | `HAS_REGION_ROLE`   | `TAPS_REGION_APPRAISER_REGION-KOOTENAY_BOUNDARY` |
 | Forest client | `HAS_FOREST_CLIENT` | `TAPS_LICENSEE_VIEWER_FOREST_CLIENT-99990001`    |
 
-Examples illustrate syntax, not deployed assignments. District codes use `D[A-Z]{2}`; forest-client numbers use eight digits, preserving leading zeroes. Scoped grants require exactly one matching suffix with a valid value. Unknown roles, wrong providers, missing scopes and extra scope dimensions grant no access.
+- District codes match `D[A-Z]{2}`. Forest-client numbers are eight digits, leading zeroes kept.
+- A scoped grant needs exactly one matching suffix with a valid value. Missing or extra suffixes grant nothing.
+- Region grants use FAM's `HAS_REGION_ROLE` convention and region codes, including ones with underscores like `KOOTENAY_BOUNDARY`. TAPS has no region model of its own.
+- `FamRegion` maps FAM region codes to the Oracle organization rollup. That mapping still needs checking against real data.
+
+ECAS draft and scenario visibility is a separate status rule, applied per grant by `EcasReadPredicate` for inbox and reference reads. Ministry viewers don't see drafts. Client-scoped roles don't see scenarios; for the client viewer this is provisional, to match the other industry roles. TAPS doesn't change any FAM role definitions or assignments.
 
 ## Enforcement
 
-`GET /api/me` returns the authenticated identity, accepted grants, capabilities and forest clients. A valid sign-in without application roles receives an empty access list. Health probes are public; other application paths default to denied.
+`GET /api/me` returns the user's identity, grants, capabilities, forest clients and `readApiEnabled`. A user with no TAPS role gets an empty access list. Health probes are public. The read routes below need `TAPS_ORACLE_ENABLED=true` and the listed capability. All other paths are denied.
 
-The frontend uses capabilities for navigation only. API endpoints must authorize independently, loading record ownership from the database. The same grant must supply both the capability and the record scope; multiple grants cannot combine a capability from one with a wider scope from another.
+| Routes                                     | Capability             |
+| ------------------------------------------ | ---------------------- |
+| ECAS inbox and references                  | `ECAS_SUBMISSION_VIEW` |
+| GAS worksheets, licence marks and FTA info | `GAS_APPRAISAL_VIEW`   |
 
-Record-scope helpers currently have synthetic test coverage and no database-backed consumers. Verify list, report, direct-record and linked-resource access when each endpoint is implemented. State-changing operations also need transaction and concurrency controls.
+A report-only capability doesn't allow GAS worksheet reads. The security filter and the controller both check the capability, then the reader applies the grant's scope in SQL. The capability and scope must come from the same grant, so a user can't pair one grant's capability with another's wider scope. Request filters only narrow results. Missing and unauthorized records both return 404.
+
+ECAS and appraised GAS records use ADS client/admin-district ownership for now. Other GAS families and FTA use their own paths. Check these mappings and the region rollup against real data and real FAM roles before turning Oracle on in a shared environment. See [Oracle read foundation](oracle-read-foundation.md) for the SQL rules and [Oracle read runtime](oracle-read-runtime.md) for the full endpoint list.
+
+Future writes must also check linked-resource scope and add state, transaction and concurrency controls.

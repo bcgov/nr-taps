@@ -2,6 +2,7 @@ import { createRootRoute, ErrorComponent, Outlet, useLocation } from '@tanstack/
 import Layout from '@/components/Layout'
 import NotFound from '@/components/NotFound'
 import AuthProvider from '@/context/auth/AuthProvider'
+import ThemeProvider from '@/context/theme/ThemeProvider'
 import { AUTH_CALLBACK_PATH } from '@/service/oidc-service'
 
 export const Route = createRootRoute({
@@ -13,10 +14,12 @@ export const Route = createRootRoute({
 function Root() {
   const isAuthCallback = useLocation().pathname === AUTH_CALLBACK_PATH
   return (
-    <AuthProvider deferSessionLoad={isAuthCallback}>
-      <Layout>
-        <Outlet />
-      </Layout>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider deferSessionLoad={isAuthCallback}>
+        <Layout>
+          <Outlet />
+        </Layout>
+      </AuthProvider>
+    </ThemeProvider>
   )
 }

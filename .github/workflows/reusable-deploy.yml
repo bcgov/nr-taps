@@ -17,6 +17,17 @@ on:
         required: true
       oc_token:
         required: true
+      # Read from the dev/test environment only, so TEST can't fall back to a DEV value.
+      database_host:
+        required: false
+      database_service_name:
+        required: false
+      database_user:
+        required: false
+      database_password:
+        required: false
+      keystore_secret:
+        required: false
     outputs:
       route_slot:
         description: Public route slot for smoke checks and registered SSO callbacks
@@ -31,29 +42,55 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       route_slot: ${{ steps.settings.outputs.route_slot }}
+      oracle_enabled: ${{ steps.settings.outputs.oracle_enabled }}
     steps:
       - name: Require OpenShift and FAM configuration
         id: settings
         env:
           DEPLOY_ENV: ${{ inputs.environment }}
           DEPLOY_TARGET: ${{ inputs.target }}
+          IMAGE_TAG: ${{ inputs.tag }}
           OC_SERVER: ${{ vars.OC_SERVER }}
           OC_APPS_DOMAIN: ${{ vars.OC_APPS_DOMAIN }}
           OC_NAMESPACE: ${{ secrets.oc_namespace }}
           OC_TOKEN: ${{ secrets.oc_token }}
           TAPS_OIDC_ISSUER_URI: ${{ vars.TAPS_OIDC_ISSUER_URI }}
           TAPS_OIDC_CLIENT_ID: ${{ vars.TAPS_OIDC_CLIENT_ID }}
+          TAPS_ORACLE_ENABLED: ${{ vars.TAPS_ORACLE_ENABLED }}
+          DATABASE_HOST: ${{ secrets.database_host }}
+          DATABASE_SERVICE_NAME: ${{ secrets.database_service_name }}
+          DATABASE_USER: ${{ secrets.database_user }}
+          DATABASE_PASSWORD: ${{ secrets.database_password }}
+          KEYSTORE_SECRET: ${{ secrets.keystore_secret }}
         run: |
+          if ! [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
+            echo '::error title=Invalid image tag::The image tag must be a PR number or commit SHA.'
+            exit 1
+          fi
           if ! { [[ "$DEPLOY_ENV" == dev && "$DEPLOY_TARGET" =~ ^[0-9]+$ ]] || [[ "$DEPLOY_ENV" == test && "$DEPLOY_TARGET" == test ]]; }; then
             echo '::error title=Unsupported deployment target::Only DEV PR previews and TEST are enabled.'
             exit 1
           fi
           for setting in OC_SERVER OC_APPS_DOMAIN OC_NAMESPACE OC_TOKEN TAPS_OIDC_ISSUER_URI TAPS_OIDC_CLIENT_ID; do
             if [ -z "${!setting}" ]; then
-              echo "::error title=Missing deployment setting::${setting} is required for the ${{ inputs.environment }} environment."
+              echo "::error title=Missing deployment setting::${setting} is required for the ${DEPLOY_ENV} environment."
               exit 1
             fi
           done
+          oracle_enabled=${TAPS_ORACLE_ENABLED:-false}
+          if [[ "$oracle_enabled" != true && "$oracle_enabled" != false ]]; then
+            echo '::error title=Invalid Oracle setting::TAPS_ORACLE_ENABLED must be true or false.'
+            exit 1
+          fi
+          if [[ "$oracle_enabled" == true ]]; then
+            for setting in DATABASE_HOST DATABASE_SERVICE_NAME DATABASE_USER DATABASE_PASSWORD KEYSTORE_SECRET; do
+              if [ -z "${!setting}" ]; then
+                echo "::error title=Missing database secret::${setting,,} is required in the ${DEPLOY_ENV} environment when Oracle is enabled."
+                exit 1
+              fi
+            done
+          fi
+          echo "oracle_enabled=$oracle_enabled" >> "$GITHUB_OUTPUT"
           # Missing environment secrets fall back to the caller's DEV secrets.
           if [[ "$OC_NAMESPACE" != *-"$DEPLOY_ENV" ]]; then
             echo "::error title=Wrong OpenShift namespace::oc_namespace must be the ${DEPLOY_ENV} namespace, ending in -${DEPLOY_ENV}."
@@ -79,6 +116,12 @@ jobs:
         with:
           persist-credentials: false
       - uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
+        env:
+          DATABASE_HOST: ${{ secrets.database_host }}
+          DATABASE_SERVICE_NAME: ${{ secrets.database_service_name }}
+          DATABASE_USER: ${{ secrets.database_user }}
+          DATABASE_PASSWORD: ${{ secrets.database_password }}
+          KEYSTORE_SECRET: ${{ secrets.keystore_secret }}
         with:
           file: backend/openshift.deploy.yml
           lite_mode: false
@@ -90,6 +133,12 @@ jobs:
             -p NAME="${{ github.event.repository.name }}"
             -p ZONE="${{ inputs.target }}"
             -p IMAGE_TAG="${{ inputs.tag }}"
+            -p ORACLE_ENABLED="${{ needs.validate.outputs.oracle_enabled }}"
+            -p DATABASE_HOST="$DATABASE_HOST"
+            -p DATABASE_SERVICE_NAME="$DATABASE_SERVICE_NAME"
+            -p DATABASE_USER="$DATABASE_USER"
+            -p DATABASE_PASSWORD="$DATABASE_PASSWORD"
+            -p KEYSTORE_SECRET="$KEYSTORE_SECRET"
             -p OIDC_ISSUER_URI="${{ vars.TAPS_OIDC_ISSUER_URI }}"
             -p OIDC_CLIENT_ID="${{ vars.TAPS_OIDC_CLIENT_ID }}"
 
