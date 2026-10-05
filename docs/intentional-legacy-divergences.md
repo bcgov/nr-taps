@@ -46,8 +46,7 @@ and null/date behaviour. Writes and calculations stay as legacy stored procedure
 | `COAST_DATE_DRAFT_ONLY` | Coast dates can be checked in memory but not saved. | See [Coast date draft](coast-appraisal-date-draft.md). |
 | `ECAS_REFERENCE_AMBIGUITY` | Conflicting FTAS contexts or major centres fail instead of taking an unordered first row. | Parent/mark and lookup cardinality. |
 
-Before removing any legacy path, run the [preflight pack](../scripts/oracle-preflight.sql) and the
-[DEV/TEST acceptance checklist](activation-acceptance.md).
+Before removing any legacy path, run the [DEV/TEST acceptance checklist](activation-acceptance.md).
 
 ## Recording a technical difference
 

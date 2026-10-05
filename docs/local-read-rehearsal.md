@@ -65,14 +65,6 @@ bash scripts/local-read-stack.sh resume-db /path/printed/by/start
 
 The app should recover without a restart.
 
-## SQL*Plus preflight
-
-```sh
-bash scripts/local-read-stack.sh preflight /path/printed/by/start
-```
-
-Runs the read-only preflight script against the fixture database. Full output goes to `preflight.log` in the output directory; the command prints the summary and verdict and exits nonzero on any error. For a shared database, follow the [activation checklist](activation-acceptance.md).
-
 ## Automated tests
 
 ```sh

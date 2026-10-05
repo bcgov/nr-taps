@@ -109,33 +109,6 @@ synthetic names. `DUAL`, built-in functions and `DBMS_LOB.GETLENGTH` use normal 
 No `GAS2_*` or `PKG_ECAS*` package is called. The account needs no `INSERT`, `UPDATE`, `DELETE`,
 DDL, schema ownership or `ANY` privilege.
 
-## Preflight check
-
-Run the [SQL*Plus pack](../scripts/oracle-preflight.sql) from the repository root in a fresh
-session as the proxy account. Log in interactively or with a wallet, never with credentials in the
-script or command line.
-
-```sql
-@scripts/oracle-preflight.sql
-```
-
-It prints session, schema, clock and NLS details; resolves each object through synonyms and
-rejects database links; and parses zero-row SELECTs for 253 columns to check their types. It
-describes the `SIL_GET_CLIENT_NAME` call without running it. Any failure exits non-zero, and it
-always rolls back, so use a fresh session. A clean run confirms access and types, not result
-parity.
-
-The [inventory](../scripts/oracle-preflight-inventory.json) drives the pack. 110 column families
-are checked against legacy DDL; the rest come from the legacy queries. The pack uses `DBMS_SQL`,
-`DBMS_OUTPUT` and metadata views, which the app doesn't need. If those are restricted, agree an
-alternative with the database team instead of adding grants to the app account.
-
-The script doesn't spool. Don't commit target metadata, account names or output; just record
-which checks passed.
-
-`python3 scripts/oracle-preflight.py` checks the generated SQL without a database. After editing
-the inventory, run it with `--write` and rerun the integration tests.
-
 ## Local integration tests
 
 With Java 21 and Docker:

@@ -30,8 +30,6 @@ import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports.Binding;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -440,19 +438,6 @@ class OracleReadIT {
     assertThat(historic.historicSpecies()).isEmpty();
     assertThat(historic.coastSpeciesGrades()).isEmpty();
     assertThat(historic.rates()).hasSize(1);
-  }
-
-  @Test
-  void activationPreflightParsesFixtureObjectsAndRejectsWrongTypesWithoutApplicationReads() throws Exception {
-    String script = Files.readString(Path.of("../scripts/oracle-preflight.sql"));
-    String block = script.split("-- PREFLIGHT_BLOCK_BEGIN", 2)[1].split("-- PREFLIGHT_BLOCK_END", 2)[0].strip();
-    if (block.endsWith("/")) block = block.substring(0, block.length() - 1).stripTrailing();
-    jdbc.execute(block);
-    String wrongType = block.replaceFirst("ORG_UNIT_NO:NUMBER", "ORG_UNIT_NO:TEXT");
-    assertThat(wrongType).isNotEqualTo(block);
-    assertThatThrownBy(() -> jdbc.execute(wrongType)).isInstanceOf(DataAccessException.class);
-    String missingHelper = block.replace("SIL_GET_CLIENT_NAME", "SYNTHETIC_MISSING_HELPER");
-    assertThatThrownBy(() -> jdbc.execute(missingHelper)).isInstanceOf(DataAccessException.class);
   }
 
   @Test

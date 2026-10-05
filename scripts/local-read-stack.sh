@@ -5,7 +5,7 @@ set -euo pipefail
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 action=${1:-}
 state_dir=${2:-}
-usage() { echo "Usage: $0 start [new-output-directory] | status|preflight|pause-db|resume-db|stop <output-directory>" >&2; exit 2; }
+usage() { echo "Usage: $0 start [new-output-directory] | status|pause-db|resume-db|stop <output-directory>" >&2; exit 2; }
 [[ -n "$action" ]] || usage
 if [[ "$action" == start ]]; then
   state_dir=${state_dir:-$(mktemp -d "${TMPDIR:-/tmp}/taps-local-read.XXXXXX")}
@@ -32,14 +32,6 @@ if [[ "$action" != start ]]; then
   [[ "$run_id" == taps-local-read-* ]] || { echo 'Not a local rehearsal state file.' >&2; exit 1; }
   case "$action" in
     status) docker ps -a --filter "label=taps.local-read=$run_id" --format '{{.Names}}: {{.Status}}'; exit 0;;
-    preflight)
-      if ! fixture_sqlplus "$run_id-oracle" "$repo_dir/scripts/oracle-preflight.sql" > "$state_dir/preflight.log" 2>&1; then
-        echo "Synthetic preflight failed; inspect $state_dir/preflight.log" >&2
-        exit 1
-      fi
-      grep -E '^(PREFLIGHT SUMMARY|PASS TAPS read schema/parse preflight)' "$state_dir/preflight.log"
-      echo "Synthetic-only SQL*Plus proof; full output: $state_dir/preflight.log"
-      exit 0;;
     pause-db) docker pause "$run_id-oracle" >/dev/null; echo 'Disposable Oracle paused.'; exit 0;;
     resume-db) docker unpause "$run_id-oracle" >/dev/null; echo 'Disposable Oracle resumed; retry the read.'; exit 0;;
     stop)

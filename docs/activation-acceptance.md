@@ -14,16 +14,14 @@ For each check, record the commit, image tag, environment, result and any follow
 
 First deploy with `TAPS_ORACLE_ENABLED=false`. Check that anonymous `/api/me` returns 401, a signed-in user gets `readApiEnabled: false`, and the UI says reads are unavailable.
 
-## 2. Oracle preflight
+## 2. Check the schema
 
-- [ ] Open a fresh SQL*Plus session using the app's proxy connection. Enter credentials interactively or with a wallet, never on the command line.
-- [ ] From the repository root, run `@scripts/oracle-preflight.sql` with spooling off. Check the session identity, NLS settings and `America/Vancouver` date handling.
-- [ ] Every object resolves to an approved owner. Database links and invalid or unresolved objects fail.
-- [ ] All 46 object parses and 253 column checks pass. Record only the verdict. Missing columns, wrong types or money precision mismatches block activation.
-- [ ] The database team reviews `SIL_GET_CLIENT_NAME`. The preflight only parses it.
+- [ ] Connect as the proxy account. Log in interactively or with a wallet, never with credentials on the command line.
+- [ ] The tables and columns listed in [Oracle read runtime](oracle-read-runtime.md) exist with the types the read adapters expect, and resolve to the expected owners.
+- [ ] The database team reviews `SIL_GET_CLIENT_NAME`.
 - [ ] The database team confirms the grants match the approved list, with no DDL or `ANY` privileges.
 
-The [preflight script](../scripts/oracle-preflight.sql) only runs metadata queries and parses, and rolls back on exit. Its [inventory](../scripts/oracle-preflight-inventory.json) lists the expected objects and columns. Never load the local fixture DDL into a shared database.
+Never load the local fixture DDL into a shared database.
 
 ## 3. Turn on DEV reads and compare with legacy
 
