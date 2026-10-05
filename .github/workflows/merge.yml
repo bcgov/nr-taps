@@ -11,7 +11,7 @@ concurrency:
 permissions: {}
 
 jobs:
-  # As in nr-lexis, TEST deploys the merged PR's images, so update a PR from main before merging.
+  # TEST deploys the merged PR's images, so update a PR from main before merging.
   init:
     name: Find merged PR image
     runs-on: ubuntu-24.04

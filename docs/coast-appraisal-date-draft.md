@@ -4,7 +4,7 @@ Users with `ECAS_SUBMISSION_EDIT` see an appraisal-dates section on the Coast re
 **Check dates** runs the rules below and **Reset draft** restores the stored values. Nothing is
 saved, and leaving or reloading the record discards the draft.
 
-Category and revision are read-only. The controls follow the LEXIS form pattern: invalid input is
+Category and revision are read-only. Invalid input is
 kept, the first invalid field gets focus, and the inputs stay inside the mobile drawer's focus trap.
 
 ## Field rules

@@ -4,7 +4,7 @@ Oracle reads are off by default (`TAPS_ORACLE_ENABLED=false`): no datasource, bu
 denied, and `/api/me` returns `readApiEnabled: false`. When enabled, the app registers the readers
 and must open a connection before startup completes. Sign-in is required either way.
 
-The setup follows nr-lexis: Spring Boot with Undertow, JDBC/Hikari, startup pool validation,
+The setup is Spring Boot with Undertow, JDBC/Hikari, startup pool validation,
 secrets from the environment and state-based health probes. TAPS stays on Spring Boot 3.5.16 and
 Java 21, with Jackson pinned to
 [2.21.7](https://github.com/FasterXML/jackson/wiki/Jackson-Release-2.21.7) for security fixes.
@@ -35,12 +35,12 @@ credentials out of Git, images and frontend config. The JDBC URL must start with
 | `TAPS_ORACLE_TRUSTSTORE_TYPE` | `JKS` | Required with a truststore path. |
 | `TAPS_ORACLE_TRUSTSTORE_PASSWORD` | Empty | Required with a truststore path. OpenShift uses `keystore_secret`. |
 
-The JDBC URL picks TCP or TCPS. As in nr-lexis, TCPS trusts the certificate the init container
+The JDBC URL picks TCP or TCPS. TCPS trusts the certificate the init container
 imports for the host, with no extra DN check and no way to skip verification. Only the local test
 database uses TCP. Idle connections close after 10 minutes and connections live at most 30
 minutes. Size the pool for the replica count and the proxy account's connection limit.
 
-`/actuator/health` includes datasource health. Liveness and readiness use app state, as in LEXIS,
+`/actuator/health` includes datasource health. Liveness and readiness use app state,
 so a database outage doesn't restart every pod. Read failures return 503. Turning Oracle on doesn't
 create accounts or run migrations.
 

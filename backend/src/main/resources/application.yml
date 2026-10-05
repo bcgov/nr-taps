@@ -40,7 +40,7 @@ management:
         liveness:
           include: livenessState
         readiness:
-          # As in nr-lexis, a database outage shouldn't take every replica out of service.
+          # A database outage shouldn't take every replica out of service.
           # Startup still checks Oracle, and /actuator/health reports it.
           include: readinessState
   endpoints:

@@ -37,7 +37,7 @@ There is no service-client API, email, report engine, file scanner or scheduled 
 
 ## Frontend
 
-The UI uses Carbon and follows LEXIS for the header, navigation, tables and side drawer. TanStack Router handles routing. See [UI foundation](ui-foundation.md).
+The UI uses Carbon for the header, navigation, tables and side drawer. TanStack Router handles routing. See [UI foundation](ui-foundation.md).
 
 | UI concern          | Carbon package / component              |
 | ------------------- | --------------------------------------- |
@@ -117,6 +117,6 @@ DEV previews use route slot `PR number modulo 50`, which caps SSO callbacks at 5
 
 Pods don't mount service-account tokens, drop all capabilities, block privilege escalation and use a read-only root filesystem with writable temp volumes. Network policies allow router-to-frontend and same-preview frontend-to-backend traffic. Replicas and resources start small.
 
-Spring's 60-second graceful shutdown plus a 10-second preStop fits in the 90-second termination budget. Caddy turns off upstream connection pooling so requests don't stick to a draining pod. As in LEXIS, liveness and readiness use Spring's app state, so a shared database outage doesn't take every pod out. `/actuator/health` includes the database when Oracle is on.
+Spring's 60-second graceful shutdown plus a 10-second preStop fits in the 90-second termination budget. Caddy turns off upstream connection pooling so requests don't stick to a draining pod. Liveness and readiness use Spring's app state, so a shared database outage doesn't take every pod out. `/actuator/health` includes the database when Oracle is on.
 
 See [deployment configuration](deployment-configuration.md) for SSO and GitHub settings.

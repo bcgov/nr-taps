@@ -76,7 +76,7 @@ class OracleReadResilienceIT {
     restoreClientNameHelper();
     new ResourceDatabasePopulator(new ClassPathResource("oracle/seed.sql"), new ClassPathResource("oracle/attachments-seed.sql"), new ClassPathResource("oracle/audit-seed.sql")).execute(fixtureSource);
 
-    // Same signed-token approach as nr-lexis, over a real HTTP listener.
+    // Signed tokens over a real HTTP listener.
     signingKey = new RSAKeyGenerator(2048).keyID("synthetic-signing-key").generate();
     issuerServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
     byte[] jwks = new JWKSet(signingKey.toPublicJWK()).toString().getBytes(StandardCharsets.UTF_8);

@@ -29,7 +29,7 @@ public class SecurityConfiguration {
         .formLogin(AbstractHttpConfigurer::disable)
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(requests -> {
-          // As in nr-lexis, let error dispatches keep their real status instead of a 401/403.
+          // Let error dispatches keep their real status instead of a 401/403.
           requests.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
               .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
               .requestMatchers(HttpMethod.GET, "/api/me").authenticated();

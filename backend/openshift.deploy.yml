@@ -11,7 +11,7 @@ parameters:
   - name: ORACLE_ENABLED
     description: Enable Oracle read APIs only after the database secrets and grants are ready
     value: 'false'
-  # Database settings come from the GitHub environment secrets, as in nr-lexis.
+  # Database settings come from the GitHub environment secrets.
   - name: DATABASE_HOST
     value: ''
   - name: DATABASE_PORT
@@ -61,7 +61,7 @@ objects:
           automountServiceAccountToken: false
           terminationGracePeriodSeconds: 90
           initContainers:
-            # Same truststore init as nr-lexis; writes /cert/jssecacerts.
+            # Writes /cert/jssecacerts from the database server's certificate.
             - name: oracle-cert
               image: ghcr.io/bcgov/nr-forest-client/common:prod
               imagePullPolicy: Always

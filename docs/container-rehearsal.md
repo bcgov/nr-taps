@@ -25,6 +25,6 @@ The script prints its output directory (logs, HTTP responses, result). Each run 
 
 A small root helper makes the test volume group-writable, like Kubernetes `fsGroup`. It doesn't run either app.
 
-The setup follows nr-lexis: arbitrary-UID Caddy/Coraza, a separate health port, selective caching, no backend keepalive and Spring graceful shutdown.
+The setup covers arbitrary-UID Caddy/Coraza, a separate health port, selective caching, no backend keepalive and Spring graceful shutdown.
 
 Oracle stays off here. Real logins, database grants, SCC, network policies, TLS and rolling updates need DEV/TEST.

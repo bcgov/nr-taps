@@ -48,7 +48,7 @@ class OracleReadConfigurationTest {
     assertThat(pool.getMinimumIdle()).isEqualTo(1);
     assertThat(pool.getConnectionTimeout()).isEqualTo(10000);
     assertThat(pool.getInitializationFailTimeout()).isPositive();
-    // nr-lexis trusts the init-generated certificate without separate server DN matching.
+    // TCPS trusts the init-generated certificate; no separate server DN match.
     assertThat(pool.getDataSourceProperties()).doesNotContainKey("oracle.net.ssl_server_dn_match")
         .containsEntry("oracle.net.CONNECT_TIMEOUT", "10000")
         .containsEntry("oracle.jdbc.ReadTimeout", "30000")

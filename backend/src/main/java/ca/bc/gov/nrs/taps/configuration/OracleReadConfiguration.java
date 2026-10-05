@@ -58,7 +58,7 @@ public class OracleReadConfiguration {
 
   @Bean
   InitializingBean warmOraclePool(DataSource dataSource) {
-    // Fail startup on a bad Oracle connection, as nr-lexis does.
+    // Fail startup on a bad Oracle connection.
     return () -> {
       try (var connection = dataSource.getConnection()) {
         if (!connection.isValid(5)) {

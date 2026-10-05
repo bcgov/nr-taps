@@ -74,8 +74,6 @@ The Analysis workflow runs these on every PR, plus an advisory Trivy scan that r
 
 ## Deployment
 
-Deployment follows [nr-lexis](https://github.com/bcgov/nr-lexis).
-
 | Event                | Target                      | URL                                               |
 | -------------------- | --------------------------- | ------------------------------------------------- |
 | PR opened or updated | DEV preview `nr-taps-<PR>`  | `https://nr-taps-<PR modulo 50>.<OC_APPS_DOMAIN>` |

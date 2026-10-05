@@ -80,7 +80,7 @@ Enter secrets through the GitHub UI or `gh secret set` from a prompt or stdin, s
 
 Oracle reads are off unless `TAPS_ORACLE_ENABLED` is `true`. The deploy workflow rejects any other value and, when it's on, requires all five database secrets. With Oracle on, the backend won't start if credentials are missing or the database is unreachable.
 
-The wiring follows nr-lexis:
+How it's wired:
 
 - The backend template creates Secret `${NAME}-${ZONE}-oracle` (`nr-taps-<PR>-oracle` in DEV, `nr-taps-test-oracle` in TEST) with keys `DATABASE_USER`, `DATABASE_PASSWORD` and `KEYSTORE_SECRET`. PR cleanup deletes it.
 - The JDBC URL is a TCPS descriptor built from `database_host`, port 1543 and `database_service_name`.

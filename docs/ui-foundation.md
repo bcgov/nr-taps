@@ -1,6 +1,6 @@
 # TAPS UI foundation
 
-The UI shell is modelled on nr-lexis: 48px blue header, theme switch, profile panel, navigation
+The UI shell has a 48px blue header, theme switch, profile panel, navigation
 rail, page spacing and tables. It uses Carbon React, IBM Products detail drawers, Carbon icons and
 pictograms, the B.C. Government logo and BC Sans. TanStack Router handles routing. Screens that
 aren't built yet say so.
@@ -104,7 +104,7 @@ const [open, setOpen] = useState(false)
 | `@carbon/pictograms-react` | `11.109.0` |
 | `@carbon/ibm-products-styles` | `2.89.0`, via the IBM Products override |
 
-The pin and override match nr-lexis. Styles load Carbon, then IBM Products SidePanel, then TAPS
+Styles load Carbon, then IBM Products SidePanel, then TAPS
 overrides. The drawer depends on that order, so recheck it when upgrading either IBM package.
 
 After changing shared components:

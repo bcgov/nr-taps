@@ -2,7 +2,7 @@ import { DatePicker, DatePickerInput } from '@carbon/react'
 import { useEffect, useRef, useState } from 'react'
 import { isValidIsoDate, parseIsoDate } from './iso-date'
 
-// Based on the nr-lexis ISO date picker; keeps invalid typed text visible for validation.
+// Keeps invalid typed text visible so the form can flag it.
 export default function IsoDatePicker({
   id,
   labelText,
