@@ -3,6 +3,46 @@ import { beforeEach } from 'vitest'
 
 Object.defineProperty(window, 'scrollTo', { configurable: true, writable: true, value: () => {} })
 
+// Each test file gets its own in-memory storage instead of the shared jsdom/Node store.
+class TestStorage implements Storage {
+  private readonly values = new Map<string, string>()
+
+  get length(): number {
+    return this.values.size
+  }
+
+  clear(): void {
+    this.values.clear()
+  }
+
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null
+  }
+
+  key(index: number): string | null {
+    return Array.from(this.values.keys())[index] ?? null
+  }
+
+  removeItem(key: string): void {
+    this.values.delete(key)
+  }
+
+  setItem(key: string, value: string): void {
+    this.values.set(key, String(value))
+  }
+}
+
+function installTestStorage(property: 'localStorage' | 'sessionStorage') {
+  const storage = new TestStorage()
+  Object.defineProperty(globalThis, property, { configurable: true, value: storage })
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, property, { configurable: true, value: storage })
+  }
+}
+
+installTestStorage('localStorage')
+installTestStorage('sessionStorage')
+
 const mediaQueries = new Set<TestMediaQueryList>()
 
 function matchesQuery(query: string) {

@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import { clearLoginDestination, getLoginDestination } from '@/context/auth/login-destination'
 import { completeLogin } from '@/service/oidc-service'
 import { InlineLoading } from '@carbon/react'
 import PageHeader from '@/components/PageHeader'
@@ -14,10 +15,15 @@ function AuthCallback() {
     let active = true
     void completeLogin()
       .then(() => {
-        if (active) void navigate({ to: '/' })
+        if (!active) return
+        const destination = getLoginDestination() ?? '/'
+        clearLoginDestination()
+        void navigate({ href: destination, replace: true })
       })
       .catch(() => {
-        if (active) setError(true)
+        if (!active) return
+        clearLoginDestination()
+        setError(true)
       })
     return () => {
       active = false

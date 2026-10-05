@@ -12,6 +12,7 @@ import type {
   LicenceMarks,
   WorksheetKey,
 } from '@/contracts/appraisal'
+import { notifySessionExpired } from '@/context/auth/session-expiry'
 import { clearLogin, getOidcUser } from './oidc-service'
 
 export class ReadApiError extends Error {
@@ -65,7 +66,10 @@ export async function readRequest<T>(
 ): Promise<T> {
   const user = await getOidcUser()
   signal.throwIfAborted()
-  if (!user) throw new ReadApiError(401)
+  if (!user) {
+    notifySessionExpired('token-unavailable')
+    throw new ReadApiError(401)
+  }
   const response = await fetch(path, {
     method: body === undefined ? 'GET' : 'POST',
     headers: {
@@ -78,7 +82,10 @@ export async function readRequest<T>(
   })
   signal.throwIfAborted()
   if (!response.ok) {
-    if (response.status === 401) await clearLogin()
+    if (response.status === 401) {
+      await clearLogin()
+      notifySessionExpired('api-unauthorized')
+    }
     // Do not surface arbitrary infrastructure/SQL error bodies in the page.
     throw new ReadApiError(response.status)
   }

@@ -1,4 +1,5 @@
 import { Button, InlineLoading, Tile } from '@carbon/react'
+import { useLocation } from '@tanstack/react-router'
 import { useAuth } from '@/context/auth/AuthContext'
 import { isOidcConfigured } from '@/service/oidc-service'
 import AppNotification from './AppNotification'
@@ -14,6 +15,7 @@ export function NoRoleNotice() {
 
 export default function SessionStatus() {
   const { state, login, logout, reloadSession } = useAuth()
+  const destination = useLocation({ select: (location) => location.href })
   if (state.kind === 'loading')
     return <InlineLoading role="status" aria-live="polite" description="Loading your session…" />
   if (state.kind === 'error') {
@@ -45,8 +47,8 @@ export default function SessionStatus() {
         business account.
       </p>
       <div className="taps-actions">
-        <Button onClick={() => void login('idir')}>Sign in with IDIR</Button>
-        <Button kind="secondary" onClick={() => void login('business-bceid')}>
+        <Button onClick={() => void login('idir', destination)}>Sign in with IDIR</Button>
+        <Button kind="secondary" onClick={() => void login('business-bceid', destination)}>
           Sign in with Business BCeID
         </Button>
       </div>

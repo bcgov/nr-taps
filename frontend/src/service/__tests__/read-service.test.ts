@@ -1,18 +1,24 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { SESSION_EXPIRED_EVENT } from '@/context/auth/session-expiry'
 import { readApi, ReadApiError } from '../read-service'
 
 const oidc = vi.hoisted(() => ({ getOidcUser: vi.fn(), clearLogin: vi.fn() }))
 vi.mock('@/service/oidc-service', () => oidc)
 const fetch = vi.fn()
 const signal = () => new AbortController().signal
+const expired = vi.fn()
 
 beforeEach(() => {
   vi.resetAllMocks()
   vi.stubGlobal('fetch', fetch)
+  window.addEventListener(SESSION_EXPIRED_EVENT, expired)
   oidc.getOidcUser.mockResolvedValue({ access_token: 'synthetic-token' })
   fetch.mockResolvedValue({ ok: true, json: async () => ({}) })
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  window.removeEventListener(SESSION_EXPIRED_EVENT, expired)
+})
 
 test('uses the bearer token and normalized POST filters without cookie credentials', async () => {
   const abort = signal()
@@ -137,9 +143,12 @@ test('does not fetch after cancellation or without an authenticated session', as
   const abort = new AbortController()
   abort.abort()
   await expect(readApi.marks('A00001', abort.signal)).rejects.toHaveProperty('name', 'AbortError')
+  expect(expired).not.toHaveBeenCalled()
   oidc.getOidcUser.mockResolvedValue(null)
   await expect(readApi.marks('A00001', signal())).rejects.toMatchObject({ status: 401 })
   expect(fetch).not.toHaveBeenCalled()
+  expect(expired).toHaveBeenCalledOnce()
+  expect(expired.mock.calls[0][0]).toMatchObject({ detail: { reason: 'token-unavailable' } })
 })
 
 test.each([400, 401, 403, 404, 503])(
@@ -152,6 +161,9 @@ test.each([400, 401, 403, 404, 503])(
     })
     await expect(readApi.marks('A00001', signal())).rejects.toEqual(new ReadApiError(status))
     expect(oidc.clearLogin).toHaveBeenCalledTimes(status === 401 ? 1 : 0)
+    expect(expired.mock.calls.map(([event]) => event.detail.reason)).toEqual(
+      status === 401 ? ['api-unauthorized'] : [],
+    )
   },
 )
 

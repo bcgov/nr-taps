@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { SESSION_EXPIRED_EVENT } from '@/context/auth/session-expiry'
 import { fetchSession, SessionUnavailableError } from '@/service/session-service'
 
 const oidc = vi.hoisted(() => ({ getOidcUser: vi.fn(), clearLogin: vi.fn() }))
@@ -36,11 +37,16 @@ test('uses the access token and returns server-decided roles and capabilities', 
   })
 })
 
-test('clears a session the API rejects with 401', async () => {
+test('clears and reports a session the API rejects with 401', async () => {
+  const expired = vi.fn()
+  window.addEventListener(SESSION_EXPIRED_EVENT, expired)
   fetch.mockResolvedValue({ status: 401 })
 
   await expect(fetchSession()).resolves.toBeNull()
   expect(oidc.clearLogin).toHaveBeenCalledOnce()
+  expect(expired).toHaveBeenCalledOnce()
+  expect(expired.mock.calls[0][0]).toMatchObject({ detail: { reason: 'api-unauthorized' } })
+  window.removeEventListener(SESSION_EXPIRED_EVENT, expired)
 })
 
 test.each([403, 500, 503])('keeps the stored session after an HTTP %s error', async (status) => {

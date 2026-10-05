@@ -2,6 +2,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import AuthProvider from '@/context/auth/AuthProvider'
 import { useAuth } from '@/context/auth/AuthContext'
 import { Capability } from '@/context/auth/capabilities'
+import { notifySessionExpired } from '@/context/auth/session-expiry'
 import type { Session } from '@/service/session-service'
 import { act, render, screen, staffSession, userEvent, waitFor } from '@/test-utils'
 
@@ -28,13 +29,16 @@ function Probe() {
       {state.kind === 'error' && <p role="alert">{state.message}</p>}
       <button onClick={() => void reloadSession()}>Reload</button>
       <button onClick={() => void logout()}>Sign out</button>
-      <button onClick={() => void login('idir')}>Sign in</button>
+      <button onClick={() => void login('idir', '/ecas/ECAS05?ecasId=1001')}>Sign in</button>
     </>
   )
 }
 
+const destinationKey = 'taps.login-destination'
+
 beforeEach(() => {
   vi.resetAllMocks()
+  window.sessionStorage.clear()
   service.fetchSession.mockResolvedValue(staffSession)
 })
 
@@ -110,6 +114,7 @@ test('revokes access after successful sign out', async () => {
   expect(screen.getByText('signed-out')).toBeInTheDocument()
   expect(screen.getByText('No ECAS access')).toBeInTheDocument()
   expect(service.logout).toHaveBeenCalledOnce()
+  expect(window.sessionStorage.getItem(destinationKey)).toBeNull()
 })
 
 test('clears locally when SSO sign out fails', async () => {
@@ -177,4 +182,73 @@ test('reports a sign-in start failure without granting access', async () => {
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Unable to start sign in')
   expect(screen.getByText('No ECAS access')).toBeInTheDocument()
+  expect(window.sessionStorage.getItem(destinationKey)).toBeNull()
+})
+
+test('keeps the requested page for the sign-in callback', async () => {
+  const user = userEvent.setup()
+  service.fetchSession.mockResolvedValue(null)
+  service.startLogin.mockReturnValue(new Promise(() => {}))
+  render(
+    <AuthProvider>
+      <Probe />
+    </AuthProvider>,
+  )
+
+  await screen.findByText('signed-out')
+  await user.click(screen.getByRole('button', { name: 'Sign in' }))
+
+  expect(service.startLogin).toHaveBeenCalledWith('idir')
+  expect(window.sessionStorage.getItem(destinationKey)).toBe('/ecas/ECAS05?ecasId=1001')
+})
+
+test.each(['api-unauthorized', 'token-unavailable'] as const)(
+  'revokes access without another session request when a service reports %s',
+  async (reason) => {
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    )
+    await screen.findByText('ECAS access')
+    window.sessionStorage.setItem(destinationKey, '/gas')
+
+    act(() => notifySessionExpired(reason))
+
+    expect(screen.getByText('signed-out')).toBeInTheDocument()
+    expect(screen.getByText('No ECAS access')).toBeInTheDocument()
+    expect(service.fetchSession).toHaveBeenCalledOnce()
+    expect(window.sessionStorage.getItem(destinationKey)).toBeNull()
+  },
+)
+
+test('a pending session request cannot restore access after the session expires', async () => {
+  const pending = Promise.withResolvers<Session>()
+  service.fetchSession.mockReturnValue(pending.promise)
+  render(
+    <AuthProvider>
+      <Probe />
+    </AuthProvider>,
+  )
+
+  act(() => notifySessionExpired('api-unauthorized'))
+  await act(async () => pending.resolve(staffSession))
+
+  expect(screen.getByText('signed-out')).toBeInTheDocument()
+  expect(screen.getByText('No ECAS access')).toBeInTheDocument()
+})
+
+test('stops listening for session expiry after unmount', async () => {
+  const view = render(
+    <AuthProvider>
+      <Probe />
+    </AuthProvider>,
+  )
+  await screen.findByText('ECAS access')
+  view.unmount()
+  window.sessionStorage.setItem(destinationKey, '/gas')
+
+  notifySessionExpired('api-unauthorized')
+
+  expect(window.sessionStorage.getItem(destinationKey)).toBe('/gas')
 })
