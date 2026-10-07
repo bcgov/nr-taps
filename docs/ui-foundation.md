@@ -1,9 +1,9 @@
-# TAPS UI foundation
+# UI development
 
 The UI shell has a 48px blue header, theme switch, profile panel, navigation
 rail, page spacing and tables. It uses Carbon React, IBM Products detail drawers, Carbon icons and
 pictograms, the B.C. Government logo and BC Sans. TanStack Router handles routing. Screens that
-aren't built yet say so.
+aren't built yet say so. Use Carbon icons and pictograms unless Carbon has nothing suitable, and keep the official B.C. Government branding.
 
 ## Development preview
 
@@ -94,25 +94,41 @@ const [open, setOpen] = useState(false)
 </DetailSidePanel>
 ```
 
-## Carbon versions
+## Dependencies and validation
 
-| Package | Version |
+Carbon versions and the IBM Products styles override are pinned in [package.json](../frontend/package.json). Styles load Carbon, then IBM Products SidePanel, then TAPS overrides; recheck that order when upgrading either IBM package.
+
+After shared-component changes, run the [frontend checks](development.md#tests) and the preview review checklist above.
+
+## Coast appraisal date draft
+
+Users with `ECAS_SUBMISSION_EDIT` see an appraisal-dates section on the Coast reference.
+**Check dates** runs the rules below and **Reset draft** restores the stored values. Nothing is
+saved, and leaving or reloading the record discards the draft.
+
+Category and revision are read-only. Invalid input is
+kept, the first invalid field gets focus, and the inputs stay inside the mobile drawer's focus trap.
+
+### Field rules
+
+| Field | Rule |
 | --- | --- |
-| `@carbon/react` | `1.108.0` |
-| `@carbon/ibm-products` | `2.90.0` |
-| `@carbon/icons-react` | `11.81.0` |
-| `@carbon/pictograms-react` | `11.109.0` |
-| `@carbon/ibm-products-styles` | `2.89.0`, via the IBM Products override |
+| Effective and expiry | Valid `yyyy-MM-dd` dates, no UTC conversion. Blank stays blank. |
+| Effective | On or after 2002-04-01. Required for reappraisal category `R`. |
+| Expiry | Optional. Needs an effective date and must be on or after it. |
 
-Styles load Carbon, then IBM Products SidePanel, then TAPS
-overrides. The drawer depends on that order, so recheck it when upgrading either IBM package.
+Code: [validator](../frontend/src/contracts/coast-reference-draft.ts) and
+[component](../frontend/src/components/appraisal/CoastAppraisalDatesDraft.tsx).
 
-After changing shared components:
+### Why it doesn't save
 
-```sh
-npm run typecheck
-npm run lint
-npm run format:check
-npm run test:unit -- --run
-npm run build
-```
+Legacy Save Dates does more than update two fields. It checks the dates against FTA and other
+appraisals for the mark, warns about overlaps, refreshes FTA defaults, can update cutting-authority
+rows, sets audit context, checks the revision and depends on workflow state.
+
+Writes like this stay in the legacy stored procedure, which TAPS doesn't call yet. A save path will
+need the user's identity, an edit capability and state check, record scope, revision conflict
+handling and audit context.
+
+Interior dates also depend on appraisal-manual data and policy dates, so don't reuse these rules
+for Interior.

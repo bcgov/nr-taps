@@ -1,4 +1,4 @@
-# TAPS architecture
+# TAPS architecture and access
 
 TAPS replaces the Electronic Commerce Appraisal System (ECAS) and the General Appraisal System (GAS2). ECAS and GAS share sign-in, session and authorization but keep separate navigation. The existing Oracle schema and data stay in place and are reached through an application proxy account.
 
@@ -24,31 +24,9 @@ flowchart LR
 - The frontend writes `/config.js` from environment values at startup, so one image runs in DEV and TEST.
 - Oracle reads run only with the backend's `oracle` Spring profile, which is off by default. With it on, the backend won't start unless it can connect.
 
-| Component      | Built                                                                   | Not yet                                     |
-| -------------- | ----------------------------------------------------------------------- | ------------------------------------------- |
-| Frontend       | Session, login, Carbon shell, ECAS/GAS read pages, synthetic preview    | Editing forms, workflow, inactivity warning |
-| Caddy / Coraza | Static assets, API proxy, CSP and security headers, WAF, health port    | Testing in DEV/TEST                         |
-| Backend        | JWT validation, grants, scoped read endpoints, `/api/me`, health probes | Write endpoints, workflow, transactions     |
-| FAM / SSO      | Role and scope model                                                    | TAPS clients and role assignments           |
-| Oracle         | Read adapters, disposable-Oracle tests                                  | Proxy access, real-data checks              |
-| OpenShift / CI | Image builds, CI tests, DEV/TEST templates, smoke tests, Trivy, ZAP     | Namespaces, credentials, sizing             |
+The frontend uses Carbon and TanStack Router; see [UI development](ui-foundation.md). After a redeploy, a tab requesting a missing code chunk reloads to pick up the new build, at most once a minute.
 
-There is no service-client API, email, report engine, file scanner or scheduled batch job yet.
-
-## Frontend
-
-The UI uses Carbon for the header, navigation, tables and side drawer. TanStack Router handles routing. See [UI foundation](ui-foundation.md).
-
-| UI concern          | Carbon package / component              |
-| ------------------- | --------------------------------------- |
-| Controls and themes | `@carbon/react`                         |
-| Detail side drawers | `SidePanel` from `@carbon/ibm-products` |
-| Icons               | `@carbon/icons-react`                   |
-| Pictograms          | `@carbon/pictograms-react`              |
-
-Use Carbon icons and pictograms unless Carbon has nothing suitable. Keep the official BC Gov branding.
-
-After a redeploy, an open tab can ask for code chunks that no longer exist. The app then reloads to pick up the new build, at most once a minute.
+Implementation status is maintained in the [repository README](../README.md#current-status).
 
 ## Authentication
 
@@ -70,9 +48,17 @@ sequenceDiagram
     Note over U,S: Tokens live in sessionStorage
 ```
 
-Only IDIR MFA and Business BCeID are supported. [Authentication and authorization](access-and-identity.md) covers token checks and grant formats.
+The public browser client uses code + PKCE with provider hints `azureidir` and `bceidbusiness`. Basic BCeID is unsupported. The backend accepts bearer tokens only, not cookies. Issuer, client and callback settings are in [deployment configuration](deployment-configuration.md#sso-request).
 
 Logout clears local credentials, then chains SiteMinder logoff to Keycloak end-session. Only one token refresh runs at a time, and a late refresh or callback can't restore a session after logout. A 401 from the API, `invalid_grant`, or a token that can't be renewed signs the user out straight away. Network errors keep credentials so the user can retry. Sign-in returns the user to the page they started from; only same-origin paths are accepted. The inactivity warning is not built yet.
+
+### Token and grant validation
+
+The API checks the token signature, issuer, lifetime, expiry, client (`azp`), type (`typ`) and identity provider. Roles come from CSS `client_roles`, or from the client's Keycloak `resource_access` entry when `client_roles` is missing. Role-to-capability mappings live in [TapsRole.java](../backend/src/main/java/ca/bc/gov/nrs/taps/security/TapsRole.java).
+
+Signing keys come from the issuer's JWKS endpoint with 10-second connect and 15-second read timeouts, one retry and a cache that refreshes ahead of expiry, so a slow key fetch doesn't fail a request.
+
+These grant nothing: malformed claims, unknown roles, wrong providers, FAM management roles and `FAM:` metadata roles. Role names, provider names and scope values are case sensitive.
 
 ## Authorization
 
@@ -89,39 +75,29 @@ The backend derives capabilities from [TapsRole](../backend/src/main/java/ca/bc/
 
 The Oracle readers apply scope in SQL before counts, pages, direct lookups and child rows. The ADS and per-family ownership mappings are provisional until checked against real data.
 
-New endpoints need their own authorization rules and tests before they're enabled. Writes also need linked-resource scope checks and transaction and concurrency controls. Record integration differences in [technical legacy divergences](intentional-legacy-divergences.md).
+### Scope format
 
-## Oracle access
+| Scope         | FAM marker          | Example (synthetic)                              |
+| ------------- | ------------------- | ------------------------------------------------ |
+| District      | `HAS_DISTRICT_ROLE` | `TAPS_VIEWER_DISTRICT-DZZ`                       |
+| Region        | `HAS_REGION_ROLE`   | `TAPS_REGION_APPRAISER_REGION-KOOTENAY_BOUNDARY` |
+| Forest client | `HAS_FOREST_CLIENT` | `TAPS_LICENSEE_VIEWER_FOREST_CLIENT-99990001`    |
 
-Current endpoints run SELECTs and the inbox's existing client-name function. No legacy write package is called. The readers and their routes only register with the `oracle` profile. Calculation, write, workflow and bulk-run procedures stay out until their side effects are reviewed.
+- District codes match `D[A-Z]{2}`. Forest-client numbers are eight digits, leading zeroes kept.
+- A scoped grant needs exactly one matching suffix with a valid value. Missing or extra suffixes grant nothing.
+- Region grants use FAM's `HAS_REGION_ROLE` convention and region codes, including ones with underscores like `KOOTENAY_BOUNDARY`. TAPS has no region model of its own.
+- `FamRegion` maps FAM region codes to the Oracle organization rollup. That mapping still needs checking against real data.
 
-- [Oracle read foundation](oracle-read-foundation.md): legacy query rules and mappings.
-- [Oracle read runtime](oracle-read-runtime.md): settings, grants and health.
+ECAS draft and scenario visibility is a separate status rule, applied per grant by `EcasReadPredicate` for inbox and reference reads. Ministry viewers don't see drafts. Client-scoped roles don't see scenarios; for the client viewer this is provisional, to match the other industry roles. TAPS doesn't change any FAM role definitions or assignments.
 
-Port legacy screens with their ECAS/GAS business behavior against the same tables. A legacy screen stays in use until it is ported.
+### Enforcement
 
-## Delivery and operations
+`GET /api/me` returns identity, grants, capabilities, forest clients and `readApiEnabled`; no TAPS role produces an empty access list. Health probes are public. Business routes require the `oracle` profile and the [route capability](oracle-reads.md#http-routes); other paths are denied.
 
-```mermaid
-flowchart LR
-    PR["Pull request"] --> Quality["Analysis<br/>tests, coverage, Trivy"]
-    PR --> Build["Build images<br/>PR and SHA tags"]
-    PR --> Tests["Backend and<br/>frontend tests"]
-    Build --> DEV["DEV preview<br/>deploy + smoke"]
-    Tests --> DEV
-    DEV --> Review["Review"]
-    Quality --> Review
-    Review --> Merge["Merge to main"]
-    Merge --> TEST["TEST<br/>PR images, smoke, tag test"]
-    Close["PR closed"] --> Cleanup["Remove its preview<br/>and closed-PR leftovers"]
-    Weekly["Weekly schedule"] --> Sweep["Remove week-old previews<br/>ZAP scan of TEST"]
-    TEST -.-> PROD["PROD disabled"]
-```
+The security filter and controller both check the capability, then the reader applies record scope. Report-only access does not allow GAS worksheet reads. Filters only narrow results, and missing and unauthorized records both return 404. New endpoints need authorization rules and tests; future writes also need linked-resource scope, state, transaction and concurrency controls.
 
-DEV previews use route slot `PR number modulo 50`, which caps SSO callbacks at 50 hosts. PRs in the same slot share a hostname, and the latest deploy owns the Route. The Route is named by slot (`nr-taps-<slot>-frontend`), but Deployments, Services and labels use the real PR number (`nr-taps-backend-<PR>`, `nr-taps-frontend-<PR>`), so cleanup never deletes a Route now owned by a newer PR. Branch protection is set in the repository settings.
+## Legacy integration
 
-Pods don't mount service-account tokens, drop all capabilities, block privilege escalation and use a read-only root filesystem with writable temp volumes. Network policies allow router-to-frontend and same-preview frontend-to-backend traffic. The frontend runs 2 replicas and the backend scales from 1 to 3 on CPU. The backend image runs an exploded jar with a 60% max heap and exits on out-of-memory so the pod restarts.
+TAPS reuses the existing schema and preserves ECAS/GAS business behavior. Low-risk reads use parameterized SELECTs and the existing inbox client-name function. No legacy write package is called. Calculation, write, workflow and bulk-run procedures remain in the legacy systems until their side effects and replacement behavior are reviewed.
 
-Spring's 60-second graceful shutdown plus a 10-second preStop fits in the 90-second termination budget. Caddy turns off upstream connection pooling so requests don't stick to a draining pod. Liveness and readiness use Spring's app state, so a shared database outage doesn't take every pod out. `/actuator/health` includes the database when Oracle is on.
-
-See [deployment configuration](deployment-configuration.md) for SSO, GitHub settings and OpenShift names.
+[Read API and Oracle behavior](oracle-reads.md) records the query mappings and intentional differences. Complete [DEV/TEST activation acceptance](deployment-configuration.md#activation-acceptance) before enabling shared-environment reads. Each legacy workflow remains in use until its replacement has passed parity checks and has a rollback plan.
