@@ -62,6 +62,8 @@ mvn -B -DskipITs verify     # no database needed; JaCoCo report in target/site/j
 mvn -B -Poracle-it verify   # needs Docker; disposable Oracle with synthetic data
 ```
 
+The SQL files under [`backend/src/test/resources/oracle`](backend/src/test/resources/oracle/README.md) are synthetic test fixtures for the Oracle tests and local read rehearsal. **The application, deployment pipeline and supplied fixture loaders have no execution path that loads them into the live ECAS/GAS database.** They are excluded from the production application package and runtime image; fixture loaders connect only to the disposable Oracle containers they create, independently of live database environment variables. See the [execution boundaries](backend/src/test/resources/oracle/README.md#where-they-run), including the separate risk of manually executing copied SQL. No changes to the shared ECAS/GAS schema are required.
+
 From `frontend`:
 
 ```sh

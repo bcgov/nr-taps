@@ -141,8 +141,13 @@ mvn -B -Poracle-it verify
 This runs the readers and HTTP layer against a disposable Oracle Free container with a synthetic
 schema. CI doesn't run it. The normal test suite needs no database. See
 [OracleReadIT](../backend/src/test/java/ca/bc/gov/nrs/taps/integration/OracleReadIT.java) and the
-[fixture schema](../backend/src/test/resources/oracle/schema.sql). Never load the fixture into a
-shared database.
+[SQL fixture inventory](../backend/src/test/resources/oracle/README.md) for each file's purpose.
+These files create tables and synthetic data only for disposable tests and the local read rehearsal;
+they are not shared-schema migrations. They are excluded from the production application package
+and runtime image and are not executed by application startup or OpenShift deployment. The fixture
+loaders use only their own disposable containers; live database environment variables cannot redirect
+them. See the [execution boundaries](../backend/src/test/resources/oracle/README.md#where-they-run).
+Never manually load the fixtures into a shared database.
 
 ## Enabling DEV or TEST
 

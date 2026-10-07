@@ -4,6 +4,8 @@ Runs the production frontend and backend images with a disposable Oracle Free da
 
 The test issuer and fixtures are local-only and aren't in any app image or OpenShift template. Keys and passwords are generated per run. Never use real credentials or a shared database with it.
 
+The stack loads the [SQL test fixtures](../backend/src/test/resources/oracle/README.md) into the Oracle container it creates. The loader runs SQLPlus inside that container against its own loopback address, using generated fixture credentials. It has no external database target option, and live database environment variables cannot redirect it. These scripts provide minimal tables and synthetic data, including attachment metadata and audit history; they are not migrations for the existing ECAS/GAS schema. See the [execution boundaries](../backend/src/test/resources/oracle/README.md#where-they-run).
+
 ## Start and stop
 
 From the repository root:
