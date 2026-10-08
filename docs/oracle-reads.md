@@ -99,12 +99,12 @@ with `getTimestamp().toLocalDateTime()`, keeping the time of day with no timezon
 
 ## ECAS search
 
-`EcasInbox.Search` accepts the fields below. `MY_TO_DO` listing fails before SQL runs because the
-assignment mapping is not implemented.
+`EcasInbox.Search` accepts the fields below. Both modes apply the caller's record scope and
+visibility rules. My To Do also applies the queue conditions described below.
 
 | Field | Rule |
 | --- | --- |
-| `mode` | `MY_TO_DO` (default, listing not built) or `ALL_SUBMISSIONS` |
+| `mode` | `MY_TO_DO` (API default) or `ALL_SUBMISSIONS` (UI default) |
 | `appraisalMethod` | `C`, `I` or `null` for both |
 | `licence`, `cuttingPermit` | Letters/digits, uppercased, max 10 / 3 |
 | `timberMark` | Uppercased, max 6 |
@@ -132,7 +132,7 @@ assignment mapping is not implemented.
 Several `Item` rows can share an ECAS ID when a submission has several marks or permits. Don't
 group by ECAS ID, or by ECAS ID and mark.
 
-`OracleEcasInbox.search` supports `ALL_SUBMISSIONS` with 100-row pages. One scoped SELECT replaces
+`OracleEcasInbox.search` supports both modes with 100-row pages. One scoped SELECT replaces
 the legacy ECAS05 temporary-table DELETE/INSERT.
 
 - Sorting is by day with fixed tie-breakers.
@@ -140,11 +140,38 @@ the legacy ECAS05 temporary-table DELETE/INSERT.
   explicit mark can match a non-primary one.
 - Organization selections only narrow results.
 - A direct ECAS ID skips other criteria but keeps authorization, status visibility, organizations,
-  client/location and certification.
+  client/location and certification. It also keeps ministry viewer queue restrictions in My To Do.
 - Certified `false` includes null; BCTS `false` requires `N`. Worked-on requires an audit event.
   FTA cutting-permit expiry applies only when both bounds are set.
 - Client names come from `SIL_GET_CLIENT_NAME`. Native midnight bounds and day truncation stand in
   for the legacy SIL date-conversion helper (provisional).
+
+### My To Do
+
+Queue conditions stay inside each grant's scope; one role cannot supply another role's scope.
+The existing draft/scenario visibility rules apply in both modes.
+
+| Role | Listing conditions in addition to scope and visibility |
+| --- | --- |
+| Administrator | Status in `ACC`, `APP`, `BUP`, `CLR`, `DCL`, `DFT`, `FWD`, `GAS`, `RCD`, `RTN`, `SLD`, `RGN`, `SUB`, `SWI`, `SCN`, `VER`, `DTR`, `UNC`. |
+| Headquarters | Assigned to the caller. |
+| District appraiser | Assigned to the caller; status `SUB`, `RCD`, `RTN` or `SCN`. |
+| Region appraiser | Assigned to the caller; status `RGN`, `SWI`, `SCN`, `CLR`, `VER`, `DTR`, `SLD` or `UNC`. Requires a matching tenure row; `VER`/`DTR` require BCTS funding `N`. |
+| Viewer / region clerk | Status `SUB`/`RCD`/`RTN` for viewer, `RGN`/`SWI` for region clerk. These restrictions also apply to direct IDs. |
+| BCTS / BCTS submitter | Status `DFT`, `CLR`, `BUP`, `VER` or `DCL`. |
+| Licensee / licensee submitter | Status `DFT`, `CLR` or `DCL`. |
+| Licensee viewer | No additional queue condition. |
+
+Except for the ministry viewer restrictions, direct-ID searches bypass queue statuses and
+assignments. Assigned listings read `ADS_ASSIGNED_TO_USER` using the signed identity provider's
+username, normalized to the legacy account format. They never use a request's worked-on filter,
+an OIDC subject or a GUID fallback as the assignment identity. Without that username, a caller
+with an assigned-queue role cannot list My To Do; the request fails before JDBC.
+
+`/api/me.ecasMyToDoAvailable` enables the UI mode selector. Changing mode clears results and
+requires a new search; Clear all restores All Submissions. Reading queues never refreshes or
+changes legacy assignments. Provider-account matching and role behavior still require deployed
+acceptance against the shared database.
 
 ## ECAS references
 

@@ -157,6 +157,7 @@ function ReadDetailPanel({
 }
 
 const emptyEcas: EcasSearchFilters = {
+  mode: 'ALL_SUBMISSIONS',
   ecasId: '',
   licence: '',
   timberMark: '',
@@ -178,6 +179,8 @@ export function EcasInboxReadPage({
   api?: ReadApi
   relatedApis?: EcasRelatedApis
 }) {
+  const { state } = useAuth()
+  const myToDoAvailable = state.kind === 'signed-in' && state.session.ecasMyToDoAvailable === true
   const [draft, setDraft] = useState(emptyEcas)
   const [query, setQuery] = useState<{ filters: EcasSearchFilters; page: number } | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -200,11 +203,18 @@ export function EcasInboxReadPage({
     <section className="taps-page taps-fullbleed-page" aria-label="ECAS inbox search">
       <PageHeader
         title="Inbox Search"
-        subtitle="Search all appraisal data submissions available to you."
+        subtitle="Search appraisal data submissions available to you."
       />
       <EcasSearchFiltersForm
         draft={draft}
-        onChange={setDraft}
+        onChange={(filters) => {
+          if (filters.mode !== draft.mode) {
+            setSelection(null)
+            setQuery(null)
+          }
+          setDraft(filters)
+        }}
+        myToDoAvailable={myToDoAvailable}
         lookups={lookups.value}
         lookupLoading={lookups.loading}
         lookupError={lookups.error?.message}
@@ -212,7 +222,10 @@ export function EcasInboxReadPage({
         loading={results.loading}
         onSearch={() => {
           setSelection(null)
-          setQuery({ filters: { ...draft }, page: 0 })
+          setQuery({
+            filters: { ...draft, mode: myToDoAvailable ? draft.mode : 'ALL_SUBMISSIONS' },
+            page: 0,
+          })
         }}
         onReset={() => {
           setSelection(null)

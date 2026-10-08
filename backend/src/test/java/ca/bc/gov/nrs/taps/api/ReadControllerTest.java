@@ -14,6 +14,7 @@ import ca.bc.gov.nrs.taps.security.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -73,7 +74,9 @@ class ReadControllerTest {
   void sessionExposesEnabledReadsAndUnknownRoutesOrWritesRemainDenied() throws Exception {
     signIn("TAPS_ADMIN", "azureidir");
     mvc.perform(get("/api/me").header("Authorization", "Bearer token"))
-        .andExpect(status().isOk()).andExpect(jsonPath("$.readApiEnabled").value(true));
+        .andExpect(status().isOk()).andExpect(jsonPath("$.readApiEnabled").value(true))
+        .andExpect(jsonPath("$.ecasMyToDoAvailable").value(true))
+        .andExpect(jsonPath("$.legacyAccount").doesNotExist());
     mvc.perform(post("/api/gas/worksheets").header("Authorization", "Bearer token"))
         .andExpect(status().isForbidden());
     mvc.perform(get("/api/gas/future").header("Authorization", "Bearer token"))
@@ -100,7 +103,7 @@ class ReadControllerTest {
   @Test
   void invalidBodiesPathsAndParametersNeverReachReaders() throws Exception {
     signIn("TAPS_ADMIN", "azureidir");
-    for (String body : List.of("{", "{}", "{\"mode\":\"UNKNOWN\"}",
+    for (String body : List.of("{", "{\"mode\":\"UNKNOWN\"}",
         "{\"mode\":\"ALL_SUBMISSIONS\",\"cuttingPermit\":\"1\"}",
         "{\"mode\":\"ALL_SUBMISSIONS\",\"statusCodes\":[null]}",
         "{\"mode\":\"ALL_SUBMISSIONS\",\"orgUnitNumbers\":[\"bogus\"]}",
@@ -121,6 +124,58 @@ class ReadControllerTest {
           .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
     verifyNoInteractions(inbox, references, worksheets, appraised, other, marks, information);
+  }
+
+  @Test
+  void assignedMyToDoUsesSignedIdentityAndKeepsRequestedActorAsAFilter() throws Exception {
+    signIn("TAPS_HEADQUARTERS", "azureidir");
+    when(inbox.search(any(), any(), eq(0))).thenReturn(new EcasInbox.Page(List.of(), 0, 0));
+    mvc.perform(post("/api/ecas/inbox").header("Authorization", "Bearer token")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"mode\":\"MY_TO_DO\",\"workedOnByUserId\":\"IDIR\\\\OTHER\"}"))
+        .andExpect(status().isOk());
+    var user = ArgumentCaptor.forClass(TapsUser.class);
+    var search = ArgumentCaptor.forClass(EcasInbox.Search.class);
+    verify(inbox).search(user.capture(), search.capture(), eq(0));
+    assertThat(user.getValue().legacyAccount()).isEqualTo("IDIR\\SYNTHETIC");
+    assertThat(search.getValue().workedOnByUserId()).isEqualTo("IDIR\\OTHER");
+    assertThat(search.getValue().mode()).isEqualTo(EcasInbox.Mode.MY_TO_DO);
+  }
+
+  @Test
+  void guidFallbackDisablesAssignedListingBeforeReaderButRetainsOtherReads() throws Exception {
+    signIn(Map.of("identity_provider", "azureidir", "idir_user_guid", "synthetic-guid",
+        "display_name", "IDIR\\SYNTHETIC", "preferred_username", "synthetic",
+        "client_roles", List.of("TAPS_DISTRICT_APPRAISER_DISTRICT-DZZ")));
+    mvc.perform(get("/api/me").header("Authorization", "Bearer token"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.readApiEnabled").value(true))
+        .andExpect(jsonPath("$.ecasMyToDoAvailable").value(false))
+        .andExpect(jsonPath("$.userId").value("IDIR\\SYNTHETIC-GUID"));
+    mvc.perform(post("/api/ecas/inbox").header("Authorization", "Bearer token")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("{\"mode\":\"MY_TO_DO\",\"workedOnByUserId\":\"IDIR\\\\SYNTHETIC\"}"))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    verifyNoInteractions(inbox);
+    when(inbox.search(any(), any(), eq(0))).thenReturn(new EcasInbox.Page(List.of(), 0, 0));
+    for (String body : List.of("{\"mode\":\"ALL_SUBMISSIONS\"}", "{\"ecasId\":\"123\"}")) {
+      mvc.perform(post("/api/ecas/inbox").header("Authorization", "Bearer token")
+          .contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
+    }
+    var user = ArgumentCaptor.forClass(TapsUser.class);
+    verify(inbox, times(2)).search(user.capture(), any(), eq(0));
+    assertThat(user.getAllValues()).allSatisfy(principal -> assertThat(principal.legacyAccount()).isNull());
+  }
+
+  @Test
+  void guidOnlyAdministratorCanUseDefaultMyToDoWithoutAssignments() throws Exception {
+    signIn(Map.of("identity_provider", "idir", "idir_user_guid", "synthetic-guid",
+        "client_roles", List.of("TAPS_ADMIN")));
+    mvc.perform(get("/api/me").header("Authorization", "Bearer token"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.ecasMyToDoAvailable").value(true));
+    when(inbox.search(any(), any(), eq(0))).thenReturn(new EcasInbox.Page(List.of(), 0, 0));
+    mvc.perform(post("/api/ecas/inbox").header("Authorization", "Bearer token")
+        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+        .andExpect(status().isOk());
   }
 
   @Test
@@ -192,11 +247,14 @@ class ReadControllerTest {
   }
 
   private void signIn(String role, String provider) {
+    signIn(Map.of("identity_provider", provider, "idir_username", "synthetic",
+        "bceid_username", "synthetic", "client_roles", role.isEmpty() ? List.of() : List.of(role)));
+  }
+
+  private void signIn(Map<String, Object> claims) {
     Instant now = Instant.now();
     when(jwtDecoder.decode("token")).thenReturn(Jwt.withTokenValue("token").header("alg", "RS256")
         .subject("synthetic-user").claim("azp", "taps").claim("typ", "Bearer")
-        .issuedAt(now).expiresAt(now.plusSeconds(300)).claim("identity_provider", provider)
-        .claim("idir_username", "synthetic").claim("bceid_username", "synthetic")
-        .claim("client_roles", role.isEmpty() ? List.of() : List.of(role)).build());
+        .issuedAt(now).expiresAt(now.plusSeconds(300)).claims(values -> values.putAll(claims)).build());
   }
 }

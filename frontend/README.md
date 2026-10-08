@@ -73,7 +73,9 @@ local synthetic preview. See the
 
 1. Switch sessions and open ECAS and GAS routes as allowed, forbidden and no-role users.
 2. Filters only apply on Search or Enter. Clear all empties the filters and removes the results
-   without searching.
+   without searching. ECAS starts and resets to All Submissions. When the backend enables
+   My To Do, changing mode also clears the results and any open detail panel. The local synthetic
+   My To Do listing is empty because its sample submissions are confirmed.
 3. Try each results state and the retry button.
 4. Open a row drawer at wide and narrow widths. Check initial focus, Escape, Tab and that focus
    returns to the row button.

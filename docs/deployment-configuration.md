@@ -171,6 +171,7 @@ Set `TAPS_ORACLE_ENABLED=true` and deploy. The workflow starts the backend with 
 | Area | Check |
 | --- | --- |
 | ECAS inbox | Filters, direct-ID lookup, labels, dates, ordering, page counts, separate mark/permit rows. |
+| ECAS My To Do | Provider username matches existing assignments; per-role statuses, direct-ID exceptions, mixed grants and BCTS funding/null behavior match legacy. |
 | ECAS visibility | Draft/scenario rules use the same FAM grant. |
 | Coast/Interior references | Revision counts, marks, FTAS defaults, location labels, nulls, ambiguous-context errors. |
 | GAS search | All three families, status exclusions, client/organization paths, all marks; verify whether family, worksheet ID and mark form a unique paging key. |

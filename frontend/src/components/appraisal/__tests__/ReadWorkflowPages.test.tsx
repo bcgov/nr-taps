@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
 import type { ReactNode } from 'react'
@@ -8,12 +8,17 @@ import { setViewportWidth } from '@/test-setup'
 import { syntheticReadApi } from '@/local-synthetic/synthetic-read-api'
 import { workflowFixture as fixture } from '@/local-synthetic/WorkflowPreview'
 import { ReadApiError } from '@/service/read-service'
+import type { EcasInboxPage } from '@/contracts/appraisal'
 import { EcasInboxReadPage, GasSearchReadPage } from '../ReadWorkflowPages'
 
-function mount(children: ReactNode, capabilities = staffSession.capabilities) {
+function mount(
+  children: ReactNode,
+  capabilities = staffSession.capabilities,
+  ecasMyToDoAvailable?: boolean,
+) {
   setViewportWidth(1440)
   const auth: AuthContextValue = {
-    state: { kind: 'signed-in', session: staffSession },
+    state: { kind: 'signed-in', session: { ...staffSession, ecasMyToDoAvailable } },
     can: (capability) => capabilities.includes(capability),
     reloadSession: vi.fn(async () => {}),
     login: vi.fn(async () => {}),
@@ -26,6 +31,96 @@ function mount(children: ReactNode, capabilities = staffSession.capabilities) {
   )
   return auth
 }
+
+test('submits the selected mode only on Search and clears results when the mode changes', async () => {
+  const user = userEvent.setup()
+  const api = { ...syntheticReadApi, inbox: vi.fn(syntheticReadApi.inbox) }
+  mount(<EcasInboxReadPage api={api} />, undefined, true)
+  const mode = screen.getByRole('combobox', { name: 'Search mode' })
+  expect(mode).toHaveValue('ALL_SUBMISSIONS')
+  expect(api.inbox).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: 'Search' }))
+  await screen.findByRole('table', { name: 'ECAS submissions' })
+  await user.selectOptions(mode, 'MY_TO_DO')
+  expect(screen.queryByRole('table', { name: 'ECAS submissions' })).not.toBeInTheDocument()
+  expect(api.inbox).toHaveBeenCalledOnce()
+  await user.click(screen.getByRole('button', { name: 'Search' }))
+  expect(await screen.findByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(api.inbox).toHaveBeenLastCalledWith(
+    expect.objectContaining({ mode: 'MY_TO_DO' }),
+    0,
+    expect.any(AbortSignal),
+  )
+})
+
+test.each([undefined, false])(
+  'does not offer My to do when availability is %s',
+  async (available) => {
+    const user = userEvent.setup()
+    const api = { ...syntheticReadApi, inbox: vi.fn(syntheticReadApi.inbox) }
+    mount(<EcasInboxReadPage api={api} />, undefined, available)
+    expect(screen.queryByRole('combobox', { name: 'Search mode' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: 'My to do list' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    await waitFor(() => expect(api.inbox).toHaveBeenCalledOnce())
+    expect(api.inbox).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'ALL_SUBMISSIONS' }),
+      0,
+      expect.any(AbortSignal),
+    )
+  },
+)
+
+test('Clear all resets mode, filters, results and the selected reference without another request', async () => {
+  const user = userEvent.setup()
+  const api = { ...syntheticReadApi, inbox: vi.fn(syntheticReadApi.inbox) }
+  mount(<EcasInboxReadPage api={api} />, undefined, true)
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Search mode' }), 'MY_TO_DO')
+  await user.type(screen.getByRole('textbox', { name: 'ECAS ID' }), '999900000002')
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Appraisal method' }), 'C')
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'LICENCE')
+  expect(screen.getByText(/takes precedence over method, licence/)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Search' }))
+  await user.click(await screen.findByRole('button', { name: /Open ECAS .*mark ZZ9997/ }))
+  await screen.findByRole('heading', { name: 'Coast reference' })
+  await user.click(screen.getByRole('button', { name: 'Clear all' }))
+  expect(screen.getByRole('combobox', { name: 'Search mode' })).toHaveValue('ALL_SUBMISSIONS')
+  expect(screen.getByRole('textbox', { name: 'ECAS ID' })).toHaveValue('')
+  expect(screen.getByRole('combobox', { name: 'Appraisal method' })).toHaveValue('')
+  expect(screen.getByRole('combobox', { name: 'Sort by' })).toHaveValue('ECAS_ID')
+  expect(screen.queryByRole('table', { name: 'ECAS submissions' })).not.toBeInTheDocument()
+  await waitFor(() =>
+    expect(screen.queryByRole('heading', { name: 'Coast reference' })).not.toBeInTheDocument(),
+  )
+  expect(api.inbox).toHaveBeenCalledOnce()
+})
+
+test('aborts an old mode request and ignores its late rows after a new mode search', async () => {
+  const user = userEvent.setup()
+  let releaseOld: (page: EcasInboxPage) => void = () => {}
+  let oldSignal: AbortSignal | undefined
+  const api = {
+    ...syntheticReadApi,
+    inbox: vi.fn((...args: Parameters<typeof syntheticReadApi.inbox>) => {
+      if (args[0].mode === 'ALL_SUBMISSIONS') {
+        oldSignal = args[2]
+        return new Promise<EcasInboxPage>((resolve) => (releaseOld = resolve))
+      }
+      return syntheticReadApi.inbox(...args)
+    }),
+  }
+  mount(<EcasInboxReadPage api={api} />, undefined, true)
+  await user.click(screen.getByRole('button', { name: 'Search' }))
+  await waitFor(() => expect(api.inbox).toHaveBeenCalledOnce())
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Search mode' }), 'MY_TO_DO')
+  expect(oldSignal?.aborted).toBe(true)
+  await user.click(screen.getByRole('button', { name: 'Search' }))
+  await screen.findByRole('heading', { name: 'No results' })
+  await act(async () => releaseOld({ items: [fixture.ecasInboxItem], total: 250, page: 0 }))
+  expect(screen.getByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(screen.queryByRole('table', { name: 'ECAS submissions' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Next page' })).not.toBeInTheDocument()
+})
 
 test('searches, opens the selected ECAS reference and follows its immutable ID to a GAS summary', async () => {
   const user = userEvent.setup()

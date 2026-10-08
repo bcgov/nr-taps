@@ -76,6 +76,18 @@ test('loads effective choices and sends date, status and sort filters without ti
   })
 })
 
+test('sends the selected inbox mode with direct ID intact', async () => {
+  await readApi.inbox(
+    { mode: 'MY_TO_DO', ecasId: ' 123 ', licence: '', timberMark: '' },
+    0,
+    signal(),
+  )
+  expect(JSON.parse(fetch.mock.calls.at(-1)![1].body)).toMatchObject({
+    mode: 'MY_TO_DO',
+    ecasId: '123',
+  })
+})
+
 test('preserves additional filters and location case while normalizing the legacy user ID', async () => {
   await readApi.inbox(
     {

@@ -31,6 +31,10 @@ export const syntheticReadApi: ReadApi = {
       ],
     }),
   inbox: async (filters, page, signal) => {
+    // No sample rows are assigned to the preview user. This does not model grant/assignment security.
+    if (filters.mode === 'MY_TO_DO' && !normalized(filters.ecasId)) {
+      return delayed(signal, { items: [], total: 0, page })
+    }
     const items = inbox.filter(
       (item) =>
         (!normalized(filters.ecasId) || item.ecasId === normalized(filters.ecasId)) &&

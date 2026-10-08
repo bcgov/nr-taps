@@ -335,6 +335,111 @@ class OracleReadIT {
   }
 
   @Test
+  void assignedQueuesKeepCallerIdentityScopeAndDuplicateAssignmentsSeparate() {
+    queueStatuses("RGN", "SUB");
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = 'RGN'");
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET ENTRY_USERID = 'IDIR\\SYNTHETIC' WHERE ECAS_ID = 1001");
+    jdbc.update("INSERT INTO ADS_ASSIGNED_TO_USER VALUES (1001, 'IDIR\\SYNTHETIC')");
+    jdbc.update("INSERT INTO ADS_ASSIGNED_TO_USER VALUES (1001, 'IDIR\\SYNTHETIC')");
+    jdbc.update("INSERT INTO ADS_ASSIGNED_TO_USER VALUES (1002, 'IDIR\\SYNTHETIC')");
+    var reader = new OracleEcasInbox(jdbc);
+    var filter = new InboxFilters();
+    filter.mode = EcasInbox.Mode.MY_TO_DO;
+    var assigned = trustedIdir("IDIR\\SYNTHETIC", "TAPS_REGION_APPRAISER_REGION-CARIBOO");
+
+    var page = reader.search(assigned, filter.search(), 0);
+    assertThat(page.total()).isEqualTo(1);
+    assertThat(page.items()).extracting(EcasInbox.Item::ecasId).containsExactly("1001");
+    filter.workedOn = " idir\\synthetic ";
+    assertThat(reader.search(assigned, filter.search(), 0).total()).isEqualTo(1);
+    assertThat(reader.search(trustedIdir("IDIR\\UNASSIGNED", "TAPS_REGION_APPRAISER_REGION-CARIBOO"),
+        filter.search(), 0).total()).isZero();
+
+    filter.workedOn = null;
+    var mixed = trustedIdir("IDIR\\SYNTHETIC", "TAPS_REGION_APPRAISER_REGION-CARIBOO", "TAPS_VIEWER_DISTRICT-DOM");
+    assertThat(reader.search(mixed, filter.search(), 0).items())
+        .extracting(EcasInbox.Item::ecasId).containsExactly("1001");
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = 'SUB' WHERE ECAS_ID = 1002");
+    jdbc.update("DELETE FROM ADS_ASSIGNED_TO_USER WHERE ECAS_ID = 1002");
+    assertThat(reader.search(mixed, filter.search(), 0).items())
+        .extracting(EcasInbox.Item::ecasId).containsExactly("1002", "1001");
+  }
+
+  @Test
+  void regionalQueuesRetainOracleNullSemanticsAndRequireTheTenureRow() {
+    queueStatuses("RGN", "VER", "DTR");
+    jdbc.update("INSERT INTO ADS_ASSIGNED_TO_USER VALUES (1001, 'IDIR\\SYNTHETIC')");
+    var reader = new OracleEcasInbox(jdbc);
+    var regional = trustedIdir("IDIR\\SYNTHETIC", "TAPS_REGION_APPRAISER_REGION-CARIBOO");
+    var filter = new InboxFilters();
+    filter.mode = EcasInbox.Mode.MY_TO_DO;
+    for (String status : List.of("VER", "DTR")) {
+      jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = ? WHERE ECAS_ID = 1001", status);
+      jdbc.update("UPDATE PROV_FOREST_USE SET SB_FUNDED_IND = 'N' WHERE FOREST_FILE_ID = 'A00001'");
+      assertThat(reader.search(regional, filter.search(), 0).total()).isEqualTo(1);
+      jdbc.update("UPDATE PROV_FOREST_USE SET SB_FUNDED_IND = 'Y' WHERE FOREST_FILE_ID = 'A00001'");
+      assertThat(reader.search(regional, filter.search(), 0).total()).isZero();
+      jdbc.update("UPDATE PROV_FOREST_USE SET SB_FUNDED_IND = NULL WHERE FOREST_FILE_ID = 'A00001'");
+      assertThat(reader.search(regional, filter.search(), 0).total()).isZero();
+    }
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = 'RGN' WHERE ECAS_ID = 1001");
+    assertThat(reader.search(regional, filter.search(), 0).total()).isEqualTo(1);
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET FOREST_FILE_ID = 'MISSING' WHERE ECAS_ID = 1001");
+    assertThat(reader.search(regional, filter.search(), 0).total()).isZero();
+    assertThat(reader.search(CARIBOO, new InboxFilters().search(), 0).total()).isEqualTo(1);
+    filter.id = "1001";
+    assertThat(reader.search(CARIBOO, filter.search(), 0).total()).isEqualTo(1);
+  }
+
+  @Test
+  void directIdsRetainMinistryViewerQueueRestrictions() {
+    queueStatuses("RGN", "SUB");
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = 'RGN' WHERE ECAS_ID = 1001");
+    var reader = new OracleEcasInbox(jdbc);
+    var districtViewer = idir("TAPS_VIEWER_DISTRICT-DCA");
+    var regionalViewer = idir("TAPS_REGION_CLERK_REGION-CARIBOO");
+    var filter = new InboxFilters();
+    filter.id = "1001";
+    filter.mode = EcasInbox.Mode.MY_TO_DO;
+    assertThat(reader.search(districtViewer, filter.search(), 0).total()).isZero();
+    assertThat(reader.search(regionalViewer, filter.search(), 0).total()).isEqualTo(1);
+    filter.mode = EcasInbox.Mode.ALL_SUBMISSIONS;
+    assertThat(reader.search(districtViewer, filter.search(), 0).total()).isEqualTo(1);
+    filter.mode = EcasInbox.Mode.MY_TO_DO;
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = 'SUB' WHERE ECAS_ID = 1001");
+    assertThat(reader.search(districtViewer, filter.search(), 0).total()).isEqualTo(1);
+    assertThat(reader.search(regionalViewer, filter.search(), 0).total()).isZero();
+  }
+
+  @Test
+  void statusOnlyQueuesNeedNoAssignmentIdentityWhileHeadquartersDoes() {
+    var reader = new OracleEcasInbox(jdbc);
+    var filter = new InboxFilters();
+    filter.mode = EcasInbox.Mode.MY_TO_DO;
+    var licensee = user(IdentityProvider.BCEID_BUSINESS, "TAPS_LICENSEE_FOREST_CLIENT-00000001");
+    var clientViewer = user(IdentityProvider.BCEID_BUSINESS, "TAPS_LICENSEE_VIEWER_FOREST_CLIENT-00000001");
+    var bcts = idir("TAPS_BCTS_FOREST_CLIENT-00000001");
+    assertThat(reader.search(ADMIN, filter.search(), 0).total()).isZero();
+    assertThat(reader.search(licensee, filter.search(), 0).total()).isZero();
+    assertThat(reader.search(bcts, filter.search(), 0).total()).isZero();
+    assertThat(reader.search(clientViewer, filter.search(), 0).total()).isEqualTo(1);
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = 'DFT' WHERE ECAS_ID = 1001");
+    assertThat(reader.search(ADMIN, filter.search(), 0).total()).isEqualTo(1);
+    assertThat(reader.search(licensee, filter.search(), 0).total()).isEqualTo(1);
+    assertThat(reader.search(bcts, filter.search(), 0).total()).isEqualTo(1);
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = 'SCN' WHERE ECAS_ID = 1001");
+    assertThat(reader.search(ADMIN, filter.search(), 0).total()).isEqualTo(1);
+    assertThat(reader.search(clientViewer, filter.search(), 0).total()).isZero();
+    assertThat(reader.search(licensee, filter.search(), 0).total()).isZero();
+    assertThat(reader.search(bcts, filter.search(), 0).total()).isZero();
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = 'CON' WHERE ECAS_ID = 1001");
+    jdbc.update("INSERT INTO ADS_ASSIGNED_TO_USER VALUES (1001, 'IDIR\\SYNTHETIC')");
+    assertThat(reader.search(trustedIdir("IDIR\\SYNTHETIC", "TAPS_HEADQUARTERS"), filter.search(), 0).total()).isEqualTo(1);
+    assertThatThrownBy(() -> reader.search(idir("TAPS_HEADQUARTERS"), filter.search(), 0))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
   void ecasPaginationKeepsScopedCountsAndStableTieOrderAcrossTheHundredRowBoundary() {
     for (int index = 0; index < 101; index++) {
       long id = 2000 + index;
@@ -357,6 +462,17 @@ class OracleReadIT {
     assertThat(first.items().getFirst().ecasId()).isEqualTo("2100");
     assertThat(second.items()).extracting(EcasInbox.Item::ecasId).containsExactly("2000", "1001");
     assertThat(reader.search(OMINECA, new InboxFilters().search(), 0).total()).isEqualTo(1);
+
+    queueStatuses("RGN");
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = 'RGN' WHERE ECAS_ID = 1001 OR ECAS_ID BETWEEN 2000 AND 2100");
+    jdbc.update("INSERT INTO ADS_ASSIGNED_TO_USER SELECT ECAS_ID, 'IDIR\\SYNTHETIC' FROM APPRAISAL_DATA_SUBMISSION WHERE ECAS_ID = 1001 OR ECAS_ID BETWEEN 2000 AND 2100");
+    var queued = new InboxFilters();
+    queued.mode = EcasInbox.Mode.MY_TO_DO;
+    var assigned = trustedIdir("IDIR\\SYNTHETIC", "TAPS_REGION_APPRAISER_REGION-CARIBOO");
+    assertThat(reader.search(assigned, queued.search(), 0).total()).isEqualTo(102);
+    assertThat(reader.search(assigned, queued.search(), 0).items()).hasSize(100);
+    assertThat(reader.search(assigned, queued.search(), 1).items()).extracting(EcasInbox.Item::ecasId)
+        .containsExactly("2000", "1001");
   }
 
   @Test
@@ -464,7 +580,11 @@ class OracleReadIT {
           .apply(springSecurity()).build();
       mvc.perform(get("/api/gas/worksheets")).andExpect(status().isUnauthorized());
       mvc.perform(get("/api/me").header("Authorization", "Bearer fixture-cariboo"))
-          .andExpect(status().isOk()).andExpect(jsonPath("$.readApiEnabled").value(true));
+          .andExpect(status().isOk()).andExpect(jsonPath("$.readApiEnabled").value(true))
+          .andExpect(jsonPath("$.ecasMyToDoAvailable").value(true));
+      mvc.perform(post("/api/ecas/inbox").header("Authorization", "Bearer fixture-cariboo")
+          .contentType(MediaType.APPLICATION_JSON).content("{\"mode\":\"MY_TO_DO\"}"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(0));
       mvc.perform(post("/api/ecas/inbox").header("Authorization", "Bearer fixture-cariboo")
           .contentType(MediaType.APPLICATION_JSON).content("{\"mode\":\"ALL_SUBMISSIONS\"}"))
           .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1))
@@ -538,12 +658,25 @@ class OracleReadIT {
     return user(IdentityProvider.IDIR, roles);
   }
 
+  private static TapsUser trustedIdir(String account, String... roles) {
+    var user = idir(roles);
+    return new TapsUser(account, user.displayName(), user.email(), user.identityProvider(),
+        user.businessName(), user.grants(), account);
+  }
+
+  private void queueStatuses(String... statuses) {
+    for (String status : statuses) {
+      jdbc.update("INSERT INTO APPRAISAL_STATUS_CODE VALUES (?, 'Synthetic queue status', DATE '2000-01-01', DATE '9999-12-31', NULL)", status);
+    }
+  }
+
   private static TapsUser user(IdentityProvider provider, String... roles) {
     return new TapsUser("synthetic-user", "Synthetic User", null, provider, null,
         Arrays.stream(roles).map(FamRoleName::parse).map(role -> RoleGrant.accept(role, provider).orElseThrow()).toList());
   }
 
   private static final class InboxFilters {
+    EcasInbox.Mode mode = EcasInbox.Mode.ALL_SUBMISSIONS;
     String id;
     String mark;
     List<String> orgs = List.of();
@@ -554,7 +687,7 @@ class OracleReadIT {
     DateRange dates;
 
     EcasInbox.Search search() {
-      return new EcasInbox.Search(EcasInbox.Mode.ALL_SUBMISSIONS, null, id, null, null, mark,
+      return new EcasInbox.Search(mode, null, id, null, null, mark,
           null, null, orgs, null, null, statuses, statusDates, null, null, null, null, null,
           workedOn, dateTypes, dates, null, null);
     }

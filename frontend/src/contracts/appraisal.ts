@@ -109,6 +109,7 @@ export type EcasSortField =
   | 'SENT_TO_REGION_DATE'
   | 'UPDATE_DATE'
 export type EcasSearchFilters = {
+  mode?: 'MY_TO_DO' | 'ALL_SUBMISSIONS'
   ecasId: string
   licence: string
   timberMark: string

@@ -83,11 +83,12 @@ From the SQL in [`read/oracle`](src/main/java/ca/bc/gov/nrs/taps/read/oracle). N
 unqualified, so the database team needs to confirm the owner and synonym of each object for the
 proxy account. Don't assume one owner because the test fixture has one.
 
-`SELECT` on these 47 objects:
+`SELECT` on these 48 objects:
 
 | Objects | Used for |
 | --- | --- |
 | `APPRAISAL_DATA_SUBMISSION`, `APPRAISAL_DATA_SUBMISSION_CTRL`, `ADS_SUBMITTED_TIMBER_MARK` | ECAS records, marks and appraised parents |
+| `ADS_ASSIGNED_TO_USER` | Existing ECAS My To Do assignments |
 | `APPRAISAL_CATEGORY_CODE`, `APPRAISAL_STATUS_CODE`, `NON_APPRAISED_STATUS_CODE`, `REAPPRAISAL_REASON_CODE`, `STAND_RATE_ELIGIBILITY_CODE` | Code labels and choices |
 | `ORG_UNIT` | District/region rollup and labels |
 | `ECAS_AUDIT_EVENT`, `ECAS_ACTION_CODE`, `ECAS_AUDIT_COMMENT`, `ECAS_AUDIT_DETAIL` | Audit history and inbox audit filters |
@@ -116,7 +117,7 @@ DDL, schema ownership or `ANY` privilege.
 
 ## API reference
 
-`/api/me` exposes identity, grants, capabilities and read availability. Health probes are public; business routes require both the `oracle` profile and the matching capability. The [read API guide](../docs/oracle-reads.md#http-routes) lists all routes, page sizes, errors and contracts. It also records the SQL ownership mappings and family-specific behavior.
+`/api/me` exposes identity, grants, capabilities and read availability, including `ecasMyToDoAvailable`. Assigned queues require a signed provider username; the GUID audit fallback cannot identify legacy assignments. Health probes are public; business routes require both the `oracle` profile and the matching capability. The [read API guide](../docs/oracle-reads.md#http-routes) lists all routes, page sizes, errors and contracts. It also records the SQL ownership mappings and family-specific behavior.
 
 Review [intentional legacy divergences](../docs/intentional-legacy-divergences.md) separately when assessing parity.
 
