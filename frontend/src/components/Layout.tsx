@@ -12,8 +12,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { applications, applicationScreens, type ApplicationId } from '@/application-catalogue'
 import { useAuth } from '@/context/auth/AuthContext'
 import { useTheme } from '@/context/theme/ThemeContext'
-import bcLogo from '@/assets/BCID_H_rgb_pos.png'
-import reverseLogo from '@/assets/gov-bc-logo-horiz.png'
+import Landing from './Landing'
 import ProfilePanel from './ProfilePanel'
 import SideNavigationGroup from './SideNavigationGroup'
 import SideNavigationTooltip from './SideNavigationTooltip'
@@ -99,6 +98,17 @@ function Layout({ children }: { children: ReactNode }) {
     if (returnFocus) requestAnimationFrame(() => profileLauncherRef.current?.focus())
   }, [])
 
+  if (state.kind === 'signed-out') return <Landing expired={state.expired} />
+
+  const currentPageTitle = (app: ApplicationId) => {
+    if (activeApplication !== app) return undefined
+    if (pathname === `/${app}` || pathname === `/${app}/`)
+      return `${applications[app].title} overview`
+    return applicationScreens.find(
+      (screen) => screen.application === app && pathname === `/${app}/${screen.id}`,
+    )?.title
+  }
+
   return (
     <div
       className={`taps-shell${hasNavigation ? ' has-navigation' : ''}${expanded ? ' is-navigation-expanded' : ''}`}
@@ -108,6 +118,7 @@ function Layout({ children }: { children: ReactNode }) {
         {hasNavigation && (
           <HeaderMenuButton
             ref={menuRef}
+            className="taps-navigation-toggle"
             isCollapsible
             aria-label={expanded ? 'Close menu' : 'Open menu'}
             aria-controls="side-navigation"
@@ -194,6 +205,7 @@ function Layout({ children }: { children: ReactNode }) {
                   icon={app === 'ecas' ? Document : Finance}
                   collapsed={!expanded}
                   active={activeApplication === app}
+                  activePage={currentPageTitle(app)}
                   onExpandNavigation={() => {
                     if (narrow) setMobileOpen(true)
                     else setDesktopCollapsed(false)
@@ -244,17 +256,6 @@ function Layout({ children }: { children: ReactNode }) {
       <main id="main-content" ref={mainRef} className="taps-main" tabIndex={-1} inert={overlayOpen}>
         <div className="taps-content">{children}</div>
       </main>
-      <footer className="taps-footer" inert={overlayOpen}>
-        <img
-          src={theme === 'g100' ? reverseLogo : bcLogo}
-          alt="Government of British Columbia"
-          className="taps-footer__logo"
-        />
-        <a href="https://www2.gov.bc.ca/gov/content/home">B.C. Government</a>
-        <a href="https://www2.gov.bc.ca/gov/content/home/privacy">Privacy</a>
-        <a href="https://www2.gov.bc.ca/gov/content/home/accessibility">Accessibility</a>
-        <a href="https://www2.gov.bc.ca/gov/content/home/copyright">Copyright</a>
-      </footer>
     </div>
   )
 }

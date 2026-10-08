@@ -74,7 +74,7 @@ async function renew(started: number): Promise<User | null> {
 }
 
 export async function startLogin(provider: 'idir' | 'business-bceid'): Promise<void> {
-  if (!isOidcConfigured()) throw new Error('TAPS sign in is not configured.')
+  if (!isOidcConfigured()) throw new Error('TAPS log in is not configured.')
   // Wait for old credentials to be cleared before starting another login.
   await renewal?.catch(() => null)
   await endingSession?.catch(() => undefined)

@@ -1,11 +1,13 @@
 import { Link } from '@tanstack/react-router'
 import { Table, TableHead, TableHeader, TableRow, TableBody, TableCell, Tile } from '@carbon/react'
+import { Catalog } from '@carbon/icons-react'
 import { applications, applicationScreens, type ApplicationId } from '@/application-catalogue'
 import { useAuth } from '@/context/auth/AuthContext'
 import RequireAccess from '@/components/RequireAccess'
 import NotFound from '@/components/NotFound'
 import PageHeader from './PageHeader'
 import EmptyState from './EmptyState'
+import CardTitle from './CardTitle'
 import TableFrame from './TableFrame'
 import { EcasInboxReadPage, GasSearchReadPage } from './appraisal/ReadWorkflowPages'
 
@@ -18,13 +20,9 @@ export function ApplicationPage({ application }: { application: ApplicationId })
   return (
     <RequireAccess capabilities={app.capabilities}>
       <section className="taps-page">
-        <PageHeader
-          title={app.title}
-          subtitle={app.description}
-          backLink={<Link to="/">TAPS home</Link>}
-        />
-        <Tile>
-          <h2 className="taps-section-title">Pages</h2>
+        <PageHeader title={app.title} subtitle={app.description} />
+        <Tile className="taps-card">
+          <CardTitle icon={Catalog}>Pages</CardTitle>
           {screens.length ? (
             <TableFrame ariaLabel={`${app.title} pages table`}>
               <Table size="md" useZebraStyles aria-label={`${app.title} pages`}>
@@ -90,11 +88,7 @@ export function ApplicationScreenPage({
   return (
     <RequireAccess capabilities={[screen.capability]}>
       <section className="taps-page">
-        <PageHeader
-          title={screen.title}
-          subtitle={screen.description}
-          backLink={<Link to={`/${application}`}>Back to {applications[application].title}</Link>}
-        />
+        <PageHeader title={screen.title} subtitle={screen.description} />
         <EmptyState
           title="Page in development"
           description="This page is being modernized. It is not available yet."

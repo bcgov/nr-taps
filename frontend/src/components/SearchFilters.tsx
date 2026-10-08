@@ -1,6 +1,6 @@
 import { Search } from '@carbon/icons-react'
-import { Button, Tile } from '@carbon/react'
-import { useId, type ReactNode } from 'react'
+import { Button } from '@carbon/react'
+import type { ReactNode } from 'react'
 
 export default function SearchFilters({
   title = 'Search filters',
@@ -17,29 +17,27 @@ export default function SearchFilters({
   loading?: boolean
   disabled?: boolean
 }) {
-  const id = useId()
   return (
-    <Tile className="taps-search-filters">
+    <section className="taps-search-filters">
       <form
-        aria-labelledby={id}
+        aria-label={title}
         onSubmit={(event) => {
           event.preventDefault()
           if (!loading && !disabled) onSearch()
         }}
       >
-        <h2 id={id}>{title}</h2>
         <div className="taps-filter-grid">{children}</div>
         <div className="taps-actions">
+          {onReset && (
+            <Button type="button" kind="tertiary" size="md" onClick={onReset} disabled={loading}>
+              Clear all
+            </Button>
+          )}
           <Button type="submit" size="md" renderIcon={Search} disabled={loading || disabled}>
             {loading ? 'Searching…' : 'Search'}
           </Button>
-          {onReset && (
-            <Button type="button" kind="secondary" size="md" onClick={onReset} disabled={loading}>
-              Reset
-            </Button>
-          )}
         </div>
       </form>
-    </Tile>
+    </section>
   )
 }

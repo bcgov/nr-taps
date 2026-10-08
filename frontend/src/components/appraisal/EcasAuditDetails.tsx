@@ -60,7 +60,7 @@ function AuditContents({ ecasId, api }: { ecasId: string; api: EcasAuditApi }) {
             title="Audit history unavailable"
             subtitle={history.error.message}
           />
-          <Button kind="tertiary" onClick={history.retry}>
+          <Button kind="tertiary" size="md" onClick={history.retry}>
             Retry audit history
           </Button>
         </>
@@ -106,16 +106,16 @@ function AuditContents({ ecasId, api }: { ecasId: string; api: EcasAuditApi }) {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          size="sm"
-                          kind="ghost"
+                        <button
+                          type="button"
+                          className="taps-link-button"
                           onClick={(click) => {
                             selectedTriggerRef.current = click.currentTarget
                             setSelected({ id: event.eventId, page: 0 })
                           }}
                         >
                           View event {event.eventId}
-                        </Button>
+                        </button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -144,7 +144,7 @@ function AuditContents({ ecasId, api }: { ecasId: string; api: EcasAuditApi }) {
           </h3>
           <Button
             kind="ghost"
-            size="sm"
+            size="md"
             onClick={() => {
               setSelected(null)
               selectedTriggerRef.current?.focus()
@@ -160,7 +160,7 @@ function AuditContents({ ecasId, api }: { ecasId: string; api: EcasAuditApi }) {
                 title="Event details unavailable"
                 subtitle={detail.error.message}
               />
-              <Button kind="tertiary" onClick={detail.retry}>
+              <Button kind="tertiary" size="md" onClick={detail.retry}>
                 Retry event details
               </Button>
             </>

@@ -23,7 +23,7 @@ export class ReadApiError extends Error {
     super(
       message ??
         (status === 401
-          ? 'Your session has ended. Sign in again.'
+          ? 'Your session has ended. Log in again.'
           : status === 403
             ? 'You do not have access to this information.'
             : status === 404

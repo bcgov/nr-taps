@@ -1,3 +1,4 @@
+import { Location } from '@carbon/icons-react'
 import {
   Button,
   Table,
@@ -8,6 +9,7 @@ import {
   TableRow,
   InlineLoading,
 } from '@carbon/react'
+import type { ReactNode } from 'react'
 import {
   ecasRowIdentity,
   gasRowIdentity,
@@ -19,6 +21,7 @@ import {
 } from '@/contracts/appraisal'
 import SearchResultsTableFrame from '../SearchResultsTableFrame'
 import AppNotification from '../AppNotification'
+import CardTitle from '../CardTitle'
 import './appraisal.scss'
 
 export const displayCode = (value: CodeOption | null) => value?.description ?? value?.code ?? '—'
@@ -30,6 +33,7 @@ export function EcasInboxResults({
   loading = false,
   error,
   onRetry,
+  pagination,
 }: {
   items: EcasInboxItem[]
   onOpen: (item: EcasInboxItem, launcher: HTMLButtonElement) => void
@@ -37,6 +41,7 @@ export function EcasInboxResults({
   loading?: boolean
   error?: string
   onRetry?: () => void
+  pagination?: ReactNode
 }) {
   return (
     <SearchResultsTableFrame
@@ -46,6 +51,7 @@ export function EcasInboxResults({
       loading={loading}
       error={error}
       onRetry={onRetry}
+      pagination={pagination}
     >
       <Table
         useZebraStyles
@@ -73,14 +79,14 @@ export function EcasInboxResults({
           {rowsWithKeys(items, ecasRowIdentity).map(({ item, key }) => (
             <TableRow key={key}>
               <TableCell>
-                <Button
-                  kind="ghost"
-                  size="sm"
+                <button
+                  type="button"
+                  className="taps-link-button"
                   aria-label={`Open ECAS ${item.ecasId}, mark ${item.timberMark ?? 'unknown'}, permit ${item.cuttingPermit ?? 'unknown'}`}
                   onClick={(event) => onOpen(item, event.currentTarget)}
                 >
                   {item.ecasId}
-                </Button>
+                </button>
               </TableCell>
               <TableCell>
                 {item.appraisalMethod === 'C'
@@ -113,6 +119,7 @@ export function GasSearchResults({
   contextLoading = false,
   contextError,
   onRetryContext,
+  pagination,
 }: {
   result: GasSearchResult
   onOpen: (item: GasAppraisalItem, launcher: HTMLButtonElement) => void
@@ -123,12 +130,15 @@ export function GasSearchResults({
   contextLoading?: boolean
   contextError?: string
   onRetryContext?: () => void
+  pagination?: ReactNode
 }) {
   const info = result.licenceInformation
   return (
     <>
-      <section aria-label="Licence information" className="taps-licence-information">
-        <h2>Licence information</h2>
+      <section aria-labelledby="licence-information-title" className="cds--tile taps-card">
+        <CardTitle id="licence-information-title" icon={Location}>
+          Licence information
+        </CardTitle>
         {contextLoading ? (
           <InlineLoading description="Loading licence information…" />
         ) : contextError ? (
@@ -138,12 +148,12 @@ export function GasSearchResults({
               title="Unable to load licence information"
               subtitle={contextError}
             />
-            <Button kind="tertiary" onClick={onRetryContext}>
+            <Button kind="tertiary" size="md" onClick={onRetryContext}>
               Retry licence information
             </Button>
           </>
         ) : info ? (
-          <dl className="taps-appraisal-fields">
+          <dl className="taps-field-grid">
             {(
               [
                 ['Client number', info.clientNumber],
@@ -176,6 +186,7 @@ export function GasSearchResults({
         loading={loading}
         error={error}
         onRetry={onRetry}
+        pagination={pagination}
       >
         <Table
           useZebraStyles
@@ -203,14 +214,14 @@ export function GasSearchResults({
               <TableRow key={key}>
                 <TableCell>
                   {allFamilies || item.key.type === 'APPRAISED' ? (
-                    <Button
-                      kind="ghost"
-                      size="sm"
+                    <button
+                      type="button"
+                      className="taps-link-button"
                       aria-label={`Open ${item.key.type} worksheet ${item.key.worksheetId}, mark ${item.timberMark ?? 'unknown'}`}
                       onClick={(event) => onOpen(item, event.currentTarget)}
                     >
                       {item.key.worksheetId}
-                    </Button>
+                    </button>
                   ) : (
                     item.key.worksheetId
                   )}

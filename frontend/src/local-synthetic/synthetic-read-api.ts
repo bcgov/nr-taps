@@ -1,39 +1,17 @@
-import { Button } from '@carbon/react'
-import { useState } from 'react'
-import { EcasInboxReadPage, GasSearchReadPage } from '@/components/appraisal/ReadWorkflowPages'
 import { ReadApiError, type ReadApi } from '@/service/read-service'
 import { workflowFixture as fixture } from './WorkflowPreview'
-import type { EcasRelatedApis } from '@/components/appraisal/EcasReferenceSections'
 
 const inbox = [...fixture.ecasInboxMultiMarkItems, fixture.ecasInboxItem]
 const worksheets = [...fixture.gasSearchResult.appraisals.items, ...fixture.gasSearchPage.items]
 const summaries = [fixture.gasMultiMarkAppraisedSummary, fixture.gasAppraisedSummary]
 const normalized = (value: string) => value.trim().toUpperCase()
-const syntheticRelatedApis: EcasRelatedApis = {
-  audit: {
-    history: async (ecasId, page) => ({ ecasId, page, total: 0, items: [] }),
-    details: async () => {
-      throw new ReadApiError(404)
-    },
-  },
-  attachments: {
-    inventory: async (ecasId, page) => ({
-      ecasId,
-      page,
-      total: 0,
-      items: [],
-      size: 50,
-      appraisalMethod: ecasId === fixture.ecasInboxItem.ecasId ? 'I' : 'C',
-    }),
-  },
-}
 async function delayed<T>(signal: AbortSignal, value: T): Promise<T> {
   await new Promise<void>((resolve) => setTimeout(resolve, 200))
   signal.throwIfAborted()
   return value
 }
 
-// Dev and test only; the app uses the HTTP readApi.
+// Local synthetic preview and tests only; the app uses the HTTP readApi.
 export const syntheticReadApi: ReadApi = {
   ecasLookups: async (signal) =>
     delayed(signal, {
@@ -103,24 +81,4 @@ export const syntheticReadApi: ReadApi = {
           (info) => info?.timberMark === mark && (!licence || info.licenceNumber === licence),
         ) ?? null,
     ),
-}
-
-export default function AsyncReadPreview() {
-  const [module, setModule] = useState<'ecas' | 'gas'>('ecas')
-  return (
-    <>
-      <p>
-        Synthetic asynchronous read preview. Uses the production page components with test fixtures;
-        no database or sign-in requests.
-      </p>
-      <Button kind="tertiary" onClick={() => setModule(module === 'ecas' ? 'gas' : 'ecas')}>
-        {module === 'ecas' ? 'GAS appraisal search' : 'ECAS inbox search'}
-      </Button>
-      {module === 'ecas' ? (
-        <EcasInboxReadPage api={syntheticReadApi} relatedApis={syntheticRelatedApis} />
-      ) : (
-        <GasSearchReadPage api={syntheticReadApi} />
-      )}
-    </>
-  )
 }

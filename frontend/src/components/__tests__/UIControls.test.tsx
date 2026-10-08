@@ -62,7 +62,7 @@ test('lets the caller reset filters without submitting a search', async () => {
   render(<FilterExample onSearch={onSearch} onReset={onReset} />)
 
   await user.type(screen.getByRole('textbox', { name: 'Reference' }), 'Draft reference')
-  await user.click(screen.getByRole('button', { name: 'Reset' }))
+  await user.click(screen.getByRole('button', { name: 'Clear all' }))
 
   expect(screen.getByRole('textbox', { name: 'Reference' })).toHaveValue('')
   expect(onReset).toHaveBeenCalledOnce()
@@ -87,8 +87,8 @@ test.each([
   )
 
   expect(screen.getByRole('button', { name: state.label })).toBeDisabled()
-  if (state.resetDisabled) expect(screen.getByRole('button', { name: 'Reset' })).toBeDisabled()
-  else expect(screen.getByRole('button', { name: 'Reset' })).toBeEnabled()
+  if (state.resetDisabled) expect(screen.getByRole('button', { name: 'Clear all' })).toBeDisabled()
+  else expect(screen.getByRole('button', { name: 'Clear all' })).toBeEnabled()
 
   await user.type(screen.getByRole('textbox', { name: 'Reference' }), 'Draft{Enter}')
   fireEvent.submit(screen.getByRole('form', { name: 'Search filters' }))
@@ -228,20 +228,20 @@ test('shows a loading state while retrying after an earlier error', () => {
   expect(screen.queryByRole('cell', { name: 'Saved reference' })).not.toBeInTheDocument()
 })
 
-test('provides one page H1 with separately labelled actions and a back link', () => {
+test('provides one page H1 with its status and separately labelled actions', () => {
   render(
     <PageHeader
       title="Inbox Search"
       subtitle="Find your submissions."
-      backLink={<a href="/ecas">Back to ECAS</a>}
+      status={<span>Draft</span>}
       actions={<button>Help</button>}
     />,
   )
 
   expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Inbox Search')
+  expect(screen.getByRole('heading', { level: 1 }).parentElement).toHaveTextContent('Draft')
   expect(screen.getByText('Find your submissions.')).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Back to ECAS' })).toHaveAttribute('href', '/ecas')
   expect(screen.getByRole('group', { name: 'Page actions' })).toContainElement(
     screen.getByRole('button', { name: 'Help' }),
   )

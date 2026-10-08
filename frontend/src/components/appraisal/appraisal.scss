@@ -2,26 +2,9 @@
   min-inline-size: 62rem;
 }
 
-.taps-licence-information {
-  border: 1px solid var(--cds-border-subtle-01);
-  border-radius: 4px;
-  padding: 1.5rem;
-  background: var(--taps-surface);
-}
-
-.taps-appraisal-fields {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: 1rem 2rem;
-  margin-block: 1.5rem;
-
-  dt {
-    font-weight: 600;
-  }
-  dd {
-    margin: 0;
-    overflow-wrap: anywhere;
-  }
+// Field groups in the detail panel keep 16px above and 24px below.
+.taps-detail-panel .taps-field-grid {
+  margin-block: 1rem 1.5rem;
 }
 
 .taps-appraisal-mark-list {

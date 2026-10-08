@@ -17,7 +17,11 @@ const NotFound: FC = () => {
       <EmptyState
         title="Page not found"
         description="The page you’re looking for does not exist."
-        action={<Button onClick={() => buttonClicked()}>Back home</Button>}
+        action={
+          <Button size="md" onClick={() => buttonClicked()}>
+            Back home
+          </Button>
+        }
       />
     </section>
   )

@@ -106,10 +106,13 @@ function DateFields({ reference }: { reference: CoastReference }) {
               : 'No date changes. This is an in-memory draft.'}
         </p>
         <div className="taps-actions">
-          <Button type="submit">Check dates</Button>
+          <Button type="submit" size="md">
+            Check dates
+          </Button>
           <Button
             type="button"
-            kind="secondary"
+            kind="tertiary"
+            size="md"
             disabled={!dirty && !checked}
             onClick={() => {
               setDraft(original)

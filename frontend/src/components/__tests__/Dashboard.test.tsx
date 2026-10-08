@@ -27,7 +27,7 @@ test.each(['idir', 'business-bceid'] as const)(
     const user = userEvent.setup()
     await renderRoute()
 
-    const name = provider === 'idir' ? 'Sign in with IDIR' : 'Sign in with Business BCeID'
+    const name = provider === 'idir' ? 'Log in with IDIR' : 'Log in with Business BCeID'
     await user.click(await screen.findByRole('button', { name }))
 
     expect(oidc.startLogin).toHaveBeenCalledWith(provider)
@@ -41,7 +41,8 @@ test('loads identity and access from the protected API using the FAM access toke
 
   await renderRoute()
 
-  expect(await screen.findByText('Signed in as TAPS User.')).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { level: 1, name: 'Home' })).toBeInTheDocument()
+  expect(screen.getByText('Logged in as TAPS User.')).toBeInTheDocument()
   expect(screen.getByText('District appraiser (district DCR)')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'ECAS' })).toHaveAttribute('href', '/ecas')
   expect(screen.getByRole('link', { name: 'GAS' })).toHaveAttribute('href', '/gas')
@@ -56,11 +57,11 @@ test('removes an invalid session when the API rejects it', async () => {
 
   await renderRoute()
 
-  expect(await screen.findByRole('button', { name: 'Sign in with IDIR' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Log in with IDIR' })).toBeInTheDocument()
   expect(oidc.clearLogin).toHaveBeenCalledOnce()
 })
 
-test('offers retry and local sign out after a transient service error', async () => {
+test('offers retry and local log out after a transient service error', async () => {
   const user = userEvent.setup()
   oidc.getOidcUser.mockResolvedValue({ access_token: 'test-token' })
   vi.stubGlobal(
@@ -74,7 +75,7 @@ test('offers retry and local sign out after a transient service error', async ()
   await renderRoute()
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load your session')
-  expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Log out' })).toBeInTheDocument()
   expect(oidc.clearLogin).not.toHaveBeenCalled()
   await user.click(screen.getByRole('button', { name: 'Try again' }))
   expect(await screen.findByRole('link', { name: 'ECAS' })).toBeInTheDocument()
@@ -94,13 +95,16 @@ test('denies a signed-in user with no roles even if capabilities are present in 
   expect(screen.queryByRole('link', { name: 'GAS' })).not.toBeInTheDocument()
 })
 
-test('explains when local sign in is not configured', async () => {
+test('explains when local log in is not configured', async () => {
   oidc.isOidcConfigured.mockReturnValue(false)
 
   await renderRoute()
 
   expect(
-    await screen.findByText('Sign in is not configured for this environment.'),
+    await screen.findByText(
+      'TAPS log in is not configured for this environment. Contact the system administrator.',
+    ),
   ).toBeInTheDocument()
-  expect(screen.queryByRole('button', { name: 'Sign in with IDIR' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Log in with IDIR' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Log in with Business BCeID' })).toBeDisabled()
 })

@@ -9,7 +9,7 @@ import {
   rowsWithKeys,
   type GasAppraisalItem,
 } from '@/contracts/appraisal'
-import WorkflowPreview, { workflowFixture as fixture } from '@/dev/WorkflowPreview'
+import WorkflowPreview, { workflowFixture as fixture } from '@/local-synthetic/WorkflowPreview'
 import { EcasInboxResults, GasSearchResults } from '../AppraisalResults'
 import GasSearchFilters, { type GasFilters } from '../GasSearchFilters'
 
@@ -202,7 +202,7 @@ test('applies the selected licence mark on Search and retains FTA context with z
   expect(
     within(screen.getByRole('region', { name: 'Licence information' })).getByText('ZZ9996'),
   ).toBeInTheDocument()
-  await user.click(screen.getByRole('button', { name: 'Reset' }))
+  await user.click(screen.getByRole('button', { name: 'Clear all' }))
   expect(
     within(screen.getByRole('table', { name: 'GAS worksheets' })).getAllByRole('row'),
   ).toHaveLength(4)

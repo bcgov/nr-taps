@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, expect, test, vi } from 'vitest'
 import type { CoastReference } from '@/contracts/appraisal'
-import { workflowFixture } from '@/dev/WorkflowPreview'
+import { workflowFixture } from '@/local-synthetic/WorkflowPreview'
 import CoastAppraisalDatesDraft from '../CoastAppraisalDatesDraft'
 
 const source = (overrides: Partial<CoastReference['header']> = {}): CoastReference => ({

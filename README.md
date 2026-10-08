@@ -21,12 +21,12 @@ Current validation uses source, synthetic data and disposable local containers. 
 
 | Environment | Runtime | Database and identity |
 | --- | --- | --- |
-| LOCAL | Developer machine or local Docker | Local validation may use disposable synthetic Oracle data and a local test issuer. |
-| DEV | OpenShift DEV | DEV database and configured SSO. |
+| LOCAL | Developer machine or local Docker | Optional local synthetic UI preview, or disposable synthetic Oracle data and a local test issuer. |
+| DEV | OpenShift DEV | Its own DEV Oracle database and configured SSO. |
 | TEST | OpenShift TEST | TEST database and configured SSO. |
 | PROD | OpenShift PROD | PROD database and configured SSO; PROD deployment automation is currently disabled. |
 
-Synthetic database fixtures, the test issuer and the UI preview are local validation tools. They
+Synthetic database fixtures, the test issuer and the local synthetic UI preview are local validation tools. They
 are not deployed to DEV, TEST or PROD and never seed those databases. All OpenShift environments
 use the release application images with environment-specific configuration; an unavailable database
 does not enable synthetic data as a fallback. CI unit tests use isolated fixtures without creating
@@ -48,7 +48,9 @@ The frontend runs on `http://localhost:3000` and proxies `/api` to `http://local
 
 Or run both in Docker with `docker compose up`: the backend through Maven on 8080 and the Vite dev server on 3000. Set the two OIDC values in the shell or a root `.env` first. `docker compose --profile caddy up` also serves the production frontend image on `http://localhost:3005`. Oracle stays off unless `SPRING_PROFILES_ACTIVE=oracle` and the database settings are set; [backend/.env.example](backend/.env.example) lists them.
 
-Read screens remain unavailable until Oracle is enabled; see [backend configuration](backend/README.md#configuration). To run everything locally with a test issuer and disposable Oracle, use the [authenticated read rehearsal](scripts/README.md#authenticated-read-rehearsal).
+Read screens remain unavailable until Oracle is enabled; see [backend configuration](backend/README.md#configuration).
+For UI checks with sample data and no backend, use the [local synthetic UI preview](frontend/README.md#local-synthetic-ui-preview).
+For local checks with a test issuer and disposable Oracle, use the [local synthetic read rehearsal](scripts/README.md#local-synthetic-read-rehearsal).
 
 ## Component docs
 

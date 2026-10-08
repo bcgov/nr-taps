@@ -32,7 +32,7 @@ export default defineConfig({
         'src/**/*.test.tsx',
         'src/**/*.spec.tsx',
         'src/__tests__/**',
-        'src/dev/**', // Development-only synthetic preview
+        'src/local-synthetic/**', // Local synthetic preview
       ],
     },
   },

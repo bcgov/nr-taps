@@ -7,6 +7,7 @@ export default function SideNavigationGroup({
   icon: Icon,
   collapsed,
   active,
+  activePage,
   onExpandNavigation,
   children,
 }: {
@@ -14,6 +15,8 @@ export default function SideNavigationGroup({
   icon: CarbonIconType
   collapsed: boolean
   active: boolean
+  // The title of the current page when this group holds it.
+  activePage?: string
   onExpandNavigation: () => void
   children: ReactNode
 }) {
@@ -21,9 +24,10 @@ export default function SideNavigationGroup({
   const buttonRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(active)
   const expanded = !collapsed && open
+  const currentGroup = active && !expanded
   return (
     <li
-      className={`cds--side-nav__item${active && !expanded ? ' cds--side-nav__item--active' : ''}`}
+      className={`cds--side-nav__item${currentGroup ? ' cds--side-nav__item--active' : ''}`}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && expanded) {
           event.stopPropagation()
@@ -32,7 +36,10 @@ export default function SideNavigationGroup({
         }
       }}
     >
-      <SideNavigationTooltip enabled={collapsed} label={label}>
+      <SideNavigationTooltip
+        enabled={collapsed}
+        label={activePage ? `${label}: ${activePage}` : label}
+      >
         {(descriptionId) => (
           <button
             ref={buttonRef}
@@ -41,7 +48,10 @@ export default function SideNavigationGroup({
             aria-label={label}
             aria-expanded={expanded}
             aria-controls={id}
-            aria-current={active && !expanded ? 'true' : undefined}
+            aria-current={currentGroup ? 'true' : undefined}
+            aria-description={
+              currentGroup && activePage ? `Contains current page: ${activePage}` : undefined
+            }
             aria-describedby={descriptionId}
             onClick={() => {
               if (collapsed) {

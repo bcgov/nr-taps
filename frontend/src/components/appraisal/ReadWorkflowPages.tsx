@@ -118,7 +118,7 @@ function ReadDetailPanel({
             title="Unable to load details"
             subtitle={detail.error.message}
           />
-          <Button kind="tertiary" onClick={detail.retry}>
+          <Button kind="tertiary" size="md" onClick={detail.retry}>
             Retry details
           </Button>
         </>
@@ -141,13 +141,14 @@ function ReadDetailPanel({
       )}
       {selection?.kind === 'reference' && detail.value && can(Capability.GasAppraisalView) && (
         <Button
+          size="md"
           onClick={() => setSelection({ kind: 'related', id: selection.id, reference: selection })}
         >
           View related GAS worksheet
         </Button>
       )}
       {selection?.kind === 'related' && (
-        <Button kind="tertiary" onClick={() => setSelection(selection.reference)}>
+        <Button kind="tertiary" size="md" onClick={() => setSelection(selection.reference)}>
           Back to ECAS reference
         </Button>
       )}
@@ -196,7 +197,7 @@ export function EcasInboxReadPage({
     setSelection({ kind: 'reference', id: item.ecasId, method: item.appraisalMethod })
   }
   return (
-    <section className="taps-page" aria-label="ECAS inbox search">
+    <section className="taps-page taps-fullbleed-page" aria-label="ECAS inbox search">
       <PageHeader
         title="Inbox Search"
         subtitle="Search all appraisal data submissions available to you."
@@ -219,34 +220,32 @@ export function EcasInboxReadPage({
           setQuery(null)
         }}
       />
-      <h2 id="read-results-heading" tabIndex={-1}>
+      <h2 id="read-results-heading" className="cds--visually-hidden" tabIndex={-1}>
         Submissions
       </h2>
-      {!query ? (
-        <p>Enter any filters, then select Search.</p>
-      ) : (
-        <>
-          <EcasInboxResults
-            items={results.value?.items ?? []}
-            totalItems={results.value?.total}
-            loading={results.loading}
-            error={results.error?.message}
-            onRetry={results.retry}
-            onOpen={openReference}
-          />
-          {total !== undefined && !results.error && (
-            <Pagination
-              page={query.page + 1}
-              pageSize={100}
-              pageSizes={[100]}
-              totalItems={total}
-              onChange={({ page }) => {
-                setSelection(null)
-                setQuery({ filters: query.filters, page: page - 1 })
-              }}
-            />
-          )}
-        </>
+      {query && (
+        <EcasInboxResults
+          items={results.value?.items ?? []}
+          totalItems={results.value?.total}
+          loading={results.loading}
+          error={results.error?.message}
+          onRetry={results.retry}
+          onOpen={openReference}
+          pagination={
+            total !== undefined && (
+              <Pagination
+                page={query.page + 1}
+                pageSize={100}
+                pageSizes={[100]}
+                totalItems={total}
+                onChange={({ page }) => {
+                  setSelection(null)
+                  setQuery({ filters: query.filters, page: page - 1 })
+                }}
+              />
+            )
+          }
+        />
       )}
       <ReadDetailPanel
         selection={selection}
@@ -298,7 +297,7 @@ export function GasSearchReadPage({ api = readApi }: { api?: ReadApi }) {
     setSelection({ kind: 'worksheet', item })
   }
   return (
-    <section className="taps-page" aria-label="GAS appraisal search">
+    <section className="taps-page taps-fullbleed-page" aria-label="GAS appraisal search">
       <PageHeader title="Appraisal Search" subtitle="Find appraisal worksheets and stored rates." />
       <GasSearchFilters
         draft={draft}
@@ -318,40 +317,38 @@ export function GasSearchReadPage({ api = readApi }: { api?: ReadApi }) {
           setQuery(null)
         }}
       />
-      <h2 id="read-results-heading" tabIndex={-1}>
+      <h2 id="read-results-heading" className="cds--visually-hidden" tabIndex={-1}>
         Worksheets
       </h2>
-      {!query ? (
-        <p>Enter any filters, then select Search.</p>
-      ) : (
-        <>
-          <GasSearchResults
-            allFamilies
-            result={{
-              appraisals: results.value ?? { items: [], total: 0, page: query.page },
-              licenceInformation: context.value ?? null,
-            }}
-            loading={results.loading}
-            error={results.error?.message}
-            onRetry={results.retry}
-            onOpen={openWorksheet}
-            contextLoading={context.loading}
-            contextError={context.error?.message}
-            onRetryContext={context.retry}
-          />
-          {total !== undefined && !results.error && (
-            <Pagination
-              page={query.page + 1}
-              pageSize={10}
-              pageSizes={[10]}
-              totalItems={total}
-              onChange={({ page }) => {
-                setSelection(null)
-                setQuery({ filters: query.filters, page: page - 1 })
-              }}
-            />
-          )}
-        </>
+      {query && (
+        <GasSearchResults
+          allFamilies
+          result={{
+            appraisals: results.value ?? { items: [], total: 0, page: query.page },
+            licenceInformation: context.value ?? null,
+          }}
+          loading={results.loading}
+          error={results.error?.message}
+          onRetry={results.retry}
+          onOpen={openWorksheet}
+          contextLoading={context.loading}
+          contextError={context.error?.message}
+          onRetryContext={context.retry}
+          pagination={
+            total !== undefined && (
+              <Pagination
+                page={query.page + 1}
+                pageSize={10}
+                pageSizes={[10]}
+                totalItems={total}
+                onChange={({ page }) => {
+                  setSelection(null)
+                  setQuery({ filters: query.filters, page: page - 1 })
+                }}
+              />
+            )
+          }
+        />
       )}
       <ReadDetailPanel
         selection={selection}

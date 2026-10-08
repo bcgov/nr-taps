@@ -1,6 +1,6 @@
 import '@bcgov/bc-sans/css/BC_Sans.css'
 import '@/scss/styles.scss'
-import './ui-preview.scss'
+import './local-synthetic.scss'
 import { Select, SelectItem } from '@carbon/react'
 import {
   Outlet,
@@ -105,40 +105,46 @@ function PreviewRoot() {
     }
   }, [scenario])
 
+  const banner = (
+    <details className="taps-preview-banner" aria-label="Local synthetic preview controls">
+      <summary>Local synthetic UI preview</summary>
+      <p>
+        All accounts and sample rows are synthetic. Session controls only change this preview; they
+        do not log in or call TAPS services.
+      </p>
+      <div className="taps-preview-toolbar">
+        <Select
+          id="synthetic-session"
+          labelText="Synthetic session"
+          value={scenario}
+          onChange={(event) => setScenario(event.target.value as Scenario)}
+        >
+          {scenarios.map((item) => (
+            <SelectItem key={item.id} value={item.id} text={item.label} />
+          ))}
+        </Select>
+        <Select
+          id="synthetic-route"
+          labelText="Preview page"
+          value={previewPaths.some((item) => item.path === pathname) ? pathname : '/'}
+          onChange={(event) => previewHistory.push(event.target.value)}
+        >
+          {previewPaths.map((item) => (
+            <SelectItem key={item.path} value={item.path} text={item.label} />
+          ))}
+        </Select>
+      </div>
+    </details>
+  )
+
   return (
     <ThemeProvider>
       <AuthContext value={auth}>
+        {/* Signed-out sessions get the login page without the shell, so keep the controls above it. */}
+        {scenario === 'signed-out' && <div className="taps-preview-landing-controls">{banner}</div>}
         <Layout>
           <div className="taps-preview-workspace">
-            <details className="taps-preview-banner" aria-label="Development preview controls">
-              <summary>Development-only synthetic UI preview</summary>
-              <p>
-                All accounts and sample rows are synthetic. Session controls only change this
-                preview; they do not sign in or call TAPS services.
-              </p>
-              <div className="taps-preview-toolbar">
-                <Select
-                  id="synthetic-session"
-                  labelText="Synthetic session"
-                  value={scenario}
-                  onChange={(event) => setScenario(event.target.value as Scenario)}
-                >
-                  {scenarios.map((item) => (
-                    <SelectItem key={item.id} value={item.id} text={item.label} />
-                  ))}
-                </Select>
-                <Select
-                  id="synthetic-route"
-                  labelText="Preview page"
-                  value={previewPaths.some((item) => item.path === pathname) ? pathname : '/'}
-                  onChange={(event) => previewHistory.push(event.target.value)}
-                >
-                  {previewPaths.map((item) => (
-                    <SelectItem key={item.path} value={item.path} text={item.label} />
-                  ))}
-                </Select>
-              </div>
-            </details>
+            {scenario !== 'signed-out' && banner}
             <Outlet />
           </div>
         </Layout>
@@ -212,7 +218,7 @@ function createPreviewRouter() {
   })
 }
 
-export function mountUiPreview() {
+export function mountLocalSyntheticPreview() {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <RouterProvider router={createPreviewRouter()} />

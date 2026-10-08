@@ -12,7 +12,7 @@ const yesNo = (value: boolean | null) => (value === null ? '—' : value ? 'Yes'
 
 function Fields({ rows }: { rows: (readonly [string, string | number | null])[] }) {
   return (
-    <dl className="taps-appraisal-fields">
+    <dl className="taps-field-grid">
       {rows.map(([label, value]) => (
         <div key={label}>
           <dt>{label}</dt>

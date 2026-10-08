@@ -117,13 +117,14 @@ export default function WorkflowPreview() {
         : 'Appraisal details'
 
   return (
-    <section className="taps-page" aria-label="Synthetic ECAS and GAS workflow">
+    <section className="taps-page taps-fullbleed-page" aria-label="Synthetic ECAS and GAS workflow">
       <PageHeader
         title={application === 'ecas' ? 'Inbox Search' : 'Appraisal Search'}
         subtitle="Synthetic contract preview. Search, reference and stored-rate presentation only."
         actions={
           <Button
             kind="tertiary"
+            size="md"
             onClick={() => {
               setDetail(null)
               setApplication(application === 'ecas' ? 'gas' : 'ecas')
@@ -172,7 +173,7 @@ export default function WorkflowPreview() {
               onChange={(event) => setEcasDraft({ ...ecasDraft, timberMark: event.target.value })}
             />
           </SearchFilters>
-          <h2 id="workflow-results" tabIndex={-1}>
+          <h2 id="workflow-results" className="cds--visually-hidden" tabIndex={-1}>
             ECAS submissions
           </h2>
           <EcasInboxResults
@@ -192,7 +193,7 @@ export default function WorkflowPreview() {
           {relatedEcasId && (
             <div className="taps-actions">
               <p>Related to ECAS {relatedEcasId}</p>
-              <Button kind="ghost" onClick={() => setRelatedEcasId(null)}>
+              <Button kind="tertiary" size="md" onClick={() => setRelatedEcasId(null)}>
                 Show all worksheets
               </Button>
             </div>
@@ -208,7 +209,7 @@ export default function WorkflowPreview() {
               setRelatedEcasId(null)
             }}
           />
-          <h2 id="workflow-results" tabIndex={-1}>
+          <h2 id="workflow-results" className="cds--visually-hidden" tabIndex={-1}>
             GAS worksheets
           </h2>
           <GasSearchResults result={result} onOpen={openGas} />
@@ -236,7 +237,9 @@ export default function WorkflowPreview() {
             ) : (
               <InteriorReferenceDetails reference={fixture.ecasInteriorReference} />
             )}
-            <Button onClick={() => showRelated(detail.item)}>View related GAS worksheets</Button>
+            <Button size="md" onClick={() => showRelated(detail.item)}>
+              View related GAS worksheets
+            </Button>
           </>
         )}
         {detail?.kind === 'gas' && <GasStoredSummary summary={detail.summary} />}

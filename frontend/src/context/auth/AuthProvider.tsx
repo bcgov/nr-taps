@@ -43,7 +43,7 @@ export default function AuthProvider({
     // The services have already cleared the stored login; drop access without another request.
     const onSessionExpired = () => {
       requestRef.current += 1
-      setState({ kind: 'signed-out' })
+      setState({ kind: 'signed-out', expired: true })
       clearLoginDestination()
     }
     window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired)
@@ -57,7 +57,7 @@ export default function AuthProvider({
       setLoginDestination(destination)
       await startLogin(provider)
     } catch {
-      setState({ kind: 'error', message: 'Unable to start sign in.' })
+      setState({ kind: 'error', message: 'Unable to start log in.' })
       clearLoginDestination()
     }
   }, [])
@@ -73,7 +73,7 @@ export default function AuthProvider({
       try {
         await clearLogin()
       } catch {
-        setState({ kind: 'error', message: 'Unable to sign out. Please try again.' })
+        setState({ kind: 'error', message: 'Unable to log out. Please try again.' })
       }
     }
   }, [])

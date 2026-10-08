@@ -93,7 +93,7 @@ test('dependent values clear when changing their parent and reset restores all f
   expect(screen.getByLabelText('Client location')).toHaveValue('')
   await user.clear(screen.getByLabelText('Management unit type'))
   expect(screen.getByLabelText('Management unit ID')).toHaveValue('')
-  await user.click(screen.getByRole('button', { name: 'Reset' }))
+  await user.click(screen.getByRole('button', { name: 'Clear all' }))
   await user.click(screen.getByRole('button', { name: 'Search' }))
   expect(search).toHaveBeenCalledWith(empty)
 })

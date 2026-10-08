@@ -83,7 +83,7 @@ export default function GasSearchFilters({
       {lookupError && (
         <div role="alert">
           <p>{lookupError}</p>
-          <Button type="button" kind="tertiary" onClick={onRetryLookup}>
+          <Button type="button" kind="tertiary" size="md" onClick={onRetryLookup}>
             Retry timber marks
           </Button>
         </div>
