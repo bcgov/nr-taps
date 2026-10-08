@@ -2,6 +2,10 @@
 
 Each environment needs its own SSO client, OpenShift namespace and deploy credentials. Keep namespace details and request tracking out of the repository.
 
+DEV, TEST and PROD are OpenShift environments using their corresponding databases. Synthetic
+Oracle data, the test issuer and the UI preview belong only to local validation; see the
+[environment map](../README.md#environments). These deployment workflows do not install them.
+
 ## SSO request
 
 | Request field         | TAPS choice                                                         |
@@ -123,18 +127,6 @@ The PR workflow runs the backend tests and frontend checks before the DEV deploy
 
 ## Oracle connection
 
-Oracle reads run only with the `oracle` Spring profile, which is off by default. Without it there's
-no datasource, business routes are denied, and `/api/me` returns `readApiEnabled: false`. With it,
-the app registers the readers and must open a connection before startup completes. Sign-in is
-required either way.
-
-The setup is Spring Boot with Undertow, JDBC/Hikari, startup pool validation,
-secrets from the environment and state-based health probes. TAPS stays on Spring Boot 3.5.16 and
-Java 21, with Jackson pinned to
-[2.21.7](https://github.com/FasterXML/jackson/wiki/Jackson-Release-2.21.7) for security fixes and
-the Oracle driver pinned to `ojdbc11` 21.3.0.0. That driver rejects passwords longer than 30
-characters, so keep the proxy account password within that.
-
 `TAPS_ORACLE_ENABLED` accepts `true` or `false`; unset means `false`. When it's `true`, the workflow requires all five database secrets and deploys the backend with `SPRING_PROFILES_ACTIVE=oracle`. With that profile, the backend won't start if credentials are missing or the database is unreachable.
 
 How it's wired:
@@ -143,89 +135,7 @@ How it's wired:
 - The `oracle` profile builds a TCPS descriptor from `DATABASE_HOST`, port 1543 and `DATABASE_SERVICE_NAME`.
 - An init container (`ghcr.io/bcgov/nr-forest-client/common:prod`) reads the database certificate and writes a JKS truststore to `/cert/jssecacerts`, protected by `keystore_secret`. It only runs when the `oracle` profile is on. The truststore is rebuilt on every pod start, so a rotated certificate is picked up. The backend mounts it read-only.
 
-### Runtime settings
-
-The profile's settings are in
-[application-oracle.yml](../backend/src/main/resources/application-oracle.yml). The secrets above supply the OpenShift variables; [backend/.env.example](../backend/.env.example) lists local settings.
-Keep credentials out of Git, images, frontend config and the JDBC URL.
-
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `SPRING_PROFILES_ACTIVE` | Empty | Include `oracle` to turn on the datasource, readers and routes. |
-| `DATABASE_HOST` | None | Required for TCPS. |
-| `DATABASE_PORT` | `1543` | TCPS port. |
-| `DATABASE_SERVICE_NAME` | None | Required for TCPS. |
-| `DATABASE_USER` | None | Required with `oracle`. Proxy account. |
-| `DATABASE_PASSWORD` | None | Required with `oracle`. |
-| `KEYSTORE_SECRET` | None | Required with `oracle`, even over TCP. Truststore password; OpenShift uses `keystore_secret`. |
-| `TRUSTSTORE_PATH` | `/cert/jssecacerts` | JKS truststore written by the init container. |
-| `DATABASE_CONNECT_TIMEOUT_MS` | `10000` | Network connect. |
-| `DATABASE_READ_TIMEOUT_MS` | `30000` | Socket read. |
-| `DATABASE_QUERY_TIMEOUT_SECONDS` | `20` | Statement timeout. |
-| `SPRING_DATASOURCE_URL` | TCPS descriptor | Local only. Replaces the descriptor for a plain-TCP database. |
-| `TAPS_HTTP_WORKER_THREADS` | `64` | Undertow workers. Reads hold one while Oracle answers. |
-| `APP_LOG_LEVEL` | `INFO` | TAPS log level. |
-| `TAPS_FAILURE_DIAGNOSTICS_LOG_LEVEL` | `INFO` | `DEBUG` logs database codes for read failures (see below). |
-
-OpenShift always uses TCPS. It trusts the certificate the init container imports for the host,
-with no extra DN check. Only local test databases use TCP. The driver's default NIO transport
-ignores the read timeout, so the profile sets `oracle.jdbc.javaNetNio=false`.
-
-The shared database only accepts `TLS_RSA_WITH_AES_256_CBC_SHA` after the listener hands off a
-TCPS connection, and Java 21.0.12 disables `TLS_RSA_*` suites. At startup TAPS removes
-`TLS_RSA_*` from the JVM's disabled list and leaves the other Java defaults
-([OracleTlsCompatibility](../backend/src/main/java/ca/bc/gov/nrs/taps/configuration/OracleTlsCompatibility.java)).
-Drop this once the database supports ECDHE.
-
-The Hikari pool holds at most 10 connections with 1 idle, and a request waits up to 30 seconds for
-one. Idle connections close after 10 minutes and connections live at most 30 minutes. Size the pool
-for the replica count (the backend scales to 3) and the proxy account's connection limit.
-
-`/actuator/health` includes datasource health. Liveness and readiness use app state,
-so a database outage doesn't restart every pod. Read failures return 503. Turning Oracle on doesn't
-create accounts or run migrations.
-
-To diagnose 503s, set `TAPS_FAILURE_DIAGNOSTICS_LOG_LEVEL=DEBUG`. The
-`ca.bc.gov.nrs.taps.audit.failure` logger then records the method, route with IDs masked, failure
-types, SQLState and vendor error code. It never logs exception messages, which can carry SQL or
-connection details.
-
-## Database privileges
-
-From the SQL in [`read/oracle`](../backend/src/main/java/ca/bc/gov/nrs/taps/read/oracle). Names are
-unqualified, so the database team needs to confirm the owner and synonym of each object for the
-proxy account. Don't assume one owner because the test fixture has one.
-
-`SELECT` on these 46 objects:
-
-| Objects | Used for |
-| --- | --- |
-| `APPRAISAL_DATA_SUBMISSION`, `APPRAISAL_DATA_SUBMISSION_CTRL`, `ADS_SUBMITTED_TIMBER_MARK` | ECAS records, marks and appraised parents |
-| `APPRAISAL_CATEGORY_CODE`, `APPRAISAL_STATUS_CODE`, `NON_APPRAISED_STATUS_CODE`, `REAPPRAISAL_REASON_CODE` | Code labels and choices |
-| `ORG_UNIT` | District/region rollup and labels |
-| `ECAS_AUDIT_EVENT`, `ECAS_ACTION_CODE`, `ECAS_AUDIT_COMMENT`, `ECAS_AUDIT_DETAIL` | Audit history and inbox audit filters |
-| `ECAS_SUBMITTED_FILE` | File metadata (no binary column) |
-| `ADS_SUPPORT_DOCUMENT`, `APPRAISAL_DOCUMENT_TYPE_CODE`, `APPRAISAL_ATTACHMENT_XREF` | Attachment inventory |
-| `APPRAISED_WORKSHEET`, `HISTORIC_APPRAISED_WORKSHEET`, `NON_APPRAISED_WORKSHEET` | Worksheet parents |
-| `APPRAISED_STUMPAGE_RATE`, `NON_APPRAISED_STUMPAGE_RATE` | Stored rates |
-| `HAULING_AUTHORITY`, `HARVESTING_AUTHORITY`, `HARVESTING_HAULING_XREF` | Licence/mark/permit links and ownership |
-| `BLANKET_ROAD_MARK`, `PRIVATE_MARK_CERTIFICATE` | Road/private FTA context |
-| `FOREST_FILE_CLIENT`, `FOREST_CLIENT`, `V_CLIENT_PUBLIC` | Client links and names (`V_CLIENT_PUBLIC` is a view in the real schema, a table in the fixture) |
-| `PROV_FOREST_USE`, `FILE_TYPE_CODE` | Licence data and filters |
-| `TENURE_FILE_STATUS_CODE`, `HARVEST_AUTH_STATUS_CODE`, `PRIVATE_MARK_STATUS_CODE` | FTA status labels |
-| `ADS_SPECIES_VOLUME`, `ADS_CUTTING_AUTHORITY_DETAIL` | Coast volume and major centre |
-| `INT_POINT_OF_APPRAISAL_CODE`, `POINT_OF_APPRAISAL` | Interior appraisal point and selling zone |
-| `TSA_NUMBER_CODE`, `TSB_NUMBER_CODE` | Management-unit labels |
-| `APPRAISAL_METHOD_CODE`, `RATE_ADJUSTMENT_TYPE_CODE` | GAS lookups |
-| `NON_APPRAISED_WS_RATE_ADDON`, `NON_APPRAISED_RATE_ADDON_CODE` | Selected add-ons |
-| `HISTORIC_SPECIES`, `HISTORIC_COAST_SPECIES_GRADE` | Historic species and Coast grades |
-
-Also `EXECUTE` on `SIL_GET_CLIENT_NAME` (inbox client names), the only function called. The
-database team should check its body, rights and dependencies; the fixture version returns
-synthetic names. `DUAL`, built-in functions and `DBMS_LOB.GETLENGTH` use normal public access.
-
-No `GAS2_*` or `PKG_ECAS*` package is called. The account needs no `INSERT`, `UPDATE`, `DELETE`,
-DDL, schema ownership or `ANY` privilege.
+See the [backend configuration](../backend/README.md#configuration) for runtime settings, TLS compatibility, pooling, health and read diagnostics, and [database privileges](../backend/README.md#database-privileges) for the object inventory.
 
 ## Activation acceptance
 
@@ -235,7 +145,7 @@ For each check, record the commit, image tag, environment, result and any follow
 
 ### 1. Identity and infrastructure
 
-- [ ] Run the [local container checks](development.md#production-container-checks), register the SSO clients and callbacks, and configure the GitHub environments and TEST branch restriction.
+- [ ] Run the [local image checks](../scripts/README.md#local-image-checks), register the SSO clients and callbacks, and configure the GitHub environments and TEST branch restriction.
 - [ ] The namespace and deploy token match the environment. Check the service account's real permissions, not just the namespace suffix.
 - [ ] Neither deploy identity can change PROD. A timeout doesn't count as a denial.
 - [ ] Frontend and backend use the same issuer and client. Callbacks, logout and providers are registered for the exact host.
@@ -247,7 +157,7 @@ First deploy with `TAPS_ORACLE_ENABLED=false`, so the backend runs without the `
 ### 2. Check the schema
 
 - [ ] Connect as the proxy account. Log in interactively or with a wallet, never with credentials on the command line.
-- [ ] The objects in the [database privilege list](#database-privileges) and columns used by the [read adapters](../backend/src/main/java/ca/bc/gov/nrs/taps/read/oracle) exist with the expected types and resolve to the expected owners.
+- [ ] The objects in the [database privilege list](../backend/README.md#database-privileges) and columns used by the [read adapters](../backend/src/main/java/ca/bc/gov/nrs/taps/read/oracle) exist with the expected types and resolve to the expected owners.
 - [ ] The database team reviews `SIL_GET_CLIENT_NAME` and its dependencies.
 - [ ] Verify attachment column sizes/nullability, driver/session date handling, and Oracle versus JVM day boundaries. Synthetic fixture definitions are not authoritative DDL.
 - [ ] The database team confirms the grants match the approved list, with no DDL or `ANY` privileges.
@@ -256,7 +166,7 @@ Never load the local fixture DDL into a shared database.
 
 ### 3. Turn on DEV reads and compare with legacy
 
-Set `TAPS_ORACLE_ENABLED=true` and deploy. The workflow starts the backend with the `oracle` Spring profile, and the backend must connect before it starts. Then compare TAPS with the legacy apps on real data:
+Set `TAPS_ORACLE_ENABLED=true` and deploy. The workflow starts the backend with the `oracle` Spring profile, and the backend must connect before it starts. Compare TAPS with the legacy apps on real data, using [intentional legacy divergences](intentional-legacy-divergences.md) to distinguish recorded technical choices from regressions and unimplemented features:
 
 | Area | Check |
 | --- | --- |
@@ -305,4 +215,4 @@ oc -n "$taps_namespace" rollout status "deployment/nr-taps-frontend-$taps_zone" 
 
 Keep ECAS and GAS2 running until each unported feature has a migration and rollback plan.
 
-Writes remain disabled. The [Coast date draft](ui-foundation.md#coast-appraisal-date-draft) describes the checks needed before its save path can be implemented.
+Writes remain disabled. The [Coast date draft](../frontend/README.md#coast-appraisal-date-draft) describes the checks needed before its save path can be implemented.

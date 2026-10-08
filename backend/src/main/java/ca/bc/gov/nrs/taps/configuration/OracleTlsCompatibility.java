@@ -5,9 +5,9 @@ import java.util.Arrays;
 import java.util.stream.Collectors;
 
 /**
- * After the listener hands off a TCPS connection, the shared Oracle database only accepts
- * TLS_RSA_WITH_AES_256_CBC_SHA. Java 21.0.12 disables TLS_RSA_* by default, so re-enable those
- * suites until the database supports ECDHE; all other Java defaults stay in place.
+ * Explicit Oracle compatibility exception: re-enables RSA key exchange disabled by current JDKs.
+ * All other Java restrictions stay in place. Validate the exception for each deployment and remove
+ * it when no longer required; environment-specific TLS details belong in private operational records.
  */
 public final class OracleTlsCompatibility {
 

@@ -22,7 +22,7 @@ import {
   GasStoredSummary,
 } from '@/components/appraisal/AppraisalDetails'
 
-// Dev-only fixture, also used by the Java serialization tests.
+// Local-preview fixture, also used by the Java serialization tests.
 export const workflowFixture = source as {
   synthetic: boolean
   ecasInboxItem: EcasInboxItem

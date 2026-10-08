@@ -1,68 +1,13 @@
-# Local development and testing
+# TAPS local validation scripts
 
-## Run the application
+Run these optional checks locally from the repository root. They use synthetic settings and
+disposable containers, not the DEV, TEST or PROD databases. Those are OpenShift environments,
+as defined in the [environment map](../README.md#environments). The [backend](../backend/README.md#testing)
+and [frontend](../frontend/README.md#testing) READMEs own the component test commands.
 
-Install Java 21, Maven and Node 24. Set `TAPS_OIDC_ISSUER_URI` and `TAPS_OIDC_CLIENT_ID` for the backend; it won't start without them. Copy [frontend/.env.example](../frontend/.env.example) to `frontend/.env` and set the matching values. Then run each in its own terminal from the repository root:
+## Local image checks
 
-```sh
-cd backend && mvn spring-boot:run
-```
-
-```sh
-cd frontend && npm ci && npm run dev
-```
-
-The frontend runs on `http://localhost:3000` and proxies `/api` to `http://localhost:8080`. Change these with `VITE_DEV_HOST`, `VITE_DEV_PORT` and `VITE_DEV_BACKEND_TARGET`. To sign in, add `http://localhost:3000/authCallback` and its origin to a development FAM client.
-
-Or run both in Docker with `docker compose up`: the backend through Maven on 8080 and the Vite dev server on 3000. Set the two OIDC values in the shell or a root `.env` first. `docker compose --profile caddy up` also serves the production frontend image on `http://localhost:3005`. Oracle stays off unless `SPRING_PROFILES_ACTIVE=oracle` and the database settings are set; [backend/.env.example](../backend/.env.example) lists them.
-
-Read screens remain unavailable until Oracle is enabled; see [Oracle connection settings](deployment-configuration.md#oracle-connection). To run everything locally with a test issuer and disposable Oracle, use the [authenticated read rehearsal](#authenticated-read-rehearsal).
-
-## Tests
-
-From `backend` with Java 21:
-
-```sh
-mvn -B -DskipITs verify     # no database needed; JaCoCo report in target/site/jacoco
-```
-
-From `frontend`:
-
-```sh
-npm run typecheck
-npm run lint
-npm run format:check
-npm run test:cov            # fails below 80% statements, 75% branches, 80% functions and lines
-npm run build
-```
-
-`npm run test:security-config` checks the Caddy/Coraza config with synthetic requests. It needs a Coraza-enabled Caddy, such as the one `frontend/Dockerfile` builds; set `CADDY_BIN` if it isn't on the path.
-
-The [UI guide](ui-foundation.md#development-preview) covers the synthetic browser preview and component review checklist.
-
-### Oracle integration tests
-
-From `backend` with Docker running:
-
-```sh
-mvn -B -Poracle-it verify
-# Run only the HTTP/runtime failure cases:
-mvn -B -Poracle-it -Dit.test=OracleReadResilienceIT verify
-```
-
-The Oracle tests start disposable Testcontainers databases and use synthetic fixtures. Normal `mvn test` does not start Oracle; selecting `oracle-it` fails if Docker or the image is unavailable. See the [fixture inventory and live-database isolation](../backend/src/test/resources/oracle/README.md) before running them.
-
-[OracleReadIT](../backend/src/test/java/ca/bc/gov/nrs/taps/integration/OracleReadIT.java) exercises the read adapters, Oracle SQL, paging, dates, nulls, exact amounts, worksheet families and scope rules. Its HTTP scenario substitutes only token decoding. [OracleReadResilienceIT](../backend/src/test/java/ca/bc/gov/nrs/taps/integration/OracleReadResilienceIT.java) uses real HTTP, the production JWT decoder and synthetic signed tokens to check regional denials, invalid tokens, pool exhaustion, statement timeouts, database outages and recovery. Neither suite validates the shared schema, actual grants, TLS, real FAM tokens, query plans or business-policy acceptance.
-
-From the repository root, check the rehearsal issuer with:
-
-```sh
-node --test scripts/local-read-issuer.test.mjs
-```
-
-## Production-container checks
-
-Builds the production Dockerfiles and runs the backend and Caddy/Coraza frontend together. Needs Docker, Bash, curl and Python 3. No namespace, Oracle account, SSO client or token is needed.
+Builds the deployment Dockerfiles and runs the backend and Caddy/Coraza frontend locally. Needs Docker, Bash, curl and Python 3. No namespace, Oracle account, SSO client or token is needed.
 
 From the repository root:
 
@@ -93,7 +38,10 @@ Oracle stays off here (no `oracle` profile). Real logins, database grants, SCC, 
 
 ## Authenticated read rehearsal
 
-Runs the production frontend/backend images with a disposable Oracle Free database and a small test OIDC issuer. The backend uses the real Spring Security JWT decoder and the `oracle` profile. Needs Docker, Bash, Python 3 and enough memory for Oracle plus the app.
+Runs the deployment frontend/backend images locally with a disposable Oracle Free database and a
+local test OIDC issuer. The backend uses the real Spring Security JWT decoder and the `oracle`
+profile, with its connection set to the disposable container. This does not deploy or connect to
+OpenShift DEV, TEST or PROD. Needs Docker, Bash, Python 3 and enough memory for Oracle plus the app.
 
 The [SQL fixture README](../backend/src/test/resources/oracle/README.md#where-they-run) explains why the loader cannot target a live database. The issuer and generated keys/passwords are also for local testing only.
 
@@ -157,3 +105,9 @@ bash scripts/local-read-stack.sh resume-db /path/printed/by/start
 ```
 
 The app should recover without a restart.
+
+## Rehearsal issuer tests
+
+```sh
+node --test scripts/local-read-issuer.test.mjs
+```

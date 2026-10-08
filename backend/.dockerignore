@@ -11,6 +11,17 @@ Dockerfile
 
 # Local-only Oracle credentials and trust material must never enter an image build context.
 .env*
-src/main/resources/application-local.yml
+src/main/resources/application-*.yml
+src/main/resources/application-*.yaml
+src/main/resources/application-*.properties
+!src/main/resources/application-oracle.yml
 src/main/resources/cert/
+**/jssecacerts
 **/*.jks
+**/*.jceks
+**/keystore.*
+**/truststore.*
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx

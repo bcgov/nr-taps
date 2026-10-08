@@ -24,7 +24,7 @@ flowchart LR
 - The frontend writes `/config.js` from environment values at startup, so one image runs in DEV and TEST.
 - Oracle reads run only with the backend's `oracle` Spring profile, which is off by default. With it on, the backend won't start unless it can connect.
 
-The frontend uses Carbon and TanStack Router; see [UI development](ui-foundation.md). After a redeploy, a tab requesting a missing code chunk reloads to pick up the new build, at most once a minute.
+The frontend uses Carbon and TanStack Router; see [UI development](../frontend/README.md). After a redeploy, a tab requesting a missing code chunk reloads to pick up the new build, at most once a minute.
 
 Implementation status is maintained in the [repository README](../README.md#current-status).
 
@@ -100,4 +100,4 @@ The security filter and controller both check the capability, then the reader ap
 
 TAPS reuses the existing schema and preserves ECAS/GAS business behavior. Low-risk reads use parameterized SELECTs and the existing inbox client-name function. No legacy write package is called. Calculation, write, workflow and bulk-run procedures remain in the legacy systems until their side effects and replacement behavior are reviewed.
 
-[Read API and Oracle behavior](oracle-reads.md) records the query mappings and intentional differences. Complete [DEV/TEST activation acceptance](deployment-configuration.md#activation-acceptance) before enabling shared-environment reads. Each legacy workflow remains in use until its replacement has passed parity checks and has a rollback plan.
+[Read API and Oracle behavior](oracle-reads.md) defines the contracts and query mappings. The separate [intentional legacy divergences](intentional-legacy-divergences.md) register records observable differences, their reasons and validation status. Complete [DEV/TEST activation acceptance](deployment-configuration.md#activation-acceptance) before enabling shared-environment reads. Each legacy workflow remains in use until its replacement has passed parity checks and has a rollback plan.

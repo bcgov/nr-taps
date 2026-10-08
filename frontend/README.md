@@ -1,11 +1,43 @@
-# UI development
+# TAPS Frontend
 
-The UI shell has a 48px blue header, theme switch, profile panel, navigation
-rail, page spacing and tables. It uses Carbon React, IBM Products detail drawers, Carbon icons and
-pictograms, the B.C. Government logo and BC Sans. TanStack Router handles routing. Screens that
-aren't built yet say so. Use Carbon icons and pictograms unless Carbon has nothing suitable, and keep the official B.C. Government branding.
+React 19, TypeScript, Vite and TanStack Router with Carbon/IBM Products and BC Sans. The shell has a 48px blue header, theme switch, profile panel and navigation rail. Use Carbon icons and pictograms unless Carbon has nothing suitable, and keep the official B.C. Government branding. Exact dependency versions and overrides are in [package.json](package.json).
 
-## Development preview
+## Running locally
+
+Use the [root local development steps](../README.md#local-development) for Vite or Docker Compose. The default browser URL is `http://localhost:3000`.
+
+## Configuration
+
+Local Vite reads [.env.example](.env.example) values at dev/build time; restart Vite after changing `.env`. Deployed containers write `/config.js` at startup, so environment changes require a rollout rather than a new build. Never put database credentials or a client secret in frontend configuration.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `VITE_OIDC_ISSUER_URI` | None | BC Gov SSO issuer; must match the backend. |
+| `VITE_OIDC_CLIENT_ID` | None | Public browser client ID; must match the backend. |
+| `VITE_OIDC_IDIR_HINT` | `azureidir` | IDIR MFA provider alias. |
+| `VITE_OIDC_BCEID_HINT` | `bceidbusiness` | Business BCeID provider alias. |
+| `VITE_OIDC_SITEMINDER_LOGOUT_URL` | Test SiteMinder URL from `.env.example` | Ends the Business BCeID session before Keycloak logout. |
+| `VITE_DEV_HOST` | `localhost` | Vite bind address. |
+| `VITE_DEV_PORT` | `3000` | Vite port. |
+| `VITE_DEV_BACKEND_TARGET` | `http://localhost:8080` | Vite `/api` proxy target. |
+
+Register `<origin>/authCallback` and `<origin>` as the callback and post-logout URL. The [deployment guide](../docs/deployment-configuration.md#redirects-and-origins) covers shared-environment hosts.
+
+## Testing
+
+From `frontend`:
+
+```sh
+npm run typecheck
+npm run lint
+npm run format:check
+npm run test:cov            # fails below 80% statements, 75% branches, 80% functions and lines
+npm run build
+```
+
+`npm run test:security-config` checks the Caddy/Coraza config with synthetic requests. It needs a Coraza-enabled Caddy, such as the one `frontend/Dockerfile` builds; set `CADDY_BIN` if it isn't on the path.
+
+## Local UI preview
 
 With Node 24:
 
@@ -29,8 +61,10 @@ Reloading resets it.
   In GAS search, licence `X99998` shows the mark chooser and mark `ZZ9996` shows FTA information
   with no worksheets.
 
-`ui-preview.html` is a dev-only Vite entry guarded by `import.meta.env.DEV`. Production code never
-imports it and `npm run build` only uses `index.html`.
+`ui-preview.html` is a local-only Vite entry guarded by `import.meta.env.DEV`. Here, `DEV` means
+Vite's local serve mode, not the OpenShift DEV environment. All OpenShift environments use
+`npm run build` output from `index.html`, which does not include the synthetic preview. See the
+[environment map](../README.md#environments).
 
 ### Review checklist
 
@@ -96,9 +130,9 @@ const [open, setOpen] = useState(false)
 
 ## Dependencies and validation
 
-Carbon versions and the IBM Products styles override are pinned in [package.json](../frontend/package.json). Styles load Carbon, then IBM Products SidePanel, then TAPS overrides; recheck that order when upgrading either IBM package.
+Carbon versions and the IBM Products styles override are pinned in [package.json](package.json). Styles load Carbon, then IBM Products SidePanel, then TAPS overrides; recheck that order when upgrading either IBM package.
 
-After shared-component changes, run the [frontend checks](development.md#tests) and the preview review checklist above.
+After shared-component changes, run the [frontend checks](#testing) and the preview review checklist above.
 
 ## Coast appraisal date draft
 
@@ -117,8 +151,8 @@ kept, the first invalid field gets focus, and the inputs stay inside the mobile 
 | Effective | On or after 2002-04-01. Required for reappraisal category `R`. |
 | Expiry | Optional. Needs an effective date and must be on or after it. |
 
-Code: [validator](../frontend/src/contracts/coast-reference-draft.ts) and
-[component](../frontend/src/components/appraisal/CoastAppraisalDatesDraft.tsx).
+Code: [validator](src/contracts/coast-reference-draft.ts) and
+[component](src/components/appraisal/CoastAppraisalDatesDraft.tsx).
 
 ### Why it doesn't save
 

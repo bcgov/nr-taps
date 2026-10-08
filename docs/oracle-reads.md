@@ -2,7 +2,7 @@
 
 The ECAS/GAS read API uses the existing schema. Low-risk legacy reads are rewritten as parameterized SELECTs; writes and calculations remain in legacy procedures that TAPS does not call. The implementation has been exercised with mocked JDBC and disposable Oracle fixtures. Provisional mappings still need comparison with the shared database.
 
-Use [architecture and access](architecture.md) for token/grant rules, [deployment](deployment-configuration.md#oracle-connection) for connection settings and privileges, and [activation acceptance](deployment-configuration.md#activation-acceptance) for real-data validation. This guide owns the API contracts, SQL mappings and intentional differences from legacy behavior.
+Use [architecture and access](architecture.md) for token/grant rules, the [backend README](../backend/README.md#configuration) for connection settings and privileges, and [activation acceptance](deployment-configuration.md#activation-acceptance) for real-data validation. This guide owns the API contracts and SQL mappings; [intentional legacy divergences](intentional-legacy-divergences.md) separately records deliberate differences and provisional choices for parity review.
 
 ## HTTP routes
 
@@ -220,7 +220,7 @@ submission's filename. Duplicate document or parent rows return 503.
 ZIP files (the UI says so), upload-form placeholders, and opening, downloading, uploading or
 deleting files. An empty list doesn't reveal whether hidden or ZIP documents exist.
 
-Attachment column names come from legacy package queries. Their sizes and nullability still need verification against the real schema; the fixture definitions are not authoritative. The [database privilege list](deployment-configuration.md#database-privileges) identifies the four metadata tables.
+Attachment column names come from legacy package queries. Their sizes and nullability still need verification against the real schema; the fixture definitions are not authoritative. The [database privilege list](../backend/README.md#database-privileges) identifies the four metadata tables.
 
 ## GAS search
 
@@ -317,4 +317,4 @@ sharing a submission.
 [ReadContractsTest](../backend/src/test/java/ca/bc/gov/nrs/taps/read/ReadContractsTest.java) checks
 it against these records.
 
-The [Coast date draft](ui-foundation.md#coast-appraisal-date-draft) is frontend-only and has no backend write contract.
+The [Coast date draft](../frontend/README.md#coast-appraisal-date-draft) is frontend-only and has no backend write contract.

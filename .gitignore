@@ -385,10 +385,11 @@ pyrightconfig.json
 **/*.jceks
 **/keystore.*
 **/truststore.*
+**/jssecacerts
+/backend/src/main/resources/cert/
 # Spring Boot application properties with secrets
-**/application-local.properties
-**/application-prod.properties
-**/application-secrets.properties
+**/application-*.properties
+**/application-*.yaml
 **/application-*.yml
 !backend/src/main/resources/application-oracle.yml
 **/bootstrap-local.yml
