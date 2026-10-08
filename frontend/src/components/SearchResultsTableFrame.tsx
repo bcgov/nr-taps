@@ -13,6 +13,7 @@ export default function SearchResultsTableFrame({
   columnCount = 3,
   error,
   onRetry,
+  pagination,
 }: {
   children: ReactNode
   ariaLabel?: string
@@ -22,39 +23,51 @@ export default function SearchResultsTableFrame({
   columnCount?: number
   error?: string
   onRetry?: () => void
+  pagination?: ReactNode
 }) {
   return (
     <section className="taps-results" aria-label="Search results">
-      {loading ? (
-        <InlineLoading role="status" aria-live="polite" description={loadingDescription} />
-      ) : error ? (
+      {error && !loading ? (
         <>
           <AppNotification kind="error" title="Unable to load results" subtitle={error} />
-          {onRetry && <Button onClick={onRetry}>Try again</Button>}
-        </>
-      ) : totalItems !== undefined ? (
-        <p role="status">
-          {new Intl.NumberFormat('en-CA').format(totalItems)}{' '}
-          {totalItems === 1 ? 'result' : 'results'} found
-        </p>
-      ) : null}
-      {!error || loading ? (
-        <TableFrame ariaLabel={ariaLabel} busy={loading}>
-          {loading ? (
-            <DataTableSkeleton
-              aria-label={loadingDescription}
-              columnCount={columnCount}
-              rowCount={5}
-              showHeader={false}
-              showToolbar={false}
-            />
-          ) : totalItems === 0 ? (
-            <EmptyState title="No results" description="Try changing your search filters." />
-          ) : (
-            children
+          {onRetry && (
+            <div className="taps-actions">
+              <Button size="md" onClick={onRetry}>
+                Try again
+              </Button>
+            </div>
           )}
-        </TableFrame>
-      ) : null}
+        </>
+      ) : (
+        <div className="taps-results-frame">
+          <div className="taps-results-toolbar">
+            {loading && <InlineLoading description={loadingDescription} />}
+            {/* Stays mounted so each new count is announced. */}
+            <p className="taps-results-count" role="status">
+              {!loading && totalItems !== undefined
+                ? `${new Intl.NumberFormat('en-CA').format(totalItems)} ${totalItems === 1 ? 'result' : 'results'} found`
+                : null}
+            </p>
+          </div>
+          <TableFrame ariaLabel={ariaLabel} busy={loading}>
+            {loading ? (
+              <DataTableSkeleton
+                aria-label={loadingDescription}
+                columnCount={columnCount}
+                rowCount={5}
+                showHeader={false}
+                showToolbar={false}
+              />
+            ) : totalItems === 0 ? (
+              <EmptyState title="No results" description="Try changing your search filters." />
+            ) : (
+              children
+            )}
+          </TableFrame>
+          {/* Stays mounted while the next page loads, so focus stays on its controls. */}
+          {loading || totalItems !== 0 ? pagination : null}
+        </div>
+      )}
     </section>
   )
 }

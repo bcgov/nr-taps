@@ -6,7 +6,8 @@ export type LoginProvider = 'idir' | 'business-bceid'
 
 export type AuthState =
   | { kind: 'loading' }
-  | { kind: 'signed-out' }
+  // expired marks a session that ended on its own rather than by logging out.
+  | { kind: 'signed-out'; expired?: boolean }
   | { kind: 'signed-in'; session: Session }
   | { kind: 'error'; message: string }
 

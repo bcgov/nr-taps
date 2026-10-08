@@ -146,7 +146,7 @@ test('keeps access revoked and reports a failed local sign out', async () => {
   await screen.findByText('ECAS access')
   await user.click(screen.getByRole('button', { name: 'Sign out' }))
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('Unable to sign out')
+  expect(await screen.findByRole('alert')).toHaveTextContent('Unable to log out')
   expect(screen.getByText('No ECAS access')).toBeInTheDocument()
 })
 
@@ -180,7 +180,7 @@ test('reports a sign-in start failure without granting access', async () => {
   await screen.findByText('signed-out')
   await user.click(screen.getByRole('button', { name: 'Sign in' }))
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('Unable to start sign in')
+  expect(await screen.findByRole('alert')).toHaveTextContent('Unable to start log in')
   expect(screen.getByText('No ECAS access')).toBeInTheDocument()
   expect(window.sessionStorage.getItem(destinationKey)).toBeNull()
 })

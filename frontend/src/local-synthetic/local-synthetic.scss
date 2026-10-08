@@ -30,6 +30,20 @@
   }
 }
 
+.taps-preview-landing-controls {
+  padding: 1rem 2rem 0;
+  background: var(--cds-background);
+
+  .taps-preview-banner {
+    margin-block-end: 0;
+  }
+}
+
+.taps-preview-intro {
+  justify-content: space-between;
+  margin-block-end: 1.5rem;
+}
+
 .taps-preview-toolbar {
   padding: 0 0.75rem 0.75rem;
   display: grid;

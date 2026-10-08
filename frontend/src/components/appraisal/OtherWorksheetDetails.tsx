@@ -109,7 +109,7 @@ export default function OtherWorksheetDetails({ summary }: { summary: GasWorkshe
   const historic = 'nonAppraisedRates' in summary
   return (
     <>
-      <dl className="taps-appraisal-fields">
+      <dl className="taps-field-grid">
         {(
           [
             ['Worksheet', summary.key.worksheetId],
@@ -130,7 +130,7 @@ export default function OtherWorksheetDetails({ summary }: { summary: GasWorkshe
       </dl>
       {historic ? (
         <>
-          <dl className="taps-appraisal-fields">
+          <dl className="taps-field-grid">
             <div>
               <dt>Variant</dt>
               <dd>{summary.variant}</dd>
@@ -223,7 +223,7 @@ export default function OtherWorksheetDetails({ summary }: { summary: GasWorkshe
         </>
       ) : (
         <>
-          <dl className="taps-appraisal-fields">
+          <dl className="taps-field-grid">
             {(
               [
                 ['Reference type', summary.referenceTypeCode],

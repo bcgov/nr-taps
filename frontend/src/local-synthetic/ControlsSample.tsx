@@ -53,13 +53,17 @@ export default function ControlsSample() {
         )
 
   return (
-    <section className="taps-page taps-preview-samples" aria-label="Synthetic controls sample">
+    <section
+      className="taps-page taps-fullbleed-page taps-preview-samples"
+      aria-label="Synthetic controls sample"
+    >
       <PageHeader
         title="Synthetic reusable controls"
         subtitle="Presentation examples only. These rows do not represent TAPS business records."
         actions={
           <Button
-            kind="secondary"
+            kind="tertiary"
+            size="md"
             onClick={() => {
               setDraft({ label: '', state: '' })
               setApplied({ label: '', state: '' })
@@ -140,9 +144,9 @@ export default function ControlsSample() {
             {rows.map((row) => (
               <TableRow key={row.label}>
                 <TableCell>
-                  <Button
-                    kind="ghost"
-                    size="sm"
+                  <button
+                    type="button"
+                    className="taps-link-button"
                     aria-label={`Open details for ${row.label}`}
                     onClick={(event) => {
                       launcherRef.current = event.currentTarget
@@ -150,7 +154,7 @@ export default function ControlsSample() {
                     }}
                   >
                     {row.label}
-                  </Button>
+                  </button>
                 </TableCell>
                 <TableCell>Synthetic {row.state}</TableCell>
                 <TableCell>{row.notes}</TableCell>
@@ -182,7 +186,7 @@ export default function ControlsSample() {
             <dd>{selectedRow.notes}</dd>
           </dl>
         )}
-        <Button kind="secondary" onClick={() => setSelectedRow(null)}>
+        <Button kind="tertiary" size="md" onClick={() => setSelectedRow(null)}>
           Close synthetic details
         </Button>
       </DetailSidePanel>

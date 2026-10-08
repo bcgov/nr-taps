@@ -36,7 +36,7 @@ The setup covers arbitrary-UID Caddy/Coraza, a separate health port, selective c
 
 Oracle stays off here (no `oracle` profile). Real logins, database grants, SCC, network policies, TLS and rolling updates need DEV/TEST.
 
-## Authenticated read rehearsal
+## Local synthetic read rehearsal
 
 Runs the deployment frontend/backend images locally with a disposable Oracle Free database and a
 local test OIDC issuer. The backend uses the real Spring Security JWT decoder and the `oracle`
@@ -70,7 +70,7 @@ bash scripts/local-read-stack.sh stop /path/printed/by/start
 
 ### Browser checks
 
-Click the normal sign-in button, pick a synthetic user, and select **Sign in to local TAPS**.
+On the TAPS login page, select a **Log in** button, pick a synthetic user, and select **Sign in to local TAPS**.
 
 | Persona | Expected behavior |
 | --- | --- |

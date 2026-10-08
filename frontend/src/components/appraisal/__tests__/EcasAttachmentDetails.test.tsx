@@ -93,6 +93,6 @@ test('uses safe retry errors and refreshes the session on 401', async () => {
       api={{ inventory: vi.fn().mockRejectedValue(new ReadApiError(401)) }}
     />,
   )
-  expect(await screen.findByText('Your session has ended. Sign in again.')).toBeInTheDocument()
+  expect(await screen.findByText('Your session has ended. Log in again.')).toBeInTheDocument()
   await waitFor(() => expect(auth.reloadSession).toHaveBeenCalledOnce())
 })

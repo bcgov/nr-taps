@@ -89,13 +89,13 @@ test.each([
 })
 
 test.each(['/ecas', '/ecas/ECAS05', '/gas', '/gas/showAppraisalSearch'])(
-  'requires sign in on direct navigation to %s',
+  'requires log in on direct navigation to %s',
   async (path) => {
     oidc.getOidcUser.mockResolvedValue(null)
 
     await renderRoute(path)
 
-    expect(await screen.findByRole('button', { name: 'Sign in with IDIR' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Log in with IDIR' })).toBeInTheDocument()
     expect(
       screen.queryByText('This page is being modernized. It is not available yet.'),
     ).not.toBeInTheDocument()

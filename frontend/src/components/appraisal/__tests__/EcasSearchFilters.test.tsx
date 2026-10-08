@@ -108,7 +108,7 @@ test('reset clears invalid typed dates and selected filters', async () => {
       }}
     />,
   )
-  await user.click(screen.getByRole('button', { name: 'Reset' }))
+  await user.click(screen.getByRole('button', { name: 'Clear all' }))
   expect(screen.getByLabelText('From date')).toHaveValue('')
   expect(screen.getByLabelText('Appraisal method')).toHaveValue('')
   expect(screen.getByLabelText('Sort by')).toHaveValue('ECAS_ID')

@@ -99,7 +99,7 @@ export default function ProfilePanel({
         }}
       >
         <Logout size={16} />
-        Sign out
+        Log out
       </button>
     </aside>
   )

@@ -49,7 +49,7 @@ function AttachmentInventory({ ecasId, api }: { ecasId: string; api: AttachmentA
             title="Attachment information unavailable"
             subtitle={result.error.message}
           />
-          <Button kind="tertiary" onClick={result.retry}>
+          <Button kind="tertiary" size="md" onClick={result.retry}>
             Retry attachments
           </Button>
         </>

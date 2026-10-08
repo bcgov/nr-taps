@@ -2,8 +2,7 @@
 
 TAPS normally preserves ECAS/GAS2 behavior. This register keeps deliberate changes visible during
 parity review, with stable IDs, reasons and links to the owning contracts. Implementation detail,
-preserved behavior and incomplete replacement coverage are separated below, following the LEXIS
-documentation pattern.
+preserved behavior and incomplete replacement coverage are separated below.
 
 These entries describe implemented technical choices, not completed business acceptance. Provisional
 ownership and visibility mappings still need real-data and role validation through the
@@ -66,6 +65,6 @@ These are current limitations, not approved retirements of legacy functionality.
 ## Recording a change
 
 Keep IDs stable. For a new observable difference, record the legacy and TAPS behavior, reason,
-affected scope, implementation/test links and actual validation status. Follow LEXIS's searchable
-`INTENTIONAL_LEGACY_DIVERGENCE(<ID>)` code-comment convention when implementing a new divergence.
+affected scope, implementation/test links and actual validation status. Mark the implementing code
+with a searchable `INTENTIONAL_LEGACY_DIVERGENCE(<ID>)` comment.
 Do not label a refactor, unported feature or provisional mapping as business-approved parity.

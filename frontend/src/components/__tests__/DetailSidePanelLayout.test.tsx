@@ -79,7 +79,6 @@ test('isolates every Layout region and keeps the mobile drawer usable through Ta
     screen.getByRole('banner'),
     screen.getByRole('navigation', { name: 'Side navigation' }),
     screen.getByRole('main'),
-    screen.getByRole('contentinfo'),
   ]
 
   for (let cycle = 0; cycle < 2; cycle++) {

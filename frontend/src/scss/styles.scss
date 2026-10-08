@@ -28,13 +28,50 @@
 // Keep IBM's base styles after Carbon and before application layout overrides.
 @use '@carbon/ibm-products/scss/components/SidePanel';
 
+// The UX standards replace Carbon's blue with two blues: the fill blue sits behind white content
+// (primary buttons, the header) and the text blue is the content (links, icons, focus, selection).
+// Every other colour is Carbon's.
 :root {
   --taps-header-height: 3rem;
+  --taps-fill-blue: #0073e6;
+  --taps-fill-blue-hover: #0066cc;
+  --taps-fill-blue-active: #00478f;
+  --taps-text-blue: #005cb8;
+  --taps-text-blue-hover: #0052a3;
+  --taps-text-blue-active: #00478f;
+  --taps-surface: #fff;
+  --taps-surface-hover: #e8e8e8;
+  --taps-table-chrome: #f4f4f4;
   @include theme.theme(themes.$white);
 }
 
 :root[data-carbon-theme='g100'] {
   @include theme.theme(themes.$g100);
+  // The fill blue stays the same; the text blue lightens so it reads on dark surfaces.
+  --taps-text-blue: #5cadff;
+  --taps-text-blue-hover: #85c2ff;
+  --taps-text-blue-active: var(--taps-fill-blue);
+  --taps-surface: #262626;
+  --taps-surface-hover: #333;
+  --taps-table-chrome: #262626;
+}
+
+// Carbon's Theme wrapper and portals re-emit Carbon's tokens, so map the blues there as well.
+:root,
+.cds--white,
+.cds--g100 {
+  --cds-button-primary: var(--taps-fill-blue);
+  --cds-button-primary-hover: var(--taps-fill-blue-hover);
+  --cds-button-primary-active: var(--taps-fill-blue-active);
+  --cds-button-tertiary: var(--taps-text-blue);
+  --cds-button-tertiary-active: var(--taps-text-blue-active);
+  --cds-interactive: var(--taps-text-blue);
+  --cds-icon-interactive: var(--taps-text-blue);
+  --cds-link-primary: var(--taps-text-blue);
+  --cds-link-primary-hover: var(--taps-text-blue-hover);
+  --cds-focus: var(--taps-text-blue);
+  --cds-border-interactive: var(--taps-text-blue);
+  --cds-support-info: var(--taps-text-blue);
 }
 
 body {
@@ -45,37 +82,14 @@ body {
   line-height: 1.5rem;
 }
 
-.taps-shell,
-.taps-detail-panel-host {
-  --taps-navigation-width: 0rem;
-  --taps-surface: #fff;
-  --taps-surface-hover: #e8e8e8;
-  --taps-link: #005cb8;
-  --taps-link-hover: #0052a3;
-  --cds-button-primary: #0073e6;
-  --cds-button-primary-hover: #0066cc;
-  --cds-button-primary-active: #00478f;
-  --cds-link-primary: var(--taps-link);
-  --cds-link-primary-hover: var(--taps-link-hover);
-  --cds-interactive: var(--taps-link);
-  --cds-focus: var(--taps-link);
-  --cds-border-interactive: var(--taps-link);
-}
-
 .taps-shell {
+  --taps-navigation-width: 0rem;
+
   min-block-size: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--cds-background);
   color: var(--cds-text-primary);
-}
-
-.cds--g100 .taps-shell,
-.taps-detail-panel-host.cds--g100 {
-  --taps-surface: #262626;
-  --taps-surface-hover: #333;
-  --taps-link: #5cadff;
-  --taps-link-hover: #85c2ff;
 }
 
 .taps-shell.has-navigation {
@@ -85,9 +99,10 @@ body {
   --taps-navigation-width: 16rem;
 }
 
+// Header: fill blue in both themes, everything on it white.
 .taps-header.cds--header {
   block-size: var(--taps-header-height);
-  background: #0073e6;
+  background: var(--taps-fill-blue);
   border: 0;
   color: #fff;
   z-index: 8000;
@@ -105,9 +120,51 @@ body {
 .taps-header .cds--header__action:hover,
 .taps-header .cds--header__action--active,
 .taps-header .cds--btn--ghost:hover {
-  background: #0066cc;
+  background: var(--taps-fill-blue-hover);
   color: #fff;
 }
+// Carbon's icon-only ghost focus state uses a grey active fill and a blue ring.
+.taps-header .cds--btn--ghost[aria-expanded='true'],
+.taps-header .cds--btn--ghost.cds--btn--icon-only:focus {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.taps-header .cds--btn--ghost[aria-expanded='true']:hover {
+  background: var(--taps-fill-blue-hover);
+}
+
+// The menu toggle names what it will do next, on hover and keyboard focus.
+.taps-navigation-toggle {
+  position: relative;
+}
+.taps-navigation-toggle svg {
+  fill: currentcolor;
+}
+.taps-navigation-toggle::after {
+  position: absolute;
+  inset-block-start: calc(100% + 8px);
+  inset-inline-start: 8px;
+  z-index: 9000;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: var(--cds-background-inverse);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 20%);
+  color: var(--cds-text-inverse);
+  content: attr(aria-label);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+}
+.taps-navigation-toggle:hover::after,
+.taps-navigation-toggle:focus-visible::after {
+  opacity: 1;
+}
+
 .taps-header__actions {
   display: flex;
   align-items: center;
@@ -120,6 +177,7 @@ body {
   padding-inline: 0.75rem;
 }
 
+// "ACRONYM Full name": acronym regular, full name bold, 12px from the toggle.
 .taps-brand {
   display: flex;
   align-items: center;
@@ -145,9 +203,10 @@ body {
   text-overflow: ellipsis;
 }
 .taps-brand:hover {
-  background: #0066cc;
+  background: var(--taps-fill-blue-hover);
   color: #fff;
 }
+// Carbon's focus ring would be blue on blue inside the header.
 .taps-brand:focus-visible,
 .taps-theme-switch:focus-visible,
 .taps-header button:focus-visible {
@@ -173,7 +232,7 @@ body {
   inline-size: 18px;
   block-size: 18px;
   border-radius: 50%;
-  background: #0073e6;
+  background: var(--taps-fill-blue);
   color: #fff;
   transition: transform 0.2s ease;
 }
@@ -190,6 +249,7 @@ body {
   fill: currentcolor;
 }
 
+// Side navigation: always present, collapsing to a 48px icon rail.
 .taps-navigation.cds--side-nav {
   inset-block-start: var(--taps-header-height);
   block-size: calc(100dvh - var(--taps-header-height));
@@ -201,6 +261,7 @@ body {
   background: var(--cds-background);
   border-inline-end: 1px solid var(--cds-border-subtle-01);
   z-index: 7000;
+  transition: inline-size 320ms cubic-bezier(0.4, 0.14, 0.3, 1);
 }
 .taps-navigation .cds--side-nav__items {
   padding: 0;
@@ -213,26 +274,53 @@ body {
 }
 .taps-navigation .cds--side-nav__link,
 .taps-navigation .cds--side-nav__submenu {
+  display: flex;
+  align-items: center;
   min-block-size: 3rem;
   padding-inline: 1rem;
   font-size: 0.875rem;
   font-weight: 400;
   letter-spacing: 0.16px;
+  transition: background-color 0.1s ease;
 }
 .taps-navigation .cds--side-nav__link-text,
 .taps-navigation .cds--side-nav__submenu-title {
+  flex: 1;
   font-weight: 400;
   color: var(--cds-text-secondary);
   overflow: hidden;
+  text-align: start;
   text-overflow: ellipsis;
+}
+// Items come to the primary text colour as soon as someone reaches for them.
+.taps-navigation .cds--side-nav__link:hover,
+.taps-navigation .cds--side-nav__link:focus-visible,
+.taps-navigation .cds--side-nav__submenu:hover,
+.taps-navigation .cds--side-nav__submenu:focus-visible {
+  background: var(--taps-surface-hover);
+}
+.taps-navigation .cds--side-nav__link:is(:hover, :focus-visible) .cds--side-nav__link-text,
+.taps-navigation .cds--side-nav__submenu:is(:hover, :focus-visible) .cds--side-nav__submenu-title {
+  color: var(--cds-text-primary);
+}
+.taps-navigation .cds--side-nav__link:focus-visible,
+.taps-navigation .cds--side-nav__submenu:focus-visible {
+  outline: 2px solid var(--cds-focus);
+  outline-offset: -2px;
 }
 .taps-navigation .cds--side-nav__icon {
   flex: 0 0 20px;
   margin-inline-end: 1rem;
 }
+// Every item keeps the same text-blue icon, including the current page.
 .taps-navigation .cds--side-nav__icon > svg {
-  color: var(--taps-link);
+  color: var(--taps-text-blue);
   fill: currentcolor;
+}
+.taps-navigation .cds--side-nav__submenu-chevron {
+  display: flex;
+  flex: 0 0 auto;
+  margin-inline-start: 0.5rem;
 }
 .taps-navigation .cds--side-nav__menu .cds--side-nav__link {
   padding-inline-start: 2rem;
@@ -287,6 +375,7 @@ body {
   margin-block-start: calc(var(--taps-header-height) + 1rem);
   margin-inline-start: var(--taps-navigation-width);
   padding: 0 1.5rem 4rem;
+  transition: margin-inline-start 320ms cubic-bezier(0.4, 0.14, 0.3, 1);
 }
 .taps-main:focus {
   outline: none;
@@ -298,16 +387,30 @@ body {
 }
 .taps-page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 2.5rem;
 }
+
+// List pages share one 1.5rem inset; the results escape it to fill the width.
+.taps-main:has(.taps-fullbleed-page) {
+  padding-inline: 1.5rem;
+}
+.taps-content:has(.taps-fullbleed-page) {
+  padding: 1rem 0 0;
+}
+.taps-page.taps-fullbleed-page {
+  gap: 1.5rem;
+}
+.taps-fullbleed-page .taps-results {
+  inline-size: calc(100% + 3rem);
+  margin-inline: -1.5rem;
+}
+
 .taps-page-header {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   min-inline-size: 0;
-}
-.taps-page-header__back {
-  margin-block-end: 1.5rem;
 }
 .taps-page-header__top {
   display: flex;
@@ -316,15 +419,23 @@ body {
   align-items: center;
   gap: 0.75rem 1rem;
 }
+.taps-page-header__title-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  min-inline-size: 0;
+}
 .taps-page-header h1 {
   margin: 0;
-  font-size: 2rem;
-  font-weight: 400;
-  line-height: 2.5rem;
+  @include type.type-style('heading-05');
   overflow-wrap: anywhere;
 }
+.taps-page-header .taps-actions {
+  gap: 1rem;
+  margin-inline-start: auto;
+}
 .taps-page-header__subtitle {
-  margin-block-start: 0.25rem;
   color: var(--cds-text-secondary);
   font-size: 1rem;
   line-height: 1.5rem;
@@ -335,63 +446,147 @@ body {
   align-items: center;
   gap: 0.5rem;
 }
+
+// Heading ladder: page title heading-05, sections heading-03, sub-sections heading-compact-02.
 .taps-page h2 {
-  font-size: 1.25rem;
-  line-height: 1.4;
+  @include type.type-style('heading-03');
+}
+.taps-page h3 {
+  @include type.type-style('heading-compact-02');
 }
 .taps-page p {
   line-height: 1.5;
 }
-.taps-page a {
-  color: var(--taps-link);
+.taps-shell a:not(.cds--side-nav__link):not(.cds--btn):not(.taps-brand) {
+  color: var(--cds-link-primary);
 }
-.taps-shell .cds--tile {
+.taps-shell a:not(.cds--side-nav__link):not(.cds--btn):not(.taps-brand):hover {
+  color: var(--cds-link-primary-hover);
+}
+.cds--link {
+  text-decoration: underline;
+}
+// Opens a record in place, styled as the link it reads as.
+.taps-link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--cds-link-primary);
+  font: inherit;
+  text-align: start;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.taps-link-button:hover {
+  color: var(--cds-link-primary-hover);
+}
+.taps-link-button:focus-visible {
+  outline: 1px solid var(--cds-focus);
+  outline-offset: 2px;
+}
+strong,
+b {
+  font-weight: 700;
+}
+
+.cds--tile {
   padding: 1.5rem;
   background: var(--taps-surface);
   border-radius: 4px;
 }
-.taps-section-title {
-  margin-block-end: 1rem;
+// A titled card on the page: an h2 in heading-03, led by a 24px icon.
+.taps-card.cds--tile {
+  padding: 1rem 1.5rem 1.5rem;
+  border: 1px solid var(--cds-border-subtle-00);
+  border-radius: 0.5rem;
 }
-.taps-access-summary h2 {
-  margin-block-end: 0.75rem;
+.taps-page .taps-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1.5rem;
+  @include type.type-style('heading-03');
+}
+.taps-card-title > svg {
+  flex-shrink: 0;
+  fill: var(--cds-icon-secondary);
 }
 .taps-grants {
   list-style: disc;
   padding-inline-start: 1.25rem;
   line-height: 1.6;
 }
-.taps-sign-in {
-  max-inline-size: 48rem;
-}
-.taps-sign-in h2,
-.taps-sign-in p {
-  margin-block-end: 1.5rem;
-}
 .taps-notification.cds--inline-notification {
+  inline-size: 100%;
   max-inline-size: 100%;
 }
 
-.taps-shell .cds--btn:not(.cds--btn--icon-only) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding-inline-end: 1rem;
+// Read-only label and value pairs. Not a DataTable, so they take the larger text sizes.
+.taps-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1rem 1.5rem;
+  margin: 0;
+
+  dt {
+    margin: 0 0 0.25rem;
+    color: var(--cds-text-secondary);
+    @include type.type-style('label-02');
+  }
+  dd {
+    margin: 0;
+    color: var(--cds-text-primary);
+    overflow-wrap: anywhere;
+    @include type.type-style('body-compact-02');
+  }
+}
+
+// Buttons are md (40px). A button without an icon centres its label; a button with an icon keeps
+// Carbon's layout, with the icon at the right edge.
+.cds--btn {
   border-radius: 4px;
+  line-height: 1.125rem;
 }
-.taps-shell .cds--btn:not(.cds--btn--icon-only) .cds--btn__icon {
-  position: static;
-  margin-inline-start: 0;
-  transform: translateY(1px);
+.cds--btn:not(.cds--btn--icon-only):not(:has(.cds--btn__icon)) {
+  justify-content: center;
+  padding-inline-end: 1rem;
 }
-.taps-shell .cds--label {
-  font-size: 0.875rem;
+.cds--btn--tertiary:hover {
+  background-color: #ebf2fc;
+  border-color: var(--cds-button-tertiary);
+  color: var(--cds-button-tertiary);
+}
+:root[data-carbon-theme='g100'] .cds--btn--tertiary:not(:disabled):not(.cds--btn--disabled):hover {
+  background-color: var(--cds-layer-hover-01);
+  border-color: var(--cds-button-tertiary);
+  color: var(--cds-button-tertiary);
+}
+
+// Field labels use label-02 and field text body-02, one step above Carbon's defaults.
+label.cds--label,
+legend.cds--label {
   color: var(--cds-text-primary);
 }
-.taps-shell .cds--text-input,
-.taps-shell .cds--select-input {
+.cds--label {
+  font-size: 0.875rem;
+  line-height: 1.125rem;
+}
+.cds--text-input,
+.cds--text-area,
+.cds--select-input,
+.cds--date-picker__input,
+.cds--number__input,
+.cds--number input[type='number'],
+.cds--list-box__label,
+.cds--list-box__menu-item__option {
   font-size: 1rem;
+}
+.cds--text-input,
+.cds--text-area,
+.cds--select-input,
+.cds--list-box,
+.cds--date-picker__input,
+.cds--search-input {
   border-start-start-radius: 4px;
   border-start-end-radius: 4px;
 }
@@ -406,13 +601,15 @@ body {
   text-align: center;
 }
 .taps-empty-state > svg {
-  color: var(--taps-link);
+  color: var(--cds-link-primary);
   margin-block-end: 1.25rem;
 }
+.taps-page .taps-empty-state h2,
 .taps-empty-state h2 {
   margin-block-end: 0.5rem;
   font-size: 1.125rem;
   font-weight: 700;
+  line-height: 1.3;
 }
 .taps-empty-state__description {
   max-inline-size: 22.5rem;
@@ -423,13 +620,22 @@ body {
 .taps-empty-state .taps-actions {
   margin-block-start: 1.5rem;
 }
+
+// Search filters sit on the page with grey fields, four to a row, and actions at the right.
 .taps-search-filters form {
-  display: grid;
-  gap: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-inline-size: 0;
+}
+.taps-search-filters .taps-actions {
+  justify-content: flex-end;
+  gap: 0.75rem;
 }
 .taps-filter-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
 }
 .taps-filter-grid .cds--form-item {
@@ -444,7 +650,6 @@ body {
   min-inline-size: 0;
   max-inline-size: 100%;
 }
-
 .taps-filter-help {
   grid-column: 1 / -1;
   color: var(--cds-text-secondary);
@@ -458,10 +663,56 @@ body {
 .taps-reference-sections .cds--accordion__content {
   padding-inline-end: 0;
 }
+
+// Results: a count toolbar, the table and its pagination on one panel.
 .taps-results {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
 }
+.taps-results-frame {
+  position: relative;
+  min-inline-size: 0;
+  min-block-size: 12rem;
+  background: var(--taps-table-chrome);
+  border-block-start: 1px solid var(--cds-border-subtle-01);
+}
+.taps-results-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-block-size: 2.5rem;
+  padding: 0.5rem 1rem;
+}
+.taps-results-count {
+  margin: 0;
+  color: var(--cds-text-primary);
+  font-size: 1rem;
+  line-height: 1;
+}
+.taps-results-frame > .taps-table-frame {
+  border: 0;
+  border-radius: 0;
+}
+.taps-results-frame .cds--data-table thead th {
+  white-space: nowrap;
+}
+.taps-results-frame .cds--data-table tbody td {
+  vertical-align: top;
+}
+.taps-results-frame .taps-empty-state {
+  background: transparent;
+}
+.taps-results-frame .cds--pagination {
+  background: var(--taps-table-chrome);
+  border: 0;
+  border-block: 1px solid var(--cds-border-subtle-01);
+  font-size: 0.875rem;
+}
+.taps-results-frame .cds--pagination :is(.cds--select-input, .cds--pagination__button) {
+  background: transparent;
+}
+
 .taps-table-frame {
   max-inline-size: 100%;
   overflow-x: auto;
@@ -501,6 +752,8 @@ body {
   background: #2c2c2c;
 }
 
+// Detail side panel: white panel, grey fields, a 64px header and the heading ladder moved down
+// one level, since the panel title is the panel's top heading.
 .taps-detail-panel-host {
   display: contents;
 }
@@ -511,9 +764,63 @@ body {
   z-index: 8001;
 }
 .taps-detail-panel.c4p--side-panel {
+  --cds-field-02: var(--cds-field-01);
+  --cds-field-hover-02: var(--cds-field-hover-01);
+  --c4p--side-panel--title-padding-right: 3.5rem;
+
   margin: 0;
   inset-block-start: var(--taps-header-height);
   block-size: calc(100dvh - var(--taps-header-height));
+
+  &,
+  .c4p--side-panel__header,
+  .c4p--side-panel__title {
+    background-color: var(--cds-layer-02);
+  }
+
+  .c4p--side-panel__header {
+    --c4p--side-panel--title-padding-bottom: calc(1.125rem - 1px);
+
+    padding: 0.5rem 0 0 1rem;
+    border-block-end: 1px solid var(--cds-border-subtle-02);
+  }
+
+  .c4p--side-panel__title {
+    padding-block-start: 0.625rem;
+  }
+
+  .c4p--side-panel__decorator-and-close {
+    inset-block-start: 0.5rem;
+    block-size: 3rem;
+  }
+
+  .cds--btn.c4p--side-panel__close-button {
+    block-size: 3rem;
+    inline-size: 3rem;
+
+    &:hover {
+      background-color: var(--cds-layer-hover-02);
+    }
+
+    svg {
+      block-size: 1.25rem;
+      inline-size: 1.25rem;
+    }
+  }
+
+  .c4p--side-panel__inner-content {
+    padding: 1.5rem 1rem;
+  }
+
+  .c4p--side-panel__inner-content h2 {
+    margin-block-end: 1rem;
+    @include type.type-style('heading-compact-02');
+  }
+
+  .c4p--side-panel__inner-content :is(h3, h4) {
+    margin-block: 1.5rem 0.75rem;
+    @include type.type-style('heading-compact-01');
+  }
 }
 .taps-detail-panel .c4p--side-panel--scrolls:focus-visible {
   outline: 2px solid var(--cds-focus);
@@ -540,7 +847,8 @@ body {
 }
 .taps-profile-panel__header h2 {
   font-size: 1.25rem;
-  font-weight: 700;
+  font-weight: 400;
+  line-height: 1.75rem;
 }
 .taps-profile-panel__body {
   padding: 1.5rem;
@@ -548,7 +856,7 @@ body {
 .taps-profile-panel__identity {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
   margin-block-end: 1.5rem;
 }
 .taps-profile-panel__name {
@@ -559,12 +867,12 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  inline-size: 3.5rem;
-  block-size: 3.5rem;
-  background: #0073e6;
+  inline-size: 4rem;
+  block-size: 4rem;
+  background: var(--taps-fill-blue);
   color: #fff;
   border-radius: 50%;
-  font-size: 1.4rem;
+  font-size: 1.5rem;
 }
 .taps-profile-panel__signout {
   display: flex;
@@ -580,6 +888,9 @@ body {
   font-size: 0.875rem;
   cursor: pointer;
 }
+.taps-profile-panel__signout svg {
+  fill: var(--taps-text-blue);
+}
 .taps-profile-panel__signout:hover {
   background: var(--taps-surface-hover);
 }
@@ -588,23 +899,74 @@ body {
   outline-offset: -2px;
 }
 
-.taps-footer {
+// Login page: logo, acronym, full name, description and sign-in actions, with one decorative
+// image on the right that moves below the content on small screens.
+.taps-landing {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-block-size: 100dvh;
+  background: var(--taps-surface);
+  color: var(--cds-text-primary);
+}
+.taps-landing__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6rem;
+  padding: 2rem;
+}
+.taps-landing__logo {
+  display: block;
+  inline-size: 10rem;
+  block-size: auto;
+  margin-block-start: 1.2rem;
+}
+.taps-landing__title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.taps-landing__title {
+  margin: 0;
+  @include type.type-style('fluid-display-01', true);
+  font-weight: 400;
+}
+.taps-landing__subtitle {
+  margin: 0;
+  @include type.type-style('fluid-paragraph-01', true);
+  font-weight: 400;
+}
+.taps-landing__description {
+  max-inline-size: 36rem;
+  margin: 0;
+  @include type.type-style('body-02');
+}
+.taps-landing__notice {
+  max-inline-size: 100%;
+}
+.taps-landing__actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 1.5rem;
-  margin-inline-start: var(--taps-navigation-width);
-  padding: 1rem 2.75rem;
-  border-block-start: 1px solid var(--cds-border-subtle-01);
-  font-size: 0.875rem;
+  gap: 1rem;
+  margin-block-start: -2rem;
 }
-.taps-footer__logo {
-  inline-size: 7rem;
-  block-size: auto;
-  margin-inline-end: auto;
+.taps-landing__actions .cds--btn {
+  flex: 0 1 18rem;
+  inline-size: 18rem;
+  max-inline-size: 100%;
+  justify-content: space-between;
+  padding-inline: 1rem;
 }
-.taps-footer a {
-  color: var(--taps-link);
+.taps-landing__help {
+  flex-basis: 100%;
+  max-inline-size: 32rem;
+  margin: 0;
+}
+.taps-landing__image {
+  display: block;
+  inline-size: 100%;
+  block-size: 100dvh;
+  object-fit: cover;
+  object-position: center;
 }
 
 @media (max-width: 1311px) {
@@ -612,9 +974,18 @@ body {
     gap: 2rem;
   }
 }
+@media (min-width: 672px) {
+  .taps-card.cds--tile {
+    padding: 2rem;
+  }
+}
 @media (max-width: 1055px) {
   .taps-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .taps-landing__content {
+    gap: 3rem;
+    padding: 1rem;
   }
 }
 @media (max-width: 671px) {
@@ -643,27 +1014,38 @@ body {
   .taps-page-header .taps-actions {
     flex-basis: 100%;
     justify-content: flex-start;
-  }
-  .taps-sign-in .taps-actions {
-    align-items: stretch;
-    flex-direction: column;
-  }
-  .taps-sign-in .cds--btn {
-    max-inline-size: none;
-    inline-size: 100%;
+    margin-inline-start: 0;
   }
   .taps-detail-panel.c4p--side-panel {
     inline-size: 100%;
     min-inline-size: 0;
     max-inline-size: 100%;
   }
-  .taps-footer {
-    padding-inline: 2.5rem;
-    gap: 1rem;
+  .taps-landing {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .taps-landing__content {
+    gap: 2.5rem;
+  }
+  .taps-landing__logo {
+    inline-size: 8rem;
+  }
+  .taps-landing__actions {
+    display: grid;
+    margin-block-start: 0;
+  }
+  .taps-landing__actions .cds--btn {
+    inline-size: 100%;
+  }
+  .taps-landing__image {
+    block-size: 22rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .taps-theme-switch__thumb {
+  .taps-theme-switch__thumb,
+  .taps-navigation.cds--side-nav,
+  .taps-main,
+  .taps-navigation-toggle::after {
     transition: none;
   }
 }

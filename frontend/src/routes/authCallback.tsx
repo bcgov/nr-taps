@@ -31,18 +31,18 @@ function AuthCallback() {
   }, [navigate])
   return (
     <section className="taps-page">
-      <PageHeader title="Sign in" />
+      <PageHeader title="Log in" />
       {error ? (
         <>
           <AppNotification
             kind="error"
-            title="Sign in unsuccessful"
-            subtitle="Sign in could not be completed. Please try again."
+            title="Log in unsuccessful"
+            subtitle="Log in could not be completed. Please try again."
           />
           <Link to="/">Return to home</Link>
         </>
       ) : (
-        <InlineLoading role="status" aria-live="polite" description="Completing sign in…" />
+        <InlineLoading role="status" aria-live="polite" description="Completing log in…" />
       )}
     </section>
   )

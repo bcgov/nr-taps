@@ -95,7 +95,7 @@ export default function EcasSearchFilters({
       {lookupError && (
         <>
           <AppNotification kind="error" title="Search choices unavailable" subtitle={lookupError} />
-          <Button kind="tertiary" onClick={onRetryLookups}>
+          <Button kind="tertiary" size="md" onClick={onRetryLookups}>
             Retry search choices
           </Button>
         </>

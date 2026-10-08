@@ -31,12 +31,12 @@ test('waits for the login callback before loading and synchronizing the shared s
   oidc.completeLogin.mockReturnValue(callback.promise)
   const { router } = await renderRoute('/authCallback')
 
-  expect(await screen.findByRole('status')).toHaveTextContent('Completing sign in')
+  expect(await screen.findByRole('status')).toHaveTextContent('Completing log in')
   expect(oidc.getOidcUser).not.toHaveBeenCalled()
   expect(fetch).not.toHaveBeenCalled()
   await act(async () => callback.resolve())
 
-  expect(await screen.findByText('Signed in as TAPS User.')).toBeInTheDocument()
+  expect(await screen.findByText('Logged in as TAPS User.')).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'ECAS' })).toBeInTheDocument()
   expect(router.state.location.pathname).toBe('/')
   expect(fetch).toHaveBeenCalledOnce()
@@ -45,14 +45,14 @@ test('waits for the login callback before loading and synchronizing the shared s
   })
 })
 
-test('returns a signed-out deep link to the same page after sign in', async () => {
+test('returns a signed-out deep link to the same page after log in', async () => {
   const user = userEvent.setup()
   const deepLink = '/ecas/ECAS05?ecasId=1001#results'
   oidc.getOidcUser.mockResolvedValue(null)
   oidc.startLogin.mockReturnValue(new Promise(() => {}))
   const signedOut = await renderRoute(deepLink)
 
-  await user.click(await screen.findByRole('button', { name: 'Sign in with Business BCeID' }))
+  await user.click(await screen.findByRole('button', { name: 'Log in with Business BCeID' }))
   expect(oidc.startLogin).toHaveBeenCalledWith('business-bceid')
   expect(window.sessionStorage.getItem(destinationKey)).toBe(deepLink)
   signedOut.unmount()
@@ -74,25 +74,25 @@ test.each(['//example.com/ecas', '/\\example.com/ecas', 'https://example.com/eca
     oidc.completeLogin.mockResolvedValue(undefined)
     const { router } = await renderRoute('/authCallback')
 
-    expect(await screen.findByText('Signed in as TAPS User.')).toBeInTheDocument()
+    expect(await screen.findByText('Logged in as TAPS User.')).toBeInTheDocument()
     expect(router.state.location.href).toBe('/')
     expect(window.sessionStorage.getItem(destinationKey)).toBeNull()
   },
 )
 
-test('can return home and sign in again after a callback error', async () => {
+test('can return home and log in again after a callback error', async () => {
   const user = userEvent.setup()
   oidc.completeLogin.mockRejectedValue(new Error('Invalid callback'))
   oidc.getOidcUser.mockResolvedValue(null)
   window.sessionStorage.setItem(destinationKey, '/ecas')
   const { router } = await renderRoute('/authCallback')
 
-  expect(await screen.findByRole('alert')).toHaveTextContent('Sign in could not be completed')
+  expect(await screen.findByRole('alert')).toHaveTextContent('Log in could not be completed')
   expect(fetch).not.toHaveBeenCalled()
   expect(window.sessionStorage.getItem(destinationKey)).toBeNull()
   await user.click(screen.getByRole('link', { name: 'Return to home' }))
 
-  expect(await screen.findByRole('button', { name: 'Sign in with IDIR' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Log in with IDIR' })).toBeInTheDocument()
   expect(router.state.location.pathname).toBe('/')
 })
 

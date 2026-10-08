@@ -15,7 +15,7 @@ export default function EmptyState({
   const id = useId()
   return (
     <section className="taps-empty-state" aria-labelledby={id} role={role}>
-      <DesignResearch width={64} height={64} aria-hidden="true" />
+      <DesignResearch width={48} height={48} aria-hidden="true" />
       <h2 id={id}>{title}</h2>
       <div className="taps-empty-state__description">{description}</div>
       {action && <div className="taps-actions">{action}</div>}
