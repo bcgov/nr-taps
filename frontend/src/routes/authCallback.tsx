@@ -1,6 +1,10 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import { clearLoginDestination, getLoginDestination } from '@/context/auth/login-destination'
 import { completeLogin } from '@/service/oidc-service'
+import { InlineLoading } from '@carbon/react'
+import PageHeader from '@/components/PageHeader'
+import AppNotification from '@/components/AppNotification'
 
 export const Route = createFileRoute('/authCallback')({ component: AuthCallback })
 
@@ -11,26 +15,35 @@ function AuthCallback() {
     let active = true
     void completeLogin()
       .then(() => {
-        if (active) void navigate({ to: '/' })
+        if (!active) return
+        const destination = getLoginDestination() ?? '/'
+        clearLoginDestination()
+        void navigate({ href: destination, replace: true })
       })
       .catch(() => {
-        if (active) setError(true)
+        if (!active) return
+        clearLoginDestination()
+        setError(true)
       })
     return () => {
       active = false
     }
   }, [navigate])
   return (
-    <main className="container taps-content">
-      <h1>Sign in</h1>
+    <section className="taps-page">
+      <PageHeader title="Sign in" />
       {error ? (
         <>
-          <p role="alert">Sign in could not be completed. Please try again.</p>
+          <AppNotification
+            kind="error"
+            title="Sign in unsuccessful"
+            subtitle="Sign in could not be completed. Please try again."
+          />
           <Link to="/">Return to home</Link>
         </>
       ) : (
-        <p role="status">Completing sign in…</p>
+        <InlineLoading role="status" aria-live="polite" description="Completing sign in…" />
       )}
-    </main>
+    </section>
   )
 }

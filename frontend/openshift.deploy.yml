@@ -1,62 +1,114 @@
+---
+# Runtime VITE_* values are written to /srv/config.js by docker-entrypoint.sh when the
+# container starts, so one image runs in every environment. The Route is in openshift.route.yml.
 apiVersion: template.openshift.io/v1
 kind: Template
+metadata:
+  name: nr-taps-frontend-deploy
 parameters:
   - name: NAME
-    required: true
+    description: App name prefix
+    value: nr-taps
   - name: ZONE
+    description: PR number or 'test'
     required: true
+  - name: REPLICAS
+    description: Pod count
+    value: "2"
+  - name: MIN_CPU
+    value: "50m"
+  - name: MIN_MEM
+    value: "64Mi"
+  - name: MAX_CPU
+    value: "200m"
+  - name: MAX_MEM
+    value: "128Mi"
   - name: IMAGE_TAG
+    description: Container image tag (PR number or commit SHA)
     required: true
-  - name: OIDC_ISSUER_URI
+  - name: ROLLOUT_TRIGGER
+    description: Value placed on the pod template to force a rollout when a reused image tag is rebuilt
+    value: ""
+  - name: FRONTEND_LOG_LEVEL
+    value: INFO
+  - name: VITE_OIDC_ISSUER_URI
+    description: BC Gov SSO issuer for interactive users
     required: true
-  - name: OIDC_CLIENT_ID
+  - name: VITE_OIDC_CLIENT_ID
+    description: Public browser client in the same SSO environment as the backend
     required: true
-  - name: OIDC_SITEMINDER_LOGOUT_URL
-    description: SiteMinder logoff.cgi chained before Keycloak logout so Business BCeID sign out ends the upstream session
-    required: true
+  - name: VITE_OIDC_IDIR_HINT
+    value: azureidir
+  - name: VITE_OIDC_BCEID_HINT
+    value: bceidbusiness
+  - name: VITE_OIDC_SITEMINDER_LOGOUT_URL
+    description: SiteMinder logoff.cgi chained before Keycloak end-session so Business BCeID sign out ends the upstream session
+    value: ""
+
 objects:
   - apiVersion: apps/v1
     kind: Deployment
     metadata:
-      name: ${NAME}-${ZONE}-frontend
+      name: ${NAME}-frontend-${ZONE}
       labels:
-        app: ${NAME}-${ZONE}
+        app: ${NAME}-frontend-${ZONE}
+        app.kubernetes.io/name: ${NAME}-frontend
+        app.kubernetes.io/instance: ${ZONE}
     spec:
-      replicas: 1
+      replicas: ${{REPLICAS}}
       selector:
         matchLabels:
-          deployment: ${NAME}-${ZONE}-frontend
+          app: ${NAME}-frontend-${ZONE}
       template:
         metadata:
           labels:
-            app: ${NAME}-${ZONE}
-            deployment: ${NAME}-${ZONE}-frontend
+            app: ${NAME}-frontend-${ZONE}
+            app.kubernetes.io/name: ${NAME}-frontend
+            app.kubernetes.io/instance: ${ZONE}
+          annotations:
+            app.openshift.io/redeploy-token: ${ROLLOUT_TRIGGER}
         spec:
           automountServiceAccountToken: false
+          topologySpreadConstraints:
+            - maxSkew: 1
+              topologyKey: kubernetes.io/hostname
+              whenUnsatisfiable: ScheduleAnyway
+              labelSelector:
+                matchLabels:
+                  app: ${NAME}-frontend-${ZONE}
+          securityContext:
+            runAsNonRoot: true
           initContainers:
-            - name: seed-static-files
+            # The entrypoint rewrites config.js, so serve a writable copy of /srv.
+            - name: seed-srv
               image: ghcr.io/bcgov/${NAME}/frontend:${IMAGE_TAG}
-              command: [sh, -c, 'cp -r /srv/. /srv-rw/']
+              imagePullPolicy: Always
+              command:
+                - sh
+                - -c
+                - 'cp -r /srv/. /srv-rw/'
               volumeMounts:
-                - name: static-files
+                - name: srv
                   mountPath: /srv-rw
               resources:
                 requests:
-                  cpu: 10m
-                  memory: 32Mi
+                  cpu: "20m"
+                  memory: "32Mi"
+                  ephemeral-storage: "50Mi"
                 limits:
-                  cpu: 100m
-                  memory: 64Mi
+                  cpu: "100m"
+                  memory: "64Mi"
+                  ephemeral-storage: "100Mi"
               securityContext:
                 allowPrivilegeEscalation: false
                 runAsNonRoot: true
                 readOnlyRootFilesystem: true
                 capabilities:
-                  drop: [ALL]
+                  drop: ["ALL"]
                 seccompProfile:
                   type: RuntimeDefault
           containers:
-            - name: frontend
+            - name: ${NAME}-frontend
               image: ghcr.io/bcgov/${NAME}/frontend:${IMAGE_TAG}
               imagePullPolicy: Always
               ports:
@@ -66,92 +118,100 @@ objects:
                   containerPort: 3001
               env:
                 - name: LOG_LEVEL
-                  value: INFO
+                  value: ${FRONTEND_LOG_LEVEL}
                 - name: BACKEND_URL
-                  value: http://${NAME}-${ZONE}-backend:8080
-                - name: VITE_OIDC_ISSUER_URI
-                  value: ${OIDC_ISSUER_URI}
-                - name: VITE_OIDC_CLIENT_ID
-                  value: ${OIDC_CLIENT_ID}
-                - name: VITE_OIDC_SITEMINDER_LOGOUT_URL
-                  value: ${OIDC_SITEMINDER_LOGOUT_URL}
+                  value: http://${NAME}-backend-${ZONE}:8080
+                - name: TAPS_IMAGE_REFERENCE
+                  value: ghcr.io/bcgov/${NAME}/frontend:${IMAGE_TAG}
                 - name: XDG_CONFIG_HOME
                   value: /tmp/caddy
                 - name: XDG_DATA_HOME
                   value: /tmp/caddy
                 - name: TMPDIR
                   value: /tmp/caddy
-              resources:
-                requests:
-                  cpu: 50m
-                  memory: 64Mi
-                limits:
-                  cpu: 250m
-                  memory: 256Mi
-              securityContext:
-                allowPrivilegeEscalation: false
-                runAsNonRoot: true
-                readOnlyRootFilesystem: true
-                capabilities:
-                  drop: [ALL]
-                seccompProfile:
-                  type: RuntimeDefault
+                - name: VITE_OIDC_ISSUER_URI
+                  value: ${VITE_OIDC_ISSUER_URI}
+                - name: VITE_OIDC_CLIENT_ID
+                  value: ${VITE_OIDC_CLIENT_ID}
+                - name: VITE_OIDC_IDIR_HINT
+                  value: ${VITE_OIDC_IDIR_HINT}
+                - name: VITE_OIDC_BCEID_HINT
+                  value: ${VITE_OIDC_BCEID_HINT}
+                - name: VITE_OIDC_SITEMINDER_LOGOUT_URL
+                  value: ${VITE_OIDC_SITEMINDER_LOGOUT_URL}
               volumeMounts:
-                - name: static-files
+                - name: srv
                   mountPath: /srv
                 - name: caddy-data
                   mountPath: /tmp/caddy
                 - name: coraza-tmp
                   mountPath: /tmp/coraza
-              startupProbe:
-                httpGet:
-                  path: /health
-                  port: health
-                periodSeconds: 5
-                failureThreshold: 30
-              readinessProbe:
-                httpGet:
-                  path: /health
-                  port: health
-                periodSeconds: 5
-                failureThreshold: 3
+              resources:
+                requests:
+                  cpu: ${MIN_CPU}
+                  memory: ${MIN_MEM}
+                  ephemeral-storage: "100Mi"
+                limits:
+                  cpu: ${MAX_CPU}
+                  memory: ${MAX_MEM}
+                  ephemeral-storage: "200Mi"
               livenessProbe:
                 httpGet:
                   path: /health
                   port: health
+                initialDelaySeconds: 5
                 periodSeconds: 10
-                failureThreshold: 3
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: health
+                initialDelaySeconds: 3
+                periodSeconds: 5
+              securityContext:
+                allowPrivilegeEscalation: false
+                runAsNonRoot: true
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
           volumes:
-            - name: static-files
+            - name: srv
               emptyDir: {}
             - name: caddy-data
               emptyDir: {}
             - name: coraza-tmp
               emptyDir: {}
+
   - apiVersion: v1
     kind: Service
     metadata:
-      name: ${NAME}-${ZONE}-frontend
+      name: ${NAME}-frontend-${ZONE}
       labels:
-        app: ${NAME}-${ZONE}
+        app: ${NAME}-frontend-${ZONE}
+        app.kubernetes.io/name: ${NAME}-frontend
+        app.kubernetes.io/instance: ${ZONE}
     spec:
       selector:
-        deployment: ${NAME}-${ZONE}-frontend
+        app: ${NAME}-frontend-${ZONE}
       ports:
         - name: http
+          protocol: TCP
           port: 3000
           targetPort: http
+
   - apiVersion: networking.k8s.io/v1
     kind: NetworkPolicy
     metadata:
-      name: ${NAME}-${ZONE}-frontend-ingress
+      name: ${NAME}-frontend-${ZONE}-ingress
       labels:
-        app: ${NAME}-${ZONE}
+        app: ${NAME}-frontend-${ZONE}
+        app.kubernetes.io/name: ${NAME}-frontend
+        app.kubernetes.io/instance: ${ZONE}
     spec:
       podSelector:
         matchLabels:
-          deployment: ${NAME}-${ZONE}-frontend
-      policyTypes: [Ingress]
+          app: ${NAME}-frontend-${ZONE}
       ingress:
         - from:
             - namespaceSelector:
@@ -160,3 +220,5 @@ objects:
           ports:
             - protocol: TCP
               port: 3000
+      policyTypes:
+        - Ingress

@@ -1,3 +1,4 @@
+import { notifySessionExpired } from '@/context/auth/session-expiry'
 import { clearLogin, getOidcUser } from '@/service/oidc-service'
 
 export type IdentityProvider = 'IDIR' | 'BCEID_BUSINESS'
@@ -7,6 +8,7 @@ export type RoleScope = { type: 'DISTRICT' | 'REGION' | 'FOREST_CLIENT'; value: 
 export type RoleGrant = { role: string; scopes: RoleScope[] }
 
 export type Session = {
+  readApiEnabled?: boolean
   userId: string
   displayName: string
   email: string | null
@@ -27,6 +29,7 @@ export async function fetchSession(): Promise<Session | null> {
   })
   if (response.status === 401) {
     await clearLogin()
+    notifySessionExpired('api-unauthorized')
     return null
   }
   if (!response.ok) throw new SessionUnavailableError('The TAPS service is unavailable.')

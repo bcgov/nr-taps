@@ -1,0 +1,131 @@
+name: Scheduled
+
+on:
+  schedule: [cron: "0 11 * * 6"] # 3 AM PST = 12 PM UDT, Saturdays
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  stale-branches:
+    name: Close Stale Branches & PRs
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/stale@v10
+        with:
+          days-before-stale: 14
+          days-before-close: 7
+          stale-label: stale
+          close-issue-message: >
+            This issue has been marked stale due to no activity for 14 days.
+            It will be closed in 7 days if no action is taken.
+            If you still need this, please reopen or comment to reset the timer.
+          close-pr-message: >
+            This PR has been marked stale due to no activity for 14 days.
+            It will be closed in 7 days if no action is taken.
+            If you still need this, please reopen or request review to reset the timer.
+          remove-stale-when-updated: true
+          operations-per-run: 100
+          debug-only: false
+
+  ageOutPRs:
+    name: PR Deployment Purge
+    env:
+      CUTOFF: "1 week ago"
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    environment:
+      name: dev
+      deployment: false
+    steps:
+      - name: Require the DEV namespace for preview cleanup
+        env:
+          OC_NAMESPACE: ${{ secrets.oc_namespace }}
+        run: |
+          if [[ "$OC_NAMESPACE" != *-dev ]]; then
+            echo '::error title=Wrong OpenShift namespace::Preview cleanup requires a DEV namespace ending in -dev.'
+            exit 1
+          fi
+
+      - name: Clean up PR Deployments
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
+        with:
+          oc_namespace: ${{ secrets.oc_namespace }}
+          oc_token: ${{ secrets.oc_token }}
+          oc_server: ${{ vars.OC_SERVER }}
+          commands: |
+            set -euo pipefail
+
+            echo "Delete stale PR deployments"
+            echo "Cutoff: ${{ env.CUTOFF }}"
+
+            BEFORE=$(date +%s -d "${{ env.CUTOFF }}")
+            NAMESPACE="${{ secrets.oc_namespace }}"
+            REPO="${{ github.repository }}"
+            REPO="${REPO#*/}"
+            RESOURCE_TYPES="deploy,rs,pod,svc,route,hpa,networkpolicy,secret,pvc,cm"
+
+            echo "Verifying OpenShift session and namespace access"
+            oc whoami >/dev/null
+            oc project "${NAMESPACE}" >/dev/null
+            if [ "$(oc auth can-i delete deployments -n "${NAMESPACE}")" != "yes" ]; then
+              echo "OpenShift token cannot delete deployments in the target namespace."
+              exit 1
+            fi
+            if [ "$(oc auth can-i delete routes -n "${NAMESPACE}")" != "yes" ]; then
+              echo "OpenShift token cannot delete routes in the target namespace."
+              exit 1
+            fi
+            if [ "$(oc auth can-i delete persistentvolumeclaims -n "${NAMESPACE}")" != "yes" ]; then
+              echo "OpenShift token cannot delete persistent volume claims in the target namespace."
+              exit 1
+            fi
+            if [ "$(oc auth can-i delete networkpolicies -n "${NAMESPACE}")" != "yes" ]; then
+              echo "OpenShift token cannot delete network policies in the target namespace."
+              exit 1
+            fi
+
+            ALL_DEPLOYS=$(oc get deploy -n "${NAMESPACE}" --no-headers -o custom-columns=:metadata.name,:metadata.creationTimestamp)
+            DEPLOYS=$(printf '%s\n' "${ALL_DEPLOYS}" | grep -E "^${REPO}-(backend|frontend)-[0-9]+[[:space:]]" || :)
+
+            if [ -n "${DEPLOYS}" ]; then
+              while read -r name created; do
+                UPDATED=$(date -d "${created}" +%s 2>/dev/null || :)
+
+                if [[ -n "${UPDATED}" ]] && [[ ${UPDATED} -lt ${BEFORE} ]]; then
+                  LABEL=$(oc get deploy "${name}" -n "${NAMESPACE}" -o jsonpath='{.metadata.labels.app}' 2>/dev/null || :)
+                  if [ -n "${LABEL}" ]; then
+                    echo -e "\nOlder than cutoff: ${name} (app=${LABEL})"
+                    oc delete "${RESOURCE_TYPES}" -n "${NAMESPACE}" -l "app=${LABEL}" --ignore-not-found
+                  else
+                    echo -e "\nERROR: No app label found on deployment ${name}"
+                    exit 1
+                  fi
+                else
+                  echo -e "\nNewer than cutoff: ${name}"
+                  echo "No need to delete"
+                fi
+              done <<< "${DEPLOYS}"
+            else
+              echo "No PR deployments found for ${REPO}"
+            fi
+
+  zap:
+    name: ZAP Scans
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: ZAP Scan
+        uses: zaproxy/action-full-scan@3c58388149901b9a03b7718852c5ba889646c27c # v0.13.0
+        with:
+          allow_issue_writing: false
+          target: https://nr-taps-test.${{ vars.OC_APPS_DOMAIN }}

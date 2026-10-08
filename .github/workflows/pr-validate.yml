@@ -11,14 +11,40 @@ concurrency:
 permissions: {}
 
 jobs:
-  validate:
-    name: Validate Results
-    if: (! github.event.pull_request.draft)
+  vars:
+    name: Variables
     runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      pull-requests: read
+    timeout-minutes: 1
+    outputs:
+      slot: ${{ steps.calc.outputs.slot }}
     steps:
-      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+      - id: calc
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.number }}
+        # Matches the DEV route slot used by reusable-deploy.yml.
+        run: echo "slot=$((PR % 50))" >> "$GITHUB_OUTPUT"
+
+  validate:
+    name: Validate PR
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    needs: [vars]
+    permissions:
+      pull-requests: write
+    uses: bcgov/quickstart-openshift-helpers/.github/workflows/.pr-validate.yml@ca6579bdadf383a2513397081f963889b92823a4 # v1.1.0
+    with:
+      markdown_links: |
+        - [Frontend](https://${{ github.event.repository.name }}-${{ needs.vars.outputs.slot }}.${{ vars.OC_APPS_DOMAIN }})
+        - [Backend](https://${{ github.event.repository.name }}-${{ needs.vars.outputs.slot }}.${{ vars.OC_APPS_DOMAIN }}/api)
+
+  results:
+    name: Validate Results
+    if: always()
+    needs: [vars, validate]
+    runs-on: ubuntu-slim
+    timeout-minutes: 1
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: echo "PR validation failed or was cancelled." && exit 1
+      - run: echo "Success!"

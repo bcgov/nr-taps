@@ -1,12 +1,31 @@
 server:
   port: 8080
+  forward-headers-strategy: framework
   shutdown: graceful
+  undertow:
+    max-http-post-size: 64KB
+    threads:
+      # Undertow defaults to 8 workers per I/O thread, only 16 on a 2-CPU pod. Reads hold a worker
+      # while Oracle answers, so keep headroom for health probes and short requests.
+      worker: ${TAPS_HTTP_WORKER_THREADS:64}
 
 spring:
+  application:
+    name: taps-backend
+  # Oracle reads start only with the oracle profile (application-oracle.yml).
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
   lifecycle:
     timeout-per-shutdown-phase: 60s
 
+logging:
+  level:
+    ca.bc.gov.nrs.taps: ${APP_LOG_LEVEL:INFO}
+    ca.bc.gov.nrs.taps.audit.failure: ${TAPS_FAILURE_DIAGNOSTICS_LOG_LEVEL:INFO}
+
 taps:
+  image-reference: ${TAPS_IMAGE_REFERENCE:local}
   auth:
     issuer-uri: ${TAPS_OIDC_ISSUER_URI:}
     client-id: ${TAPS_OIDC_CLIENT_ID:}
@@ -16,6 +35,10 @@ management:
     health:
       probes:
         enabled: true
+      show-details: never
+      group:
+        liveness:
+          include: livenessState
   endpoints:
     web:
       exposure:

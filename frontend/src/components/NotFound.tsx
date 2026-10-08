@@ -1,6 +1,8 @@
 import type { FC } from 'react'
-import { Button } from 'react-bootstrap'
+import { Button } from '@carbon/react'
 import { useNavigate } from '@tanstack/react-router'
+import PageHeader from './PageHeader'
+import EmptyState from './EmptyState'
 
 const NotFound: FC = () => {
   const navigate = useNavigate()
@@ -10,13 +12,14 @@ const NotFound: FC = () => {
     })
   }
   return (
-    <div className="d-flex flex-column justify-content-center align-items-center">
-      <h1>404</h1>
-      <h6>The page you’re looking for does not exist.</h6>
-      <Button name="homeBtn" id="homeBtn" onClick={() => buttonClicked()} variant="contained">
-        Back Home
-      </Button>
-    </div>
+    <section className="taps-page">
+      <PageHeader title="404" />
+      <EmptyState
+        title="Page not found"
+        description="The page you’re looking for does not exist."
+        action={<Button onClick={() => buttonClicked()}>Back home</Button>}
+      />
+    </section>
   )
 }
 

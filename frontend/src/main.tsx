@@ -5,6 +5,7 @@ import { RouterProvider, createRouter } from '@tanstack/react-router'
 
 import '@/scss/styles.scss'
 
+import { registerStaleChunkRecovery } from '@/config/stale-chunk-recovery'
 import { routeTree } from './routeTree.gen'
 
 const router = createRouter({ routeTree })
@@ -14,6 +15,8 @@ declare module '@tanstack/react-router' {
     router: typeof router
   }
 }
+
+registerStaleChunkRecovery()
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>

@@ -3,17 +3,22 @@ name: Merge
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "*.md"
+      - ".github/graphics/**"
 
 concurrency:
-  group: merge
+  group: ${{ github.workflow }}
   cancel-in-progress: false
 
 permissions: {}
 
 jobs:
+  # TEST deploys the merged PR's images, so update a PR from main before merging.
   init:
     name: Find merged PR image
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -43,15 +48,17 @@ jobs:
 
   smoke:
     name: TEST Smoke
-    needs: [deploy-test]
+    needs: [init, deploy-test]
     uses: ./.github/workflows/reusable-tests.yml
     with:
       target: test
+      tag: ${{ needs.init.outputs.pr }}
 
   promote-test:
     name: Tag TEST Images
     needs: [init, smoke]
     runs-on: ubuntu-slim
+    timeout-minutes: 1
     permissions:
       packages: write
     strategy:

@@ -45,6 +45,7 @@ Fixes # (issue)
 - [ ] I have added tests that prove my fix is effective or that my feature works
 - [ ] New and existing unit tests pass locally with my changes
 - [ ] Any dependent changes have already been accepted and merged
+- [ ] Before merge, this PR is synchronized with current `main` and its PR images were rebuilt after that synchronization
 
 
 ## Further comments

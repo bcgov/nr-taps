@@ -1,6 +1,17 @@
 package ca.bc.gov.nrs.taps.security;
 
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.jwk.source.JWKSourceBuilder;
+import com.nimbusds.jose.proc.JWSVerificationKeySelector;
+import com.nimbusds.jose.proc.SecurityContext;
+import com.nimbusds.jose.util.DefaultResourceRetriever;
+import com.nimbusds.jwt.proc.DefaultJWTProcessor;
+import com.nimbusds.jwt.proc.JWTProcessor;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URL;
+import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,6 +27,10 @@ import org.springframework.util.StringUtils;
 
 @Configuration
 public class JwtDecoderConfiguration {
+  private static final int JWKS_CONNECT_TIMEOUT_MILLIS = (int) Duration.ofSeconds(10).toMillis();
+  private static final int JWKS_READ_TIMEOUT_MILLIS = (int) Duration.ofSeconds(15).toMillis();
+  private static final int JWKS_SIZE_LIMIT_BYTES = 50 * 1024;
+
   @Bean
   JwtDecoder jwtDecoder(
       @Value("${taps.auth.issuer-uri:}") String issuerUri,
@@ -30,11 +45,34 @@ public class JwtDecoderConfiguration {
     }
 
     NimbusJwtDecoder decoder =
-        NimbusJwtDecoder.withJwkSetUri(issuer + "/protocol/openid-connect/certs").build();
+        new NimbusJwtDecoder(jwtProcessor(issuer + "/protocol/openid-connect/certs"));
     decoder.setJwtValidator(
         new DelegatingOAuth2TokenValidator<>(
             JwtValidators.createDefaultWithIssuer(issuer), clientTokenValidator(clientId)));
     return decoder;
+  }
+
+  // Refresh SSO keys ahead of expiry with bounded, retried fetches so a slow key fetch can't 401 a
+  // request. Claims are left to the token validators.
+  private static JWTProcessor<SecurityContext> jwtProcessor(String jwkSetUri) {
+    URL jwkSetUrl;
+    try {
+      jwkSetUrl = URI.create(jwkSetUri).toURL();
+    } catch (IllegalArgumentException | MalformedURLException exception) {
+      throw new IllegalStateException("TAPS_OIDC_ISSUER_URI must be an absolute URL", exception);
+    }
+    JWKSource<SecurityContext> jwkSource =
+        JWKSourceBuilder.create(
+                jwkSetUrl,
+                new DefaultResourceRetriever(
+                    JWKS_CONNECT_TIMEOUT_MILLIS, JWKS_READ_TIMEOUT_MILLIS, JWKS_SIZE_LIMIT_BYTES))
+            .retrying(true)
+            .refreshAheadCache(true)
+            .build();
+    DefaultJWTProcessor<SecurityContext> processor = new DefaultJWTProcessor<>();
+    processor.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256, jwkSource));
+    processor.setJWTClaimsSetVerifier((claims, context) -> {});
+    return processor;
   }
 
   static OAuth2TokenValidator<Jwt> clientTokenValidator(String clientId) {

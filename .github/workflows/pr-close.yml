@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [closed]
 
-# Cancel any deployment before removing the preview.
+# PR open and close share this group, so only one changes a preview at a time.
 concurrency:
   group: pr-${{ github.event.number }}
   cancel-in-progress: true
@@ -13,9 +13,15 @@ permissions: {}
 
 jobs:
   cleanup:
-    name: Remove DEV preview
+    name: Cleanup PR OpenShift Resources
     if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    environment:
+      name: dev
+      deployment: false
+    permissions:
+      pull-requests: read
     steps:
       - name: Require the DEV namespace for preview cleanup
         env:
@@ -25,10 +31,76 @@ jobs:
             echo '::error title=Wrong OpenShift namespace::Preview cleanup requires a DEV namespace ending in -dev.'
             exit 1
           fi
-      - uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
+
+      - id: open-prs
+        name: List Open PRs
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            })
+            core.setOutput('numbers', prs.map((pr) => pr.number).join(' '))
+
+      - name: Delete per-PR OpenShift resources
+        uses: bcgov/action-oc-runner@111868d1fc50db0a40417ba321d865ef5c931bbd # v1.7.0
         with:
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_token: ${{ secrets.oc_token }}
           oc_server: ${{ vars.OC_SERVER }}
           commands: |
-            oc delete deployment,service,route,networkpolicy -l app=${{ github.event.repository.name }}-${{ github.event.number }} --ignore-not-found
+            set -euo pipefail
+            NAMESPACE="${{ secrets.oc_namespace }}"
+            REPO="${{ github.event.repository.name }}"
+            OPEN_PRS="${{ steps.open-prs.outputs.numbers }}"
+            CLOSED_PR="${{ github.event.number }}"
+            RESOURCE_TYPES="deploy,rs,pod,svc,route,hpa,networkpolicy,secret,pvc,cm"
+
+            oc project "${NAMESPACE}" >/dev/null
+
+            is_open_pr() {
+              local pr_number="$1"
+              for open_pr in ${OPEN_PRS}; do
+                if [ "${open_pr}" = "${pr_number}" ]; then
+                  return 0
+                fi
+              done
+              return 1
+            }
+
+            delete_preview() {
+              local pr_number="$1"
+
+              for component in backend frontend; do
+                local label="${REPO}-${component}-${pr_number}"
+                echo "Deleting PR resources matching app=${label}"
+                oc delete "${RESOURCE_TYPES}" -n "${NAMESPACE}" -l "app=${label}" --ignore-not-found
+              done
+            }
+
+            echo "Deleting resources for closed PR ${CLOSED_PR}"
+            delete_preview "${CLOSED_PR}"
+
+            PREVIEW_PRS=$(
+              oc get deploy -n "${NAMESPACE}" --no-headers -o custom-columns=:metadata.name \
+                | sed -nE "s/^${REPO}-(backend|frontend)-([0-9]+)$/\2/p" \
+                | sort -un
+            )
+
+            if [ -z "${PREVIEW_PRS}" ]; then
+              echo "No numeric PR preview deployments found for ${REPO}."
+              exit 0
+            fi
+
+            for pr_number in ${PREVIEW_PRS}; do
+              if is_open_pr "${pr_number}"; then
+                echo "Skipping open PR preview ${pr_number}"
+                continue
+              fi
+
+              echo "Deleting orphaned closed PR preview ${pr_number}"
+              delete_preview "${pr_number}"
+            done

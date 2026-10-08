@@ -21,6 +21,9 @@
 (security_headers) {
 	header {
 		-Server
+		# Lets the smoke check confirm the deployed frontend. API responses also carry the
+		# backend's X-TAPS-Backend-Image.
+		X-TAPS-Image "{$TAPS_IMAGE_REFERENCE:local}"
 		X-Frame-Options "SAMEORIGIN"
 		X-XSS-Protection "1;mode=block"
 		X-Content-Type-Options "nosniff"

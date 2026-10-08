@@ -14,7 +14,8 @@ export type AuthContextValue = {
   state: AuthState
   can: (capability: Capability) => boolean
   reloadSession: () => Promise<void>
-  login: (provider: LoginProvider) => Promise<void>
+  // destination is the local path to return to after the sign-in callback.
+  login: (provider: LoginProvider, destination?: string) => Promise<void>
   logout: () => Promise<void>
 }
 

@@ -1,0 +1,30 @@
+.taps-appraisal-table {
+  min-inline-size: 62rem;
+}
+
+.taps-licence-information {
+  border: 1px solid var(--cds-border-subtle-01);
+  border-radius: 4px;
+  padding: 1.5rem;
+  background: var(--taps-surface);
+}
+
+.taps-appraisal-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 1rem 2rem;
+  margin-block: 1.5rem;
+
+  dt {
+    font-weight: 600;
+  }
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+.taps-appraisal-mark-list {
+  padding-inline-start: 1.25rem;
+  margin-block: 1rem;
+}

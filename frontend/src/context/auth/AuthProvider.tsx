@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AuthContext, type AuthState, type LoginProvider } from '@/context/auth/AuthContext'
 import type { Capability } from '@/context/auth/capabilities'
+import { clearLoginDestination, setLoginDestination } from '@/context/auth/login-destination'
+import { SESSION_EXPIRED_EVENT } from '@/context/auth/session-expiry'
 import { clearLogin, logout as endSession, startLogin } from '@/service/oidc-service'
 import { fetchSession } from '@/service/session-service'
 
@@ -37,13 +39,26 @@ export default function AuthProvider({
     }
   }, [deferSessionLoad, reloadSession])
 
-  const login = useCallback(async (provider: LoginProvider) => {
+  useEffect(() => {
+    // The services have already cleared the stored login; drop access without another request.
+    const onSessionExpired = () => {
+      requestRef.current += 1
+      setState({ kind: 'signed-out' })
+      clearLoginDestination()
+    }
+    window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired)
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired)
+  }, [])
+
+  const login = useCallback(async (provider: LoginProvider, destination?: string) => {
     requestRef.current += 1
     setState({ kind: 'loading' })
     try {
+      setLoginDestination(destination)
       await startLogin(provider)
     } catch {
       setState({ kind: 'error', message: 'Unable to start sign in.' })
+      clearLoginDestination()
     }
   }, [])
 
@@ -51,6 +66,7 @@ export default function AuthProvider({
     // Invalidate pending session requests before logout.
     requestRef.current += 1
     setState({ kind: 'signed-out' })
+    clearLoginDestination()
     try {
       await endSession()
     } catch {

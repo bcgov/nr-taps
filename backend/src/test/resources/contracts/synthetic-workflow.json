@@ -1,0 +1,373 @@
+{
+  "synthetic": true,
+  "ecasSearch": {
+    "mode": "ALL_SUBMISSIONS",
+    "appraisalMethod": "I",
+    "ecasId": null,
+    "licence": "X99999",
+    "cuttingPermit": "001",
+    "timberMark": null,
+    "clientNumber": "99990001",
+    "clientLocationCode": null,
+    "orgUnitNumbers": [],
+    "appraisalCategoryCode": null,
+    "reappraisalReasonCode": null,
+    "statusCodes": [],
+    "statusDates": null,
+    "bctsFunded": null,
+    "certified": null,
+    "fileTypeCode": null,
+    "managementUnitType": null,
+    "managementUnitId": null,
+    "workedOnByUserId": null,
+    "dateTypes": ["EFFCTV"],
+    "dates": {"from": "2026-10-01", "to": null},
+    "sortBy": "ECAS_ID",
+    "sortDirection": "DESC"
+  },
+  "ecasInboxItem": {
+    "ecasId": "999900000001",
+    "appraisalMethod": "I",
+    "timberMark": "ZZ9999",
+    "licence": "X99999",
+    "cuttingPermit": "001",
+    "status": {"code": "DTR", "description": "Synthetic status label"},
+    "statusDate": "2026-10-01",
+    "appraisalTypeDescription": "Synthetic appraisal category",
+    "effectiveDate": "2026-10-01",
+    "expiryDate": null,
+    "licenseeSubmittedDate": null,
+    "districtReceivedDate": null,
+    "sentToRegionDate": null,
+    "multipleTimberMarks": false,
+    "clientNumber": "99990001",
+    "clientLocationCode": "00",
+    "clientName": "Synthetic Forest Client",
+    "revisionCount": 1
+  },
+  "ecasCoastReference": {
+    "header": {
+      "ecasId": "999900000002",
+      "appraisalMethod": "C",
+      "revisionCount": 2,
+      "licence": "X99998",
+      "cuttingPermit": "002",
+      "clientNumber": "99990001",
+      "clientLocationCode": "00",
+      "licenseeName": "Synthetic Forest Client",
+      "status": {"code": "DTR", "description": "Synthetic status label"},
+      "appraisalCategoryCode": null,
+      "reappraisalReasonCode": null,
+      "rateCalculationMethodCode": "MPS",
+      "effectiveDate": "2026-10-01",
+      "expiryDate": null,
+      "administrativeDistrict": null,
+      "geographicDistrict": null,
+      "fileType": null,
+      "timberSupplyArea": null,
+      "timberSupplyBlock": null
+    },
+    "primaryTimberMark": "ZZ9998",
+    "timberMarks": [
+      {"timberMark": "ZZ9998", "cruiseVolume": 123.45, "primary": true, "revisionCount": 3}
+    ],
+    "referenceMark": null,
+    "netCruiseVolume": 123.45,
+    "netMerchantableArea": 10.25,
+    "initialMerchantableArea": null,
+    "pointOfAppraisalDistance": null,
+    "majorCentreCode": null,
+    "majorCentreDistance": null
+  },
+  "ecasInteriorReference": {
+    "header": {
+      "ecasId": "999900000001",
+      "appraisalMethod": "I",
+      "revisionCount": 1,
+      "licence": "X99999",
+      "cuttingPermit": "001",
+      "clientNumber": "99990001",
+      "clientLocationCode": "00",
+      "licenseeName": "Synthetic Forest Client",
+      "status": {"code": "DTR", "description": "Synthetic status label"},
+      "appraisalCategoryCode": null,
+      "reappraisalReasonCode": null,
+      "rateCalculationMethodCode": "MPS",
+      "effectiveDate": "2026-10-01",
+      "expiryDate": null,
+      "administrativeDistrict": null,
+      "geographicDistrict": null,
+      "fileType": null,
+      "timberSupplyArea": null,
+      "timberSupplyBlock": null
+    },
+    "timberMark": "ZZ9999",
+    "timberMarkRevisionCount": 2,
+    "referenceMark": null,
+    "pointOfAppraisal": null,
+    "sellingPriceZoneCode": null,
+    "comparativeCruise": false,
+    "salvage": null
+  },
+  "gasSearch": {"licence": "X99999", "timberMark": "ZZ9999", "page": 0},
+  "gasSearchPage": {
+    "items": [
+      {
+        "key": {"type": "APPRAISED", "worksheetId": "999900000010"},
+        "licence": "X99999",
+        "timberMark": "ZZ9999",
+        "effectiveDate": "2026-10-01",
+        "expiryDate": null,
+        "status": {"code": "DTR", "description": "Synthetic status label"},
+        "referenceTypeCode": null
+      }
+    ],
+    "total": 1,
+    "page": 0
+  },
+  "gasAppraisedSummary": {
+    "key": {"type": "APPRAISED", "worksheetId": "999900000010"},
+    "ecasId": "999900000001",
+    "appraisalMethod": "I",
+    "variant": "INTERIOR_MPS",
+    "rateCalculationMethodCode": "MPS",
+    "toaEligible": null,
+    "status": {"code": "DTR", "description": "Synthetic status label"},
+    "effectiveDate": "2026-10-01",
+    "expiryDate": null,
+    "timberMarks": ["ZZ9999"],
+    "referenceTypeCode": null,
+    "ceaseAdjustmentDate": null,
+    "rates": [
+      {"rateId": "999900000020", "effectiveDate": "2026-10-01", "totalStumpageRate": "12.34"}
+    ]
+  },
+  "gasLicenceMarks": {
+    "licence": "X99998",
+    "timberMarks": [
+      "ZZ9998",
+      "ZZ9997",
+      "ZZ9996"
+    ]
+  },
+  "gasSearchResult": {
+    "appraisals": {
+      "items": [
+        {
+          "key": {
+            "type": "APPRAISED",
+            "worksheetId": "999900000011"
+          },
+          "licence": "X99998",
+          "timberMark": "ZZ9998",
+          "effectiveDate": "2026-10-01",
+          "expiryDate": null,
+          "status": {
+            "code": "DTR",
+            "description": "Synthetic status label"
+          },
+          "referenceTypeCode": null
+        },
+        {
+          "key": {
+            "type": "APPRAISED",
+            "worksheetId": "999900000011"
+          },
+          "licence": "X99998",
+          "timberMark": "ZZ9997",
+          "effectiveDate": "2026-10-01",
+          "expiryDate": null,
+          "status": {
+            "code": "DTR",
+            "description": "Synthetic status label"
+          },
+          "referenceTypeCode": null
+        }
+      ],
+      "total": 2,
+      "page": 0
+    },
+    "licenceInformation": {
+      "clientNumber": "99990001",
+      "licenseeName": "Synthetic Forest Client",
+      "licenceNumber": "X99998",
+      "cuttingPermit": "002,003",
+      "fileTypeCode": "SYN",
+      "timberMark": "ZZ9998",
+      "forestRegion": "Synthetic Coast Region",
+      "forestDistrict": "Synthetic Coast District",
+      "markExpiryDate": "2027-09-30",
+      "markExtendDate": null,
+      "ftaStatus": "Synthetic active licence"
+    }
+  },
+  "gasSearchResultWithoutAppraisals": {
+    "appraisals": {
+      "items": [],
+      "total": 0,
+      "page": 0
+    },
+    "licenceInformation": {
+      "clientNumber": "99990001",
+      "licenseeName": "Synthetic Forest Client",
+      "licenceNumber": "X99998",
+      "cuttingPermit": null,
+      "fileTypeCode": "SYN",
+      "timberMark": "ZZ9996",
+      "forestRegion": "Synthetic Coast Region",
+      "forestDistrict": "Synthetic Coast District",
+      "markExpiryDate": "2027-09-30",
+      "markExtendDate": null,
+      "ftaStatus": "Synthetic active licence"
+    }
+  },
+  "ecasInboxMultiMarkItems": [
+    {
+      "ecasId": "999900000002",
+      "appraisalMethod": "C",
+      "timberMark": "ZZ9998",
+      "licence": "X99998",
+      "cuttingPermit": "002",
+      "status": {
+        "code": "DTR",
+        "description": "Synthetic status label"
+      },
+      "statusDate": "2026-10-01",
+      "appraisalTypeDescription": "Synthetic appraisal category",
+      "effectiveDate": "2026-10-01",
+      "expiryDate": null,
+      "licenseeSubmittedDate": null,
+      "districtReceivedDate": null,
+      "sentToRegionDate": null,
+      "multipleTimberMarks": true,
+      "clientNumber": "99990001",
+      "clientLocationCode": "00",
+      "clientName": "Synthetic Forest Client",
+      "revisionCount": 2
+    },
+    {
+      "ecasId": "999900000002",
+      "appraisalMethod": "C",
+      "timberMark": "ZZ9997",
+      "licence": "X99998",
+      "cuttingPermit": "002",
+      "status": {
+        "code": "DTR",
+        "description": "Synthetic status label"
+      },
+      "statusDate": "2026-10-01",
+      "appraisalTypeDescription": "Synthetic appraisal category",
+      "effectiveDate": "2026-10-01",
+      "expiryDate": null,
+      "licenseeSubmittedDate": null,
+      "districtReceivedDate": null,
+      "sentToRegionDate": null,
+      "multipleTimberMarks": true,
+      "clientNumber": "99990001",
+      "clientLocationCode": "00",
+      "clientName": "Synthetic Forest Client",
+      "revisionCount": 2
+    },
+    {
+      "ecasId": "999900000002",
+      "appraisalMethod": "C",
+      "timberMark": "ZZ9998",
+      "licence": "X99998",
+      "cuttingPermit": "003",
+      "status": {
+        "code": "DTR",
+        "description": "Synthetic status label"
+      },
+      "statusDate": "2026-10-01",
+      "appraisalTypeDescription": "Synthetic appraisal category",
+      "effectiveDate": "2026-10-01",
+      "expiryDate": null,
+      "licenseeSubmittedDate": null,
+      "districtReceivedDate": null,
+      "sentToRegionDate": null,
+      "multipleTimberMarks": true,
+      "clientNumber": "99990001",
+      "clientLocationCode": "00",
+      "clientName": "Synthetic Forest Client",
+      "revisionCount": 2
+    }
+  ],
+  "ecasCoastMultiMarkReference": {
+    "header": {
+      "ecasId": "999900000002",
+      "appraisalMethod": "C",
+      "revisionCount": 2,
+      "licence": "X99998",
+      "cuttingPermit": "002",
+      "clientNumber": "99990001",
+      "clientLocationCode": "00",
+      "licenseeName": "Synthetic Forest Client",
+      "status": {
+        "code": "DTR",
+        "description": "Synthetic status label"
+      },
+      "appraisalCategoryCode": null,
+      "reappraisalReasonCode": null,
+      "rateCalculationMethodCode": "MPS",
+      "effectiveDate": "2026-10-01",
+      "expiryDate": null,
+      "administrativeDistrict": null,
+      "geographicDistrict": null,
+      "fileType": null,
+      "timberSupplyArea": null,
+      "timberSupplyBlock": null
+    },
+    "primaryTimberMark": "ZZ9998",
+    "timberMarks": [
+      {
+        "timberMark": "ZZ9998",
+        "cruiseVolume": 123.45,
+        "primary": true,
+        "revisionCount": 3
+      },
+      {
+        "timberMark": "ZZ9997",
+        "cruiseVolume": 67.89,
+        "primary": false,
+        "revisionCount": 4
+      }
+    ],
+    "referenceMark": null,
+    "netCruiseVolume": 191.34,
+    "netMerchantableArea": 10.25,
+    "initialMerchantableArea": null,
+    "pointOfAppraisalDistance": null,
+    "majorCentreCode": null,
+    "majorCentreDistance": null
+  },
+  "gasMultiMarkAppraisedSummary": {
+    "key": {
+      "type": "APPRAISED",
+      "worksheetId": "999900000011"
+    },
+    "ecasId": "999900000002",
+    "appraisalMethod": "C",
+    "variant": "COAST_MPS_TOA_N",
+    "rateCalculationMethodCode": "MPS",
+    "toaEligible": false,
+    "status": {
+      "code": "DTR",
+      "description": "Synthetic status label"
+    },
+    "effectiveDate": "2026-10-01",
+    "expiryDate": null,
+    "timberMarks": [
+      "ZZ9998",
+      "ZZ9997"
+    ],
+    "referenceTypeCode": null,
+    "ceaseAdjustmentDate": null,
+    "rates": [
+      {
+        "rateId": "999900000021",
+        "effectiveDate": "2026-10-01",
+        "totalStumpageRate": "12.30"
+      }
+    ]
+  }
+}
