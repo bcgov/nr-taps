@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import ca.bc.gov.nrs.taps.TapsApplication;
 import ca.bc.gov.nrs.taps.domain.DateRange;
+import ca.bc.gov.nrs.taps.read.CodeOption;
 import ca.bc.gov.nrs.taps.read.EcasInbox;
 import ca.bc.gov.nrs.taps.read.EcasReference;
 import ca.bc.gov.nrs.taps.read.EffectiveCode;
@@ -392,11 +393,19 @@ class OracleReadIT {
     assertThat(coast.header().administrativeDistrict().code()).isEqualTo("DCA");
     assertThat(coast.header().timberSupplyArea().code()).isEqualTo("12");
     assertThat(coast.header().fileType().code()).isEqualTo("A01");
+    assertThat(coast.header().coniferousStandRateEligibility())
+        .isEqualTo(new CodeOption("S", "Sawlog Grades"));
+    assertThat(coast.header().deciduousStandRateEligibility())
+        .isEqualTo(new CodeOption("N", "No Grades"));
     var interior = reader.interior(OMINECA, "1002").orElseThrow();
     assertThat(interior.sellingPriceZoneCode()).isEqualTo("2");
     assertThat(interior.comparativeCruise()).isFalse();
     assertThat(interior.salvage()).isNull();
     assertThat(interior.timberMarkRevisionCount()).isNull();
+    assertThat(interior.header().coniferousStandRateEligibility())
+        .isEqualTo(new CodeOption(null, null));
+    assertThat(interior.header().deciduousStandRateEligibility())
+        .isEqualTo(new CodeOption(null, null));
     assertThat(reader.coast(OMINECA, "1001")).isEmpty();
     assertThat(reader.interior(CARIBOO, "1002")).isEmpty();
     assertThat(reader.interior(ADMIN, "1001")).isEmpty();

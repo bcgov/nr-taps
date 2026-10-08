@@ -76,7 +76,7 @@ test('loads effective choices and sends date, status and sort filters without ti
   })
 })
 
-test('preserves all additional filters, explicit false and legacy user/location case', async () => {
+test('preserves additional filters and location case while normalizing the legacy user ID', async () => {
   await readApi.inbox(
     {
       ecasId: '',
@@ -110,7 +110,7 @@ test('preserves all additional filters, explicit false and legacy user/location 
     fileTypeCode: 'A01',
     managementUnitType: 'U',
     managementUnitId: '12',
-    workedOnByUserId: 'IDIR\\MixedCase',
+    workedOnByUserId: 'IDIR\\MIXEDCASE',
     bctsFunded: false,
     certified: false,
   })

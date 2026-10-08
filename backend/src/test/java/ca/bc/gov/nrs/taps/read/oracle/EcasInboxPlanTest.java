@@ -153,6 +153,32 @@ class EcasInboxPlanTest {
   }
 
   @Test
+  void workedOnUserIdIsNormalizedBeforeEveryBoundMatch() {
+    var filters = new Filters();
+    filters.worked = " idir\\SyntheticUser ";
+    var mixedCase = EcasInboxPlan.forUser(idir("TAPS_ADMIN"), filters.search(), 0);
+    filters.worked = "IDIR\\SYNTHETICUSER";
+    var upperCase = EcasInboxPlan.forUser(idir("TAPS_ADMIN"), filters.search(), 0);
+
+    assertThat(mixedCase.sql()).isEqualTo(upperCase.sql());
+    assertThat(mixedCase.parameters()).isEqualTo(upperCase.parameters())
+        .containsExactlyElementsOf(java.util.Collections.nCopies(5, "IDIR\\SYNTHETICUSER"));
+  }
+
+  @Test
+  void blankWorkedOnUserIdAddsNoActorFilterAndOverlongValueIsRejected() {
+    var filters = new Filters();
+    filters.worked = "   ";
+    var plan = EcasInboxPlan.forUser(idir("TAPS_ADMIN"), filters.search(), 0);
+    assertThat(plan.sql()).doesNotContain("ECAS_AUDIT_EVENT worked");
+    assertThat(plan.parameters()).isEmpty();
+
+    filters.worked = "IDIR\\" + "x".repeat(26);
+    assertThatThrownBy(filters::search).isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("workedOnByUserId exceeds 30 characters");
+  }
+
+  @Test
   void selectedDateTypesAreAnIntersectionWithInclusiveMidnightBounds() {
     var filters = new Filters();
     filters.dateTypes = List.of(EcasInbox.DateType.values());

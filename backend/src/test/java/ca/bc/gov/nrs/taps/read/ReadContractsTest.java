@@ -159,6 +159,33 @@ class ReadContractsTest {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"ecasCoastReference", "ecasInteriorReference"})
+  void standRateEligibilitySerializesCodesAndDescriptionsSeparately(String name) throws IOException {
+    EcasReference.Header header = mapper.treeToValue(fixture().get(name).get("header"),
+        EcasReference.Header.class);
+    assertThat(header.coniferousStandRateEligibility())
+        .isEqualTo(new CodeOption("S", "Sawlog Grades"));
+    assertThat(header.deciduousStandRateEligibility())
+        .isEqualTo(new CodeOption("N", "No Grades"));
+    ObjectNode json = mapper.valueToTree(header);
+    assertThat(json.get("coniferousStandRateEligibility").get("description").asText())
+        .isEqualTo("Sawlog Grades");
+    assertThat(json.get("deciduousStandRateEligibility").get("code").asText()).isEqualTo("N");
+  }
+
+  @Test
+  void referenceContractPreservesAbsentAndUnlabelledStandRateEligibility() throws IOException {
+    ObjectNode json = (ObjectNode) fixture().get("ecasInteriorReference").get("header");
+    json.putNull("coniferousStandRateEligibility");
+    json.set("deciduousStandRateEligibility", mapper.readTree("{\"code\":\"X\",\"description\":null}"));
+    EcasReference.Header header = mapper.treeToValue(json, EcasReference.Header.class);
+    assertThat(header.coniferousStandRateEligibility()).isNull();
+    assertThat(header.deciduousStandRateEligibility()).isEqualTo(new CodeOption("X", null));
+    JsonNode serialized = mapper.valueToTree(header);
+    assertThat(serialized).isEqualTo(json);
+  }
+
+  @ParameterizedTest
   @CsvSource({"0,APPRAISED", "1,NON_APPRAISED", "2,HISTORIC"})
   void worksheetTypesPreserveTheLegacyDiscriminator(int code, GasAppraisal.WorksheetType type) {
     assertThat(GasAppraisal.WorksheetType.fromLegacyCode(code)).isEqualTo(type);

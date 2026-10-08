@@ -110,7 +110,7 @@ assignment mapping is not implemented.
 | `timberMark` | Uppercased, max 6 |
 | `clientNumber`, `clientLocationCode` | Padded to 8 / 2 characters |
 | `managementUnitType`, `managementUnitId` | Letters/digits, uppercased, max 1 / 4 |
-| `workedOnByUserId` | Max 30 |
+| `workedOnByUserId` | Trimmed, uppercased, max 30 |
 | `bctsFunded`, `certified` | `null` means no filter |
 | `orgUnitNumbers`, `statusCodes` | Empty means no filter |
 | `sortBy`, `sortDirection` | Enums, default `ECAS_ID` `DESC` |
@@ -152,6 +152,10 @@ the legacy ECAS05 temporary-table DELETE/INSERT.
 with its own revision count), cruise volume, areas and major centre. `Interior` adds its single
 mark, mark revision count, point of appraisal, selling price zone, comparative cruise and salvage.
 These are read views, not the full editing forms.
+
+Both reference headers include stored Coniferous and Deciduous Stand Rate Eligibility as code and
+description pairs. Descriptions come from `STAND_RATE_ELIGIBILITY_CODE`; missing descriptions keep
+the stored code, and missing codes remain absent rather than applying new-form defaults.
 
 `OracleEcasReference.coast` and `.interior` use ADS ownership and `EcasReadPredicate`, which ties
 draft/scenario visibility to each FAM grant.

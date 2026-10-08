@@ -38,6 +38,8 @@ function HeaderDetails({ header }: { header: ReferenceHeader }) {
         ['Appraisal category', header.appraisalCategoryCode],
         ['Reappraisal reason', header.reappraisalReasonCode],
         ['Rate calculation method', header.rateCalculationMethodCode],
+        ['Coniferous stand rate eligibility', displayCode(header.coniferousStandRateEligibility)],
+        ['Deciduous stand rate eligibility', displayCode(header.deciduousStandRateEligibility)],
         ['Effective date', header.effectiveDate],
         ['Expiry date', header.expiryDate],
         ['Administrative district', displayCode(header.administrativeDistrict)],

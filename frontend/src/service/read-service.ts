@@ -119,7 +119,7 @@ export const readApi: ReadApi = {
         filters.managementUnitType === undefined ? undefined : value(filters.managementUnitType),
       managementUnitId:
         filters.managementUnitId === undefined ? undefined : value(filters.managementUnitId),
-      workedOnByUserId: filters.workedOnByUserId?.trim() || undefined,
+      workedOnByUserId: filters.workedOnByUserId?.trim().toUpperCase() || undefined,
       bctsFunded: filters.bctsFunded,
       certified: filters.certified,
       appraisalMethod: filters.appraisalMethod || undefined,

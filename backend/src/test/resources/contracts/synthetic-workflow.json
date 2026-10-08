@@ -65,7 +65,9 @@
       "geographicDistrict": null,
       "fileType": null,
       "timberSupplyArea": null,
-      "timberSupplyBlock": null
+      "timberSupplyBlock": null,
+      "coniferousStandRateEligibility": {"code": "S", "description": "Sawlog Grades"},
+      "deciduousStandRateEligibility": {"code": "N", "description": "No Grades"}
     },
     "primaryTimberMark": "ZZ9998",
     "timberMarks": [
@@ -99,7 +101,9 @@
       "geographicDistrict": null,
       "fileType": null,
       "timberSupplyArea": null,
-      "timberSupplyBlock": null
+      "timberSupplyBlock": null,
+      "coniferousStandRateEligibility": {"code": "S", "description": "Sawlog Grades"},
+      "deciduousStandRateEligibility": {"code": "N", "description": "No Grades"}
     },
     "timberMark": "ZZ9999",
     "timberMarkRevisionCount": 2,
@@ -315,7 +319,9 @@
       "geographicDistrict": null,
       "fileType": null,
       "timberSupplyArea": null,
-      "timberSupplyBlock": null
+      "timberSupplyBlock": null,
+      "coniferousStandRateEligibility": {"code": "S", "description": "Sawlog Grades"},
+      "deciduousStandRateEligibility": {"code": "N", "description": "No Grades"}
     },
     "primaryTimberMark": "ZZ9998",
     "timberMarks": [

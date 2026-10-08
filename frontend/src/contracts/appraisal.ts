@@ -36,6 +36,8 @@ export type ReferenceHeader = {
   appraisalCategoryCode: string | null
   reappraisalReasonCode: string | null
   rateCalculationMethodCode: string | null
+  coniferousStandRateEligibility: CodeOption | null
+  deciduousStandRateEligibility: CodeOption | null
   effectiveDate: string | null
   expiryDate: string | null
   administrativeDistrict: CodeOption | null
