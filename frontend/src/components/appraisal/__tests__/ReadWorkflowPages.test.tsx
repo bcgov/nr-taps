@@ -7,6 +7,7 @@ import { staffSession } from '@/test-utils'
 import { setViewportWidth } from '@/test-setup'
 import { syntheticReadApi } from '@/local-synthetic/synthetic-read-api'
 import { workflowFixture as fixture } from '@/local-synthetic/WorkflowPreview'
+import { nonAppraisedSample } from '@/local-synthetic/non-appraised-sample'
 import { ReadApiError } from '@/service/read-service'
 import type { EcasInboxPage } from '@/contracts/appraisal'
 import { EcasInboxReadPage, GasSearchReadPage } from '../ReadWorkflowPages'
@@ -173,6 +174,25 @@ test('preserves the licence chooser and FTA context when worksheets are empty', 
   await user.clear(screen.getByRole('textbox', { name: 'Licence' }))
   expect(screen.getByRole('textbox', { name: 'Timber mark' })).toHaveValue('')
   expect(screen.queryByRole('option', { name: 'ZZ9996' })).not.toBeInTheDocument()
+})
+
+test('opens the fictional non-appraised preview worksheet with labelled server rate totals', async () => {
+  const user = userEvent.setup()
+  mount(<GasSearchReadPage api={syntheticReadApi} />)
+  await user.type(screen.getByRole('textbox', { name: 'Licence' }), nonAppraisedSample.licence!)
+  await screen.findByRole('option', { name: nonAppraisedSample.timberMark! })
+  await user.click(screen.getByRole('button', { name: 'Search' }))
+  await user.click(
+    await screen.findByRole('button', {
+      name: `Open NON_APPRAISED worksheet ${nonAppraisedSample.key.worksheetId}, mark ${nonAppraisedSample.timberMark}`,
+    }),
+  )
+  const rates = within(await screen.findByRole('table', { name: 'Non-appraised rates' }))
+  expect(rates.getByRole('cell', { name: 'Logs' })).toBeInTheDocument()
+  expect(rates.getByRole('cell', { name: 'Ungraded' })).toBeInTheDocument()
+  expect(rates.getByRole('cell', { name: '14.70' })).toBeInTheDocument()
+  expect(rates.getByRole('cell', { name: 'UNKNOWN' })).toBeInTheDocument()
+  expect(screen.getByText('Synthetic forest zone')).toBeInTheDocument()
 })
 
 test('retains worksheet rows when the separate FTA request fails and retries only that request', async () => {

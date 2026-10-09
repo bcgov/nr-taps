@@ -7,11 +7,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import ca.bc.gov.nrs.taps.configuration.JsonConfiguration;
+import ca.bc.gov.nrs.taps.domain.AppraisalMethod;
+import ca.bc.gov.nrs.taps.read.CodeOption;
 import ca.bc.gov.nrs.taps.read.EcasInbox;
 import ca.bc.gov.nrs.taps.read.GasAppraisal;
 import ca.bc.gov.nrs.taps.read.oracle.*;
 import ca.bc.gov.nrs.taps.security.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -244,6 +247,35 @@ class ReadControllerTest {
         .andExpect(jsonPath("$.effectiveDate").value("2026-10-01"))
         .andExpect(jsonPath("$.rates[0].totalStumpageRate").isString())
         .andExpect(jsonPath("$.rates[0].totalStumpageRate").value("12.30"));
+  }
+
+  @Test
+  void nonAppraisedSummaryPublishesLabelsAndExactDisplayTotals() throws Exception {
+    signIn("TAPS_ADMIN", "azureidir");
+    var key = new GasAppraisal.Key(GasAppraisal.WorksheetType.NON_APPRAISED, "123");
+    var rate = new GasAppraisal.StoredNonAppraisedRate("456", new CodeOption("FI", "Synthetic fir"),
+        new CodeOption(" ", "Logs"), new CodeOption(" ", "Ungraded"),
+        new BigDecimal("999.99"), new BigDecimal("999.99"), new BigDecimal("999.99"), new BigDecimal("999.99"));
+    var summary = new GasAppraisal.NonAppraisedSummary(key, "A00001", "AA0001",
+        AppraisalMethod.C, null, null, null,
+        new CodeOption("NEW", "Synthetic new appraisal"), null, "1201",
+        new CodeOption("A", null), null, null, List.of(rate), List.of());
+    when(other.nonAppraised(any(), eq(key))).thenReturn(Optional.of(summary));
+    mvc.perform(get("/api/gas/worksheets/NON_APPRAISED/123").header("Authorization", "Bearer token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.referenceType.description").value("Synthetic new appraisal"))
+        .andExpect(jsonPath("$.appraisalForestZone.code").value("A"))
+        .andExpect(jsonPath("$.appraisalForestZone.description").isEmpty())
+        .andExpect(jsonPath("$.nonAppraisedRateType").isEmpty())
+        .andExpect(jsonPath("$.referenceTypeCode").doesNotExist())
+        .andExpect(jsonPath("$.rates[0].scaleSpecies.description").value("Synthetic fir"))
+        .andExpect(jsonPath("$.rates[0].scaleProduct.code").value(" "))
+        .andExpect(jsonPath("$.rates[0].scaleGrade.description").value("Ungraded"))
+        .andExpect(jsonPath("$.rates[0].reserveStumpageRate").value("999.99"))
+        .andExpect(jsonPath("$.rates[0].upsetStumpageRate").isString())
+        .andExpect(jsonPath("$.rates[0].upsetStumpageRate").value("2999.97"))
+        .andExpect(jsonPath("$.rates[0].totalStumpageRate").isString())
+        .andExpect(jsonPath("$.rates[0].totalStumpageRate").value("3999.96"));
   }
 
   private void signIn(String role, String provider) {

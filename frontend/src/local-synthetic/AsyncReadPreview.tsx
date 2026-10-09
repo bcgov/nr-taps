@@ -32,7 +32,8 @@ export default function AsyncReadPreview() {
       <div className="taps-actions taps-preview-intro">
         <p>
           Synthetic asynchronous read preview. Uses the production page components with test
-          fixtures; no database or sign-in requests.
+          fixtures; no database or sign-in requests. In GAS search, licence X99995 and timber mark
+          ZZ9995 open a fictional non-appraised worksheet with labels and rate totals.
         </p>
         <Button
           kind="tertiary"

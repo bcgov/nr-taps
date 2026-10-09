@@ -61,6 +61,9 @@ Reloading resets it.
   marks and permits for one submission. **View related GAS worksheets** follows the fixture link.
   In GAS search, licence `X99998` shows the mark chooser and mark `ZZ9996` shows FTA information
   with no worksheets.
+- **Synthetic asynchronous read pages:** GAS licence `X99995` and mark `ZZ9995` open a fictional
+  non-appraised summary with descriptive labels, nullable rate components and exact Upset Rate /
+  Total Rate values.
 
 The preview source lives in `src/local-synthetic/`, with `LocalSyntheticPreview.tsx` as its UI.
 `local-synthetic.html` is guarded by Vite's built-in `import.meta.env.DEV` flag, which enables local

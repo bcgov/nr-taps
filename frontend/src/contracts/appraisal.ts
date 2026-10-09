@@ -189,13 +189,15 @@ export type GasAppraisedSummary = {
 
 export type StoredNonAppraisedRate = {
   rateId: string
-  scaleSpeciesCode: string
-  scaleProductCode: string
-  scaleGradeCode: string
+  scaleSpecies: CodeOption
+  scaleProduct: CodeOption
+  scaleGrade: CodeOption
   reserveStumpageRate: string
   bonusBidAmount: string | null
   developmentLevy: string | null
   silvicultureLevy: string | null
+  upsetStumpageRate: string
+  totalStumpageRate: string
 }
 
 export type GasHistoricSummary = {
@@ -227,12 +229,12 @@ export type GasNonAppraisedSummary = {
   status: CodeOption | null
   effectiveDate: string | null
   expiryDate: string | null
-  referenceTypeCode: string | null
+  referenceType: CodeOption | null
   sdmDeclarationAcceptanceDate: string | null
   tsbNumberCode: string | null
-  appraisalForestZoneCode: string | null
-  nonAppraisedRateTypeCode: string | null
-  rateAdjustmentTypeCode: string | null
+  appraisalForestZone: CodeOption | null
+  nonAppraisedRateType: CodeOption | null
+  rateAdjustmentType: CodeOption | null
   rates: StoredNonAppraisedRate[]
   selectedRateAddons: SelectedRateAddon[]
 }

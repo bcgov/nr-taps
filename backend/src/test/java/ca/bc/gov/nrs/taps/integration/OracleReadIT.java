@@ -239,14 +239,78 @@ class OracleReadIT {
     assertThat(historic.adjustQuarterly()).isNull();
     assertThat(historic.rates().getFirst().totalStumpageRate()).isEqualByComparingTo("19.25");
     assertThat(historic.nonAppraisedRates().getFirst().developmentLevy()).isNull();
+    assertThat(historic.nonAppraisedRates().getFirst().scaleSpecies())
+        .isEqualTo(new CodeOption("HE", "Synthetic hemlock"));
+    assertThat(historic.nonAppraisedRates().getFirst().upsetStumpageRate()).isEqualByComparingTo("5.25");
+    assertThat(historic.nonAppraisedRates().getFirst().totalStumpageRate()).isEqualByComparingTo("6.75");
     var other = reader.nonAppraised(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301")).orElseThrow();
     assertThat(other.status().description()).isEqualTo("Stored non-appraised");
     assertThat(other.rates().getFirst().reserveStumpageRate()).isEqualByComparingTo("1.25");
     assertThat(other.rates().getFirst().bonusBidAmount()).isNull();
     assertThat(other.rates().getFirst().developmentLevy()).isEqualByComparingTo("0.00");
+    assertThat(other.referenceType()).isEqualTo(new CodeOption("NEW", "Synthetic reference"));
+    assertThat(other.appraisalForestZone()).isEqualTo(new CodeOption("A", "Synthetic forest zone"));
+    assertThat(other.nonAppraisedRateType()).isEqualTo(new CodeOption("S", "Synthetic rate type"));
+    assertThat(other.rateAdjustmentType()).isEqualTo(new CodeOption("A", "Synthetic adjustment"));
+    assertThat(other.rates().getFirst().scaleSpecies()).isEqualTo(new CodeOption("FI", "Synthetic fir"));
+    assertThat(other.rates().getFirst().scaleProduct()).isEqualTo(new CodeOption("01", "Synthetic product"));
+    assertThat(other.rates().getFirst().scaleGrade()).isEqualTo(new CodeOption("A", "Synthetic grade"));
+    assertThat(other.rates().getFirst().upsetStumpageRate()).isEqualByComparingTo("3.75");
+    assertThat(other.rates().getFirst().totalStumpageRate()).isEqualByComparingTo("3.75");
     assertThat(reader.historic(CARIBOO, key(GasAppraisal.WorksheetType.HISTORIC, "203"))).isEmpty();
     assertThat(reader.historic(OMINECA, key(GasAppraisal.WorksheetType.HISTORIC, "201"))).isEmpty();
     assertThat(reader.nonAppraised(OMINECA, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"))).isEmpty();
+  }
+
+  @Test
+  void worksheetLabelsRetainLiteralSpaceCodesAndRowsWithMissingOrInactiveDescriptions() {
+    var reader = new OracleOtherWorksheetSummary(jdbc);
+    var key = key(GasAppraisal.WorksheetType.NON_APPRAISED, "301");
+    jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RATE SET SCALE_PRODUCT_CODE = ' ', SCALE_GRADE_CODE = ' ' WHERE NON_APPRAISED_STUMPAGE_RATE_ID = 30001");
+    var summary = reader.nonAppraised(CARIBOO, key).orElseThrow();
+    assertThat(summary.rates()).hasSize(1);
+    assertThat(summary.rates().getFirst().scaleProduct()).isEqualTo(new CodeOption(" ", "Logs"));
+    assertThat(summary.rates().getFirst().scaleGrade()).isEqualTo(new CodeOption(" ", "Ungraded"));
+
+    jdbc.update("UPDATE WORKSHEET_REFERENCE_TYPE_CODE SET EFFECTIVE_DATE = SYSDATE + 1");
+    jdbc.update("UPDATE APPRAISAL_FOREST_ZONE_CODE SET EXPIRY_DATE = SYSDATE - 1");
+    jdbc.update("UPDATE NON_APPRAISED_RATE_TYPE_CODE SET EXPIRY_DATE = NULL");
+    jdbc.update("DELETE FROM RATE_ADJUSTMENT_TYPE_CODE WHERE RATE_ADJUSTMENT_TYPE_CODE = 'A'");
+    jdbc.update("DELETE FROM SCALE_SPECIES_CODE WHERE SCALE_SPECIES_CODE = 'FI'");
+    summary = reader.nonAppraised(CARIBOO, key).orElseThrow();
+    assertThat(summary.referenceType()).isEqualTo(new CodeOption("NEW", null));
+    assertThat(summary.appraisalForestZone()).isEqualTo(new CodeOption("A", null));
+    assertThat(summary.nonAppraisedRateType()).isEqualTo(new CodeOption("S", null));
+    assertThat(summary.rateAdjustmentType()).isEqualTo(new CodeOption("A", null));
+    assertThat(summary.rates()).hasSize(1);
+    assertThat(summary.rates().getFirst().scaleSpecies()).isEqualTo(new CodeOption("FI", null));
+    assertThat(summary.rates().getFirst().totalStumpageRate()).isEqualByComparingTo("3.75");
+    assertThat(reader.nonAppraised(OMINECA, key)).isEmpty();
+
+    jdbc.update("UPDATE NON_APPRAISED_WORKSHEET SET WORKSHEET_REFERENCE_TYPE_CODE = NULL, APPRAISAL_FOREST_ZONE_CODE = NULL, NON_APPRAISED_RATE_TYPE_CODE = NULL, RATE_ADJUSTMENT_TYPE_CODE = NULL WHERE NON_APPRAISED_WORKSHEET_ID = 301");
+    summary = reader.nonAppraised(CARIBOO, key).orElseThrow();
+    assertThat(summary.referenceType()).isNull();
+    assertThat(summary.appraisalForestZone()).isNull();
+    assertThat(summary.nonAppraisedRateType()).isNull();
+    assertThat(summary.rateAdjustmentType()).isNull();
+  }
+
+  @Test
+  void nonAppraisedTotalsKeepExactSumsBeyondTheComponentColumnRange() {
+    jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RATE SET RESERVE_STUMPAGE_RATE = 999.99, SILVICULTURE_LEVY = 999.99, DEVELOPMENT_LEVY = 999.99, BONUS_BID_AMOUNT = 999.99 WHERE NON_APPRAISED_STUMPAGE_RATE_ID = 30001");
+    var rate = new OracleOtherWorksheetSummary(jdbc)
+        .nonAppraised(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"))
+        .orElseThrow().rates().getFirst();
+    assertThat(rate.upsetStumpageRate().toPlainString()).isEqualTo("2999.97");
+    assertThat(rate.totalStumpageRate().toPlainString()).isEqualTo("3999.96");
+  }
+
+  @Test
+  void ambiguousRateLabelsFailRatherThanMultiplyingStoredRows() {
+    jdbc.update("INSERT INTO SCALE_GRADE_CODE VALUES ('A', 'Conflicting synthetic grade', DATE '2000-01-01', DATE '9999-12-31')");
+    assertThatThrownBy(() -> new OracleOtherWorksheetSummary(jdbc)
+        .nonAppraised(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301")))
+        .isInstanceOf(DataAccessException.class).rootCause().hasMessageContaining("ORA-01427");
   }
 
   @Test
@@ -603,6 +667,10 @@ class OracleReadIT {
           .andExpect(jsonPath("$.coastSpeciesGrades[1].scaleProductCode").value("02"));
       mvc.perform(get("/api/gas/worksheets/NON_APPRAISED/301").header("Authorization", "Bearer fixture-cariboo"))
           .andExpect(status().isOk()).andExpect(jsonPath("$.rates[0].reserveStumpageRate").value("1.25"))
+          .andExpect(jsonPath("$.referenceType.description").value("Synthetic reference"))
+          .andExpect(jsonPath("$.rates[0].scaleSpecies.description").value("Synthetic fir"))
+          .andExpect(jsonPath("$.rates[0].upsetStumpageRate").value("3.75"))
+          .andExpect(jsonPath("$.rates[0].totalStumpageRate").value("3.75"))
           .andExpect(jsonPath("$.selectedRateAddons[0].code").value("EXPIRED"));
       mvc.perform(get("/api/gas/licences/A00001/marks").header("Authorization", "Bearer fixture-cariboo"))
           .andExpect(status().isOk()).andExpect(jsonPath("$.timberMarks.length()").value(2));

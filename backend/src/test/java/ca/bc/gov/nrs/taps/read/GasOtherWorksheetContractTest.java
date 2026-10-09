@@ -4,18 +4,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ca.bc.gov.nrs.taps.domain.AppraisalMethod;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 
 class GasOtherWorksheetContractTest {
   @Test
-  void rawRateComponentsSerializeAsExactDecimalStringsAndNullsWithoutInventedTotal() throws Exception {
-    var rate = new GasAppraisal.StoredNonAppraisedRate("00042", "F", "01", "A",
+  void labelsAndRawComponentsSerializeWithExactDerivedDecimalStrings() throws Exception {
+    var rate = new GasAppraisal.StoredNonAppraisedRate("00042", new CodeOption("F", "Synthetic fir"),
+        new CodeOption(" ", "Logs"), new CodeOption(" ", "Ungraded"),
         new BigDecimal("123.40"), null, BigDecimal.ZERO, new BigDecimal("-1.2"));
     var json = Jackson2ObjectMapperBuilder.json().build().valueToTree(rate);
 
@@ -25,16 +28,77 @@ class GasOtherWorksheetContractTest {
     assertThat(json.get("bonusBidAmount").isNull()).isTrue();
     assertThat(json.get("developmentLevy").asText()).isEqualTo("0.00");
     assertThat(json.get("silvicultureLevy").asText()).isEqualTo("-1.20");
-    assertThat(json.has("totalStumpageRate")).isFalse();
+    assertThat(json.get("scaleSpecies").get("description").asText()).isEqualTo("Synthetic fir");
+    assertThat(json.get("scaleProduct").get("code").asText()).isEqualTo(" ");
+    assertThat(json.get("scaleGrade").get("code").asText()).isEqualTo(" ");
+    assertThat(json.get("upsetStumpageRate").isTextual()).isTrue();
+    assertThat(json.get("upsetStumpageRate").asText()).isEqualTo("122.20");
+    assertThat(json.get("totalStumpageRate").isTextual()).isTrue();
+    assertThat(json.get("totalStumpageRate").asText()).isEqualTo("122.20");
+    assertThat(json.has("scaleSpeciesCode")).isFalse();
+    assertThat(json.has("scaleProductCode")).isFalse();
+    assertThat(json.has("scaleGradeCode")).isFalse();
+  }
+
+  @ParameterizedTest
+  @CsvSource(nullValues = "NULL", value = {
+      "0,NULL,NULL,NULL,0.00,0.00",
+      "1.25,0,0,0,1.25,1.25",
+      "1.10,2.20,3.30,4.40,8.80,11.00",
+      "5.10,NULL,0,-1.20,3.90,3.90",
+      "0,50.25,NULL,NULL,0.00,50.25",
+      "999.99,999.99,999.99,999.99,2999.97,3999.96",
+      "-999.99,-999.99,-999.99,-999.99,-2999.97,-3999.96"
+  })
+  void totalsAddOnlyStoredNonNullComponentsWithoutExtraRoundingOrCap(BigDecimal reserve,
+      BigDecimal bonus, BigDecimal development, BigDecimal silviculture, String upset, String total) {
+    var rate = new GasAppraisal.StoredNonAppraisedRate("42", new CodeOption("F", null),
+        new CodeOption("01", null), new CodeOption("A", null), reserve, bonus, development, silviculture);
+    assertThat(rate.upsetStumpageRate()).isEqualTo(new BigDecimal(upset));
+    assertThat(rate.totalStumpageRate()).isEqualTo(new BigDecimal(total));
+    assertThat(rate.bonusBidAmount() == null).isEqualTo(bonus == null);
+    assertThat(rate.developmentLevy() == null).isEqualTo(development == null);
+    assertThat(rate.silvicultureLevy() == null).isEqualTo(silviculture == null);
+  }
+
+  @Test
+  void suppliedDisplayTotalsCannotOverrideTheStoredComponents() throws Exception {
+    var mapper = Jackson2ObjectMapperBuilder.json().build();
+    var rate = mapper.readValue("""
+        {"rateId":"42","scaleSpecies":{"code":"F","description":null},
+         "scaleProduct":{"code":" ","description":"Logs"},
+         "scaleGrade":{"code":" ","description":"Ungraded"},
+         "reserveStumpageRate":"1.20","bonusBidAmount":"0.03",
+         "developmentLevy":null,"silvicultureLevy":null,
+         "upsetStumpageRate":"9000.00","totalStumpageRate":"9001.00"}
+        """, GasAppraisal.StoredNonAppraisedRate.class);
+    assertThat(rate.upsetStumpageRate()).isEqualTo(new BigDecimal("1.20"));
+    assertThat(rate.totalStumpageRate()).isEqualTo(new BigDecimal("1.23"));
+    JsonNode json = mapper.valueToTree(rate);
+    assertThat(mapper.treeToValue(json, GasAppraisal.StoredNonAppraisedRate.class)).isEqualTo(rate);
+    assertThat(json.get("upsetStumpageRate").asText()).isEqualTo("1.20");
+    assertThat(json.get("totalStumpageRate").asText()).isEqualTo("1.23");
   }
 
   @ParameterizedTest
   @ValueSource(strings = {"1.234", "1000.00", "-1000.00"})
   void storedRateComponentsDoNotRoundOrExceedSchemaPrecision(String invalid) {
-    assertThatThrownBy(() -> new GasAppraisal.StoredNonAppraisedRate("42", "F", "01", "A",
+    assertThatThrownBy(() -> new GasAppraisal.StoredNonAppraisedRate("42", new CodeOption("F", null),
+        new CodeOption("01", null), new CodeOption("A", null),
         new BigDecimal(invalid), null, null, null)).isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new GasAppraisal.StoredNonAppraisedRate("42", "F", "01", "A",
+    assertThatThrownBy(() -> new GasAppraisal.StoredNonAppraisedRate("42", new CodeOption("F", null),
+        new CodeOption("01", null), new CodeOption("A", null),
         BigDecimal.ZERO, new BigDecimal(invalid), null, null)).isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void reserveAndSelectedScaleCodesRemainRequired() {
+    assertThatThrownBy(() -> new GasAppraisal.StoredNonAppraisedRate("42", new CodeOption("F", null),
+        new CodeOption(" ", null), new CodeOption(" ", null), null, null, null, null))
+        .isInstanceOf(NullPointerException.class).hasMessage("reserveStumpageRate");
+    assertThatThrownBy(() -> new GasAppraisal.StoredNonAppraisedRate("42", new CodeOption(null, null),
+        new CodeOption(" ", null), new CodeOption(" ", null), BigDecimal.ZERO, null, null, null))
+        .isInstanceOf(NullPointerException.class).hasMessage("scaleSpecies.code");
   }
 
   @Test
@@ -54,7 +118,8 @@ class GasOtherWorksheetContractTest {
   @Test
   void nonAppraisedSummaryCopiesRatesAndRequiresItsFamily() {
     var key = new GasAppraisal.Key(GasAppraisal.WorksheetType.NON_APPRAISED, "42");
-    var rate = new GasAppraisal.StoredNonAppraisedRate("1", "F", "01", "A", BigDecimal.ZERO, null, null, null);
+    var rate = new GasAppraisal.StoredNonAppraisedRate("1", new CodeOption("F", null),
+        new CodeOption("01", null), new CodeOption("A", null), BigDecimal.ZERO, null, null, null);
     var rates = new ArrayList<>(List.of(rate));
     var summary = new GasAppraisal.NonAppraisedSummary(key, null, "ABC123", AppraisalMethod.I,
         null, null, null, null, null, null, null, null, null, rates, List.of());

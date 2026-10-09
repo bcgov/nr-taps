@@ -83,7 +83,7 @@ From the SQL in [`read/oracle`](src/main/java/ca/bc/gov/nrs/taps/read/oracle). N
 unqualified, so the database team needs to confirm the owner and synonym of each object for the
 proxy account. Don't assume one owner because the test fixture has one.
 
-`SELECT` on these 48 objects:
+`SELECT` on these 54 objects:
 
 | Objects | Used for |
 | --- | --- |
@@ -105,6 +105,8 @@ proxy account. Don't assume one owner because the test fixture has one.
 | `INT_POINT_OF_APPRAISAL_CODE`, `POINT_OF_APPRAISAL` | Interior appraisal point and selling zone |
 | `TSA_NUMBER_CODE`, `TSB_NUMBER_CODE` | Management-unit labels |
 | `APPRAISAL_METHOD_CODE`, `RATE_ADJUSTMENT_TYPE_CODE` | GAS lookups |
+| `WORKSHEET_REFERENCE_TYPE_CODE`, `APPRAISAL_FOREST_ZONE_CODE`, `NON_APPRAISED_RATE_TYPE_CODE` | Non-appraised worksheet labels |
+| `SCALE_SPECIES_CODE`, `SCALE_PRODUCT_CODE`, `SCALE_GRADE_CODE` | Stored rate labels |
 | `NON_APPRAISED_WS_RATE_ADDON`, `NON_APPRAISED_RATE_ADDON_CODE` | Selected add-ons |
 | `HISTORIC_SPECIES`, `HISTORIC_COAST_SPECIES_GRADE` | Historic species and Coast grades |
 

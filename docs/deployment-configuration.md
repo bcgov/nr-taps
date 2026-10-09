@@ -176,6 +176,7 @@ Set `TAPS_ORACLE_ENABLED=true` and deploy. The workflow starts the backend with 
 | Coast/Interior references | Revision counts, marks, FTAS defaults, location labels, nulls, ambiguous-context errors. |
 | GAS search | All three families, status exclusions, client/organization paths, all marks; verify whether family, worksheet ID and mark form a unique paging key. |
 | Appraised summary | ADS ownership, ADS/ADSC differences, rate order and precision, linked ECAS. |
+| Non-appraised summary | Classification and species/product/grade labels, space codes, expired code rules, nullable components and exact Upset Rate / Total Rate values. |
 | Historic summary | Stored ASR/NASR rows, species inputs, nullable fields, Coast species/grade; no new rates derived. |
 | Non-appraised summary | NASR components, add-ons, expired selections; no recalculation. |
 | Licence/FTA | Chooser, permit contexts, multi-permit totals, FTA shown even with no worksheets. |

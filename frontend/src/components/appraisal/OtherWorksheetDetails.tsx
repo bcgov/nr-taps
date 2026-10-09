@@ -48,19 +48,20 @@ function StoredDetailsTable({
 
 function RateComponents({ rates }: { rates: StoredNonAppraisedRate[] }) {
   return (
-    <TableFrame ariaLabel="Stored rate components">
-      <Table useZebraStyles size="md" aria-label="Stored rate components">
+    <TableFrame ariaLabel="Non-appraised rates">
+      <Table useZebraStyles size="md" aria-label="Non-appraised rates">
         <TableHead>
           <TableRow>
             {[
-              'Rate ID',
               'Species',
               'Product',
               'Grade',
-              'Reserve',
-              'Bonus',
-              'Development levy',
+              'Reserve rate',
               'Silviculture levy',
+              'Development levy',
+              'Upset rate',
+              'Bonus bid',
+              'Total rate',
             ].map((label) => (
               <TableHeader key={label}>{label}</TableHeader>
             ))}
@@ -70,26 +71,28 @@ function RateComponents({ rates }: { rates: StoredNonAppraisedRate[] }) {
           {rates.map((rate) => (
             <TableRow key={rate.rateId}>
               {[
-                rate.rateId,
-                rate.scaleSpeciesCode,
-                rate.scaleProductCode,
-                rate.scaleGradeCode,
+                displayCode(rate.scaleSpecies),
+                displayCode(rate.scaleProduct),
+                displayCode(rate.scaleGrade),
                 rate.reserveStumpageRate,
-                rate.bonusBidAmount,
-                rate.developmentLevy,
                 rate.silvicultureLevy,
+                rate.developmentLevy,
+                rate.upsetStumpageRate,
+                rate.bonusBidAmount,
+                rate.totalStumpageRate,
               ].map((value, index) => (
                 <TableCell
                   key={
                     [
-                      'id',
                       'species',
                       'product',
                       'grade',
                       'reserve',
-                      'bonus',
-                      'development',
                       'silviculture',
+                      'development',
+                      'upset',
+                      'bonus',
+                      'total',
                     ][index]
                   }
                 >
@@ -181,7 +184,7 @@ export default function OtherWorksheetDetails({ summary }: { summary: GasWorkshe
               </TableBody>
             </Table>
           </TableFrame>
-          <h3>Non-appraised rate components</h3>
+          <h3>Non-appraised rates</h3>
           <RateComponents rates={summary.nonAppraisedRates} />
           <StoredDetailsTable
             title="Historic species"
@@ -226,11 +229,11 @@ export default function OtherWorksheetDetails({ summary }: { summary: GasWorkshe
           <dl className="taps-field-grid">
             {(
               [
-                ['Reference type', summary.referenceTypeCode],
+                ['Reference type', displayCode(summary.referenceType)],
                 ['TSB', summary.tsbNumberCode],
-                ['Forest zone', summary.appraisalForestZoneCode],
-                ['Rate type', summary.nonAppraisedRateTypeCode],
-                ['Adjustment type', summary.rateAdjustmentTypeCode],
+                ['Forest zone', displayCode(summary.appraisalForestZone)],
+                ['Rate type', displayCode(summary.nonAppraisedRateType)],
+                ['Adjustment type', displayCode(summary.rateAdjustmentType)],
                 ['SDM acceptance date', summary.sdmDeclarationAcceptanceDate],
               ] as const
             ).map(([label, value]) => (
@@ -240,7 +243,7 @@ export default function OtherWorksheetDetails({ summary }: { summary: GasWorkshe
               </div>
             ))}
           </dl>
-          <h3>Stored rate components</h3>
+          <h3>Non-appraised rates</h3>
           <RateComponents rates={summary.rates} />
           <StoredDetailsTable
             title="Selected rate add-ons"

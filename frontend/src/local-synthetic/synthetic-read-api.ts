@@ -1,9 +1,15 @@
 import { ReadApiError, type ReadApi } from '@/service/read-service'
 import { workflowFixture as fixture } from './WorkflowPreview'
+import { nonAppraisedSample, nonAppraisedSampleItem } from './non-appraised-sample'
 
 const inbox = [...fixture.ecasInboxMultiMarkItems, fixture.ecasInboxItem]
-const worksheets = [...fixture.gasSearchResult.appraisals.items, ...fixture.gasSearchPage.items]
-const summaries = [fixture.gasMultiMarkAppraisedSummary, fixture.gasAppraisedSummary]
+const worksheets = [
+  ...fixture.gasSearchResult.appraisals.items,
+  ...fixture.gasSearchPage.items,
+  nonAppraisedSampleItem,
+]
+const appraisedSummaries = [fixture.gasMultiMarkAppraisedSummary, fixture.gasAppraisedSummary]
+const summaries = [...appraisedSummaries, nonAppraisedSample]
 const normalized = (value: string) => value.trim().toUpperCase()
 async function delayed<T>(signal: AbortSignal, value: T): Promise<T> {
   await new Promise<void>((resolve) => setTimeout(resolve, 200))
@@ -52,7 +58,7 @@ export const syntheticReadApi: ReadApi = {
     return delayed(signal, reference)
   },
   relatedSummary: async (id, signal) => {
-    const summary = summaries.find((entry) => entry.ecasId === id)
+    const summary = appraisedSummaries.find((entry) => entry.ecasId === id)
     if (!summary) throw new ReadApiError(404)
     return delayed(signal, summary)
   },
@@ -72,9 +78,11 @@ export const syntheticReadApi: ReadApi = {
   marks: async (licence, signal) =>
     delayed(
       signal,
-      licence === fixture.gasLicenceMarks.licence
-        ? fixture.gasLicenceMarks
-        : { licence, timberMarks: [] },
+      licence === nonAppraisedSample.licence
+        ? { licence, timberMarks: [nonAppraisedSample.timberMark!] }
+        : licence === fixture.gasLicenceMarks.licence
+          ? fixture.gasLicenceMarks
+          : { licence, timberMarks: [] },
     ),
   licenceInformation: async (licence, mark, signal) =>
     delayed(

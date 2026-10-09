@@ -58,7 +58,9 @@ Java records below and matching types in `frontend/src/contracts` define the fie
 - Stored amounts are exact two-decimal strings such as `"12.30"`: `NUMBER(6,2)` for `StoredRate`
   and ASR, `NUMBER(5,2)` for NASR components. Overflow or rounding is rejected. Reference
   quantities are `BigDecimal` JSON numbers.
-- No totals, breakdowns, policy costs or action flags are calculated.
+- Non-appraised Upset Rate and Total Rate are exact decimal sums of stored components, returned
+  as two-decimal strings. Their sums are not limited to an individual component column's range.
+  Policy costs, pricing breakdowns and action flags are not calculated.
 
 ## Record scope
 
@@ -307,7 +309,24 @@ relationships fail.
 **`OracleOtherWorksheetSummary`** (`historic`, `nonAppraised`) needs the exact family key. ASR/NASR
 children must match the family foreign key. It returns stored headers, rates, historic species,
 Coast grades and selected add-ons. Add-ons keep the legacy `code - description` label and expired
-selections. Available add-ons, costs and eligibility aren't included; nothing is calculated.
+selections. Available add-ons, costs and eligibility aren't included.
+
+Non-appraised worksheet classifications and rate species/product/grade return `CodeOption` values.
+Missing descriptions retain the original code; a missing classification remains `null`. Literal
+space product/grade codes are preserved. Species/product/grade descriptions use the stored code
+without an expiry filter; classification descriptions require
+`SYSDATE BETWEEN EFFECTIVE_DATE AND EXPIRY_DATE`. Grade labels use the grade code alone. Rates
+remain ordered by species/product/grade codes and rate ID, independently of their labels.
+
+For non-appraised rates, including historic worksheet components:
+
+- Upset Rate is reserve plus silviculture levy plus development levy.
+- Total Rate is Upset Rate plus bonus bid.
+- Reserve is required. Optional null components add zero to these totals but remain null in the
+  response so the UI distinguishes missing values from a stored zero.
+
+These are display calculations using exact decimal addition. Reading a summary does not persist
+rates, call pricing procedures, refresh a worksheet or run legacy model constructors.
 
 ## Licence marks and FTA information
 
