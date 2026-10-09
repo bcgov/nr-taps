@@ -14,6 +14,7 @@ import ca.bc.gov.nrs.taps.read.GasAppraisal;
 import ca.bc.gov.nrs.taps.read.oracle.*;
 import ca.bc.gov.nrs.taps.security.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -244,9 +245,44 @@ class ReadControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.ecasId").value(summary.ecasId()))
         .andExpect(jsonPath("$.timberMarks.length()").value(2))
+        .andExpect(jsonPath("$.primaryTimberMark").value("ZZ9998"))
         .andExpect(jsonPath("$.effectiveDate").value("2026-10-01"))
         .andExpect(jsonPath("$.rates[0].totalStumpageRate").isString())
         .andExpect(jsonPath("$.rates[0].totalStumpageRate").value("12.30"));
+  }
+
+  @Test
+  void ftaMetadataWireContractKeepsLicenceAndMarkStatusSeparate() throws Exception {
+    signIn("TAPS_ADMIN", "azureidir");
+    var fixture = mapper.readTree(getClass().getResourceAsStream("/contracts/synthetic-workflow.json"));
+    var context = mapper.treeToValue(fixture.get("gasSearchResult").get("licenceInformation"),
+        GasAppraisal.FtaLicenceInformation.class);
+    when(information.find(any(), isNull(), eq("ZZ9998"))).thenReturn(Optional.of(context));
+    mvc.perform(get("/api/gas/licence-information?timberMark=ZZ9998").header("Authorization", "Bearer token"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.ftaStatus").value("Synthetic active licence"))
+        .andExpect(jsonPath("$.markStatus.code").value("I"))
+        .andExpect(jsonPath("$.markStatus.description").value("Synthetic issued mark"))
+        .andExpect(jsonPath("$.cruiseBased").isBoolean())
+        .andExpect(jsonPath("$.cruiseBased").value(true));
+  }
+
+  @Test
+  void absentPrimaryAndUnknownCruiseMetadataRemainJsonNull() throws Exception {
+    signIn("TAPS_ADMIN", "azureidir");
+    var fixture = mapper.readTree(getClass().getResourceAsStream("/contracts/synthetic-workflow.json"));
+    ((ObjectNode) fixture.get("gasMultiMarkAppraisedSummary"))
+        .putNull("primaryTimberMark");
+    var summary = mapper.treeToValue(fixture.get("gasMultiMarkAppraisedSummary"), GasAppraisal.AppraisedSummary.class);
+    when(appraised.byTypedKey(any(), eq(summary.key()))).thenReturn(Optional.of(summary));
+    mvc.perform(get("/api/gas/worksheets/APPRAISED/" + summary.key().worksheetId()).header("Authorization", "Bearer token"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.timberMarks.length()").value(2))
+        .andExpect(jsonPath("$.primaryTimberMark").isEmpty());
+    var context = mapper.treeToValue(fixture.get("gasSearchResultWithoutAppraisals").get("licenceInformation"),
+        GasAppraisal.FtaLicenceInformation.class);
+    when(information.find(any(), isNull(), eq("ZZ9996"))).thenReturn(Optional.of(context));
+    mvc.perform(get("/api/gas/licence-information?timberMark=ZZ9996").header("Authorization", "Bearer token"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.cruiseBased").isEmpty());
   }
 
   @Test

@@ -13,6 +13,9 @@ import WorkflowPreview, { workflowFixture as fixture } from '@/local-synthetic/W
 import { EcasInboxResults, GasSearchResults } from '../AppraisalResults'
 import GasSearchFilters, { type GasFilters } from '../GasSearchFilters'
 
+const { reloadSession } = vi.hoisted(() => ({ reloadSession: vi.fn(async () => {}) }))
+vi.mock('@/context/auth/AuthContext', () => ({ useAuth: () => ({ reloadSession }) }))
+
 test('retains ECAS marks and permits sharing the same submission and opens the selected row', async () => {
   const user = userEvent.setup()
   const onOpen = vi.fn()

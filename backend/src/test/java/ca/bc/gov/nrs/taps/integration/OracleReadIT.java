@@ -215,6 +215,7 @@ class OracleReadIT {
     var summary = reader.byTypedKey(CARIBOO, key(GasAppraisal.WorksheetType.APPRAISED, "101")).orElseThrow();
     assertThat(summary).isEqualTo(reader.byEcasId(CARIBOO, "1001").orElseThrow());
     assertThat(summary.timberMarks()).containsExactly("AA0001", "AA0002");
+    assertThat(summary.primaryTimberMark()).isEqualTo("AA0001");
     assertThat(summary.rates()).extracting(GasAppraisal.StoredRate::rateId).containsExactly("10001", "10002");
     assertThat(summary.rates().getFirst().totalStumpageRate()).isEqualByComparingTo("12.30");
     assertThat(summary.rates().getLast().totalStumpageRate()).isEqualByComparingTo("0.00");
@@ -224,6 +225,23 @@ class OracleReadIT {
     assertThat(reader.byEcasId(OMINECA, "1001")).isEmpty();
     assertThat(reader.byTypedKey(OMINECA, key(GasAppraisal.WorksheetType.APPRAISED, "101"))).isEmpty();
     assertThat(reader.byEcasId(idir(), "1001")).isEmpty();
+  }
+
+  @Test
+  void appraisedSummaryUsesTheFlaggedPrimaryMarkWithoutFallingBackToListOrder() {
+    var reader = new OracleAppraisedSummary(jdbc);
+    var key = key(GasAppraisal.WorksheetType.APPRAISED, "101");
+    jdbc.update("UPDATE ADS_SUBMITTED_TIMBER_MARK SET PRIMARY_MARK_IND = CASE WHEN TIMBER_MARK = 'AA0002' THEN 'Y' ELSE 'N' END WHERE ECAS_ID = 1001");
+    var summary = reader.byTypedKey(CARIBOO, key).orElseThrow();
+    assertThat(summary.timberMarks()).containsExactly("AA0001", "AA0002");
+    assertThat(summary.primaryTimberMark()).isEqualTo("AA0002");
+    assertThat(reader.byEcasId(CARIBOO, "1001")).contains(summary);
+    jdbc.update("UPDATE ADS_SUBMITTED_TIMBER_MARK SET PRIMARY_MARK_IND = 'N' WHERE ECAS_ID = 1001");
+    assertThat(reader.byTypedKey(CARIBOO, key).orElseThrow().primaryTimberMark()).isNull();
+    jdbc.update("UPDATE ADS_SUBMITTED_TIMBER_MARK SET PRIMARY_MARK_IND = 'Y' WHERE ECAS_ID = 1001");
+    assertThatThrownBy(() -> reader.byTypedKey(CARIBOO, key))
+        .isInstanceOf(DataAccessException.class).rootCause().hasMessageContaining("ORA-01427");
+    assertThat(reader.byTypedKey(OMINECA, key)).isEmpty();
   }
 
   @Test
@@ -443,19 +461,70 @@ class OracleReadIT {
     assertThat(permit.licenseeName()).isEqualTo("Synthetic current owner");
     assertThat(permit.markExpiryDate()).isEqualTo(LocalDate.of(2030, 12, 31));
     assertThat(permit.markExtendDate()).isNull();
+    assertThat(permit.ftaStatus()).isEqualTo("Active");
+    assertThat(permit.markStatus()).isEqualTo(new CodeOption("A", "Synthetic permit issued"));
+    assertThat(permit.cruiseBased()).isNull();
     var privateMark = fta.find(CARIBOO, "A00003", "PM0001").orElseThrow();
     assertThat(privateMark.markExpiryDate()).isNull();
     assertThat(privateMark.cuttingPermit()).isNull();
-    assertThat(fta.find(CARIBOO, null, "RM0001").orElseThrow().forestDistrict()).isEqualTo("Synthetic district A");
+    assertThat(privateMark.markStatus()).isEqualTo(new CodeOption("A", "Synthetic private status"));
+    assertThat(privateMark.cruiseBased()).isNull();
+    var road = fta.find(CARIBOO, null, "RM0001").orElseThrow();
+    assertThat(road.forestDistrict()).isEqualTo("Synthetic district A");
+    assertThat(road.markStatus()).isEqualTo(new CodeOption("A", "Active"));
+    assertThat(road.cruiseBased()).isNull();
     assertThat(new OracleGasSearch(jdbc).search(CARIBOO, gas("A00003", "PM0001", 0)).total()).isZero();
     assertThat(fta.find(OMINECA, "A00001", "AA0001")).isEmpty();
   }
 
   @Test
-  void permitAggregationCannotExposeSiblingPermitsOutsideTheGrantedDistrict() {
-    jdbc.update("INSERT INTO HARVESTING_AUTHORITY VALUES (103, 'A00001', '004', 10, 10, 'A', DATE '2030-12-31', NULL, '12', 'U')");
+  void ftaCruiseContextDistinguishesYesNoAndUnspecifiedWithoutChangingLicenceStatus() {
+    var reader = new OracleFtaLicenceInformation(jdbc);
+    for (String yes : List.of("Y", "y")) {
+      jdbc.update("UPDATE HARVESTING_AUTHORITY SET CRUISE_BASED_IND = ? WHERE HVA_SKEY = 101", yes);
+      assertThat(reader.find(CARIBOO, null, "AA0001").orElseThrow().cruiseBased()).isTrue();
+    }
+    for (String no : List.of("N", "n")) {
+      jdbc.update("UPDATE HARVESTING_AUTHORITY SET CRUISE_BASED_IND = ? WHERE HVA_SKEY = 101", no);
+      assertThat(reader.find(CARIBOO, null, "AA0001").orElseThrow().cruiseBased()).isFalse();
+    }
+    jdbc.update("UPDATE HARVESTING_AUTHORITY SET CRUISE_BASED_IND = NULL WHERE HVA_SKEY = 101");
+    assertThat(reader.find(CARIBOO, null, "AA0001").orElseThrow().cruiseBased()).isNull();
+    jdbc.update("UPDATE HARVESTING_AUTHORITY SET CRUISE_BASED_IND = 'X' WHERE HVA_SKEY = 101");
+    var unknown = reader.find(CARIBOO, null, "AA0001").orElseThrow();
+    assertThat(unknown.cruiseBased()).isNull();
+    assertThat(unknown.ftaStatus()).isEqualTo("Active");
+    assertThat(unknown.markStatus().description()).isEqualTo("Synthetic permit issued");
+  }
+
+  @Test
+  void ftaContextRejectsConflictingPermitStatusOrCruiseWithinTheGrantedScope() {
+    var reader = new OracleFtaLicenceInformation(jdbc);
+    jdbc.update("INSERT INTO HARVESTING_AUTHORITY VALUES (103, 'A00001', '004', 10, 10, 'A', DATE '2030-12-31', NULL, '12', 'U', NULL)");
     jdbc.update("INSERT INTO HARVESTING_HAULING_XREF VALUES ('AA0001', 103, 'N')");
-    jdbc.update("INSERT INTO HARVESTING_AUTHORITY VALUES (104, 'A00001', 'SECRET', 20, 20, 'A', DATE '2030-12-31', NULL, '12', 'U')");
+    assertThat(reader.find(CARIBOO, null, "AA0001").orElseThrow().cuttingPermit()).isEqualTo("001, 004");
+    jdbc.update("UPDATE HARVESTING_AUTHORITY SET CRUISE_BASED_IND = 'Y' WHERE HVA_SKEY = 101");
+    assertThatThrownBy(() -> reader.find(CARIBOO, null, "AA0001"))
+        .isInstanceOf(IncorrectResultSizeDataAccessException.class);
+    jdbc.update("UPDATE HARVESTING_AUTHORITY SET CRUISE_BASED_IND = 'Y' WHERE HVA_SKEY = 103");
+    assertThat(reader.find(CARIBOO, null, "AA0001").orElseThrow().cruiseBased()).isTrue();
+    jdbc.update("INSERT INTO HARVEST_AUTH_STATUS_CODE VALUES ('B', 'Synthetic alternate mark status')");
+    jdbc.update("UPDATE HARVESTING_AUTHORITY SET HARVEST_AUTH_STATUS_CODE = 'B' WHERE HVA_SKEY = 103");
+    assertThatThrownBy(() -> reader.find(CARIBOO, null, "AA0001"))
+        .isInstanceOf(IncorrectResultSizeDataAccessException.class);
+    jdbc.update("UPDATE HARVESTING_AUTHORITY SET FOREST_DISTRICT = 20 WHERE HVA_SKEY = 103");
+    var scoped = reader.find(CARIBOO, null, "AA0001").orElseThrow();
+    assertThat(scoped.markStatus()).isEqualTo(new CodeOption("A", "Synthetic permit issued"));
+    assertThat(scoped.cuttingPermit()).isEqualTo("001");
+    assertThatThrownBy(() -> reader.find(ADMIN, null, "AA0001"))
+        .isInstanceOf(IncorrectResultSizeDataAccessException.class);
+  }
+
+  @Test
+  void permitAggregationCannotExposeSiblingPermitsOutsideTheGrantedDistrict() {
+    jdbc.update("INSERT INTO HARVESTING_AUTHORITY VALUES (103, 'A00001', '004', 10, 10, 'A', DATE '2030-12-31', NULL, '12', 'U', NULL)");
+    jdbc.update("INSERT INTO HARVESTING_HAULING_XREF VALUES ('AA0001', 103, 'N')");
+    jdbc.update("INSERT INTO HARVESTING_AUTHORITY VALUES (104, 'A00001', 'SECRET', 20, 20, 'A', DATE '2030-12-31', NULL, '12', 'U', NULL)");
     jdbc.update("INSERT INTO HARVESTING_HAULING_XREF VALUES ('AA0001', 104, 'N')");
     assertThat(new OracleFtaLicenceInformation(jdbc).find(CARIBOO, "A00001", "AA0001")
         .orElseThrow().cuttingPermit()).isEqualTo("001, 004");
@@ -470,7 +539,7 @@ class OracleReadIT {
 
   @Test
   void ecasInboxKeepsPermitRowsAndSecondaryMarkFiltersWithoutWideningScope() {
-    jdbc.update("INSERT INTO HARVESTING_AUTHORITY VALUES (103, 'A00001', '004', 10, 10, 'A', DATE '2030-12-31', NULL, '12', 'U')");
+    jdbc.update("INSERT INTO HARVESTING_AUTHORITY VALUES (103, 'A00001', '004', 10, 10, 'A', DATE '2030-12-31', NULL, '12', 'U', NULL)");
     jdbc.update("INSERT INTO HARVESTING_HAULING_XREF VALUES ('AA0001', 103, 'N')");
     var reader = new OracleEcasInbox(jdbc);
     var page = reader.search(CARIBOO, new InboxFilters().search(), 0);
@@ -702,7 +771,7 @@ class OracleReadIT {
 
   @Test
   void conflictingFtaReferenceParentsAreRejected() {
-    jdbc.update("INSERT INTO HARVESTING_AUTHORITY VALUES (103, 'A00001', '004', 10, 10, 'A', DATE '2030-12-31', NULL, '12', 'U')");
+    jdbc.update("INSERT INTO HARVESTING_AUTHORITY VALUES (103, 'A00001', '004', 10, 10, 'A', DATE '2030-12-31', NULL, '12', 'U', NULL)");
     jdbc.update("INSERT INTO HARVESTING_HAULING_XREF VALUES ('AA0001', 103, 'N')");
     assertThatThrownBy(() -> new OracleEcasReference(jdbc).coast(CARIBOO, "1001"))
         .isInstanceOf(IncorrectResultSizeDataAccessException.class);
@@ -767,6 +836,7 @@ class OracleReadIT {
           .andExpect(jsonPath("$.header.effectiveDate").value("2026-01-02"));
       mvc.perform(get("/api/gas/appraised/by-ecas/1001").header("Authorization", "Bearer fixture-cariboo"))
           .andExpect(status().isOk()).andExpect(jsonPath("$.key.worksheetId").value("101"))
+          .andExpect(jsonPath("$.primaryTimberMark").value("AA0001"))
           .andExpect(jsonPath("$.rates[0].totalStumpageRate").value("12.30"));
       mvc.perform(get("/api/gas/worksheets").header("Authorization", "Bearer fixture-cariboo"))
           .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(4));
@@ -791,7 +861,13 @@ class OracleReadIT {
           .andExpect(status().isOk()).andExpect(jsonPath("$.timberMarks.length()").value(2));
       mvc.perform(get("/api/gas/licence-information?timberMark=PM0001")
           .header("Authorization", "Bearer fixture-cariboo"))
-          .andExpect(status().isOk()).andExpect(jsonPath("$.licenceNumber").value("A00003"));
+          .andExpect(status().isOk()).andExpect(jsonPath("$.licenceNumber").value("A00003"))
+          .andExpect(jsonPath("$.markStatus.description").value("Synthetic private status"))
+          .andExpect(jsonPath("$.cruiseBased").isEmpty());
+      mvc.perform(get("/api/gas/licence-information?timberMark=AA0001")
+          .header("Authorization", "Bearer fixture-cariboo"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.ftaStatus").value("Active"))
+          .andExpect(jsonPath("$.markStatus.description").value("Synthetic permit issued"));
       mvc.perform(get("/api/ecas/references/C/1001").header("Authorization", "Bearer fixture-omineca"))
           .andExpect(status().isNotFound()).andExpect(jsonPath("$.code").value("NOT_FOUND"));
       mvc.perform(get("/api/gas/worksheets/APPRAISED/101").header("Authorization", "Bearer fixture-omineca"))

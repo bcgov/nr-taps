@@ -299,6 +299,8 @@ client changes and authorization.
 - One statement: a scoped parent CTE plus tagged UNION ALL rows, so marks and rates don't
   multiply. Marks in mark order, rates by effective date then rate ID.
 - Null TOA becomes `'N'` (legacy `NVL`); other non-Y/N values fail.
+- `primaryTimberMark` comes from the submitted mark explicitly flagged primary. Missing primary
+  stays null; multiple primary rows fail. The full sorted mark list is retained independently.
 - Status is a LEFT JOIN, so a missing or expired description doesn't hide the record. Search status
   exclusions don't apply.
 
@@ -369,18 +371,29 @@ Both readers use `FtaScopeSql` with `GAS_APPRAISAL_VIEW`. Scope is the mark's di
 file/mark pair authorized, ordered by mark, no road-only marks. An EXISTS check stops duplicate
 ownership rows from repeating marks.
 
-`OracleFtaLicenceInformation.find` returns the eleven-field licence panel:
+`OracleFtaLicenceInformation.find` returns licence details and separate summary context:
 
 - Mark required, licence optional. Mark-only reads find files through HA and blanket-road records.
 - Handles permit, private and road contexts. No worksheet needed.
-- Status is licence status; client name is `FOREST_CLIENT.CLIENT_NAME`.
+- `ftaStatus` remains licence status for the search panel; client name is `FOREST_CLIENT.CLIENT_NAME`.
+- `markStatus` is the summary's FTA Status: harvesting-authority status for permits, private-mark
+  status for private marks, and tenure-file status for road marks. Labels have no expiry filter.
+- `cruiseBased` comes from the harvesting authority. Y/N maps to true/false; missing or other
+  values remain null. Private and road contexts have no cruise flag and never default to false.
 - Displayed region is `PROV_FOREST_USE.FOREST_REGION`, which can differ from the rollup used for
   authorization.
+
 - Client is the distinct non-null S-link client, else the A-link client. Legacy took an unordered
   first row; we fail when there is more than one client or permitted context.
 - Cutting permits are joined with `, ` after scope filtering, so permits the user can't see are left
   out. Legacy used a 500-character buffer, so text over 498 characters fails. The query keeps the
   legacy split between the HA licence and the HVA file; don't add a file-equality check.
+
+Worksheet summaries load FTA context independently of the search filters. Appraised summaries
+use `primaryTimberMark`; historic and non-appraised summaries use their stored timber mark.
+The lookup validates the returned mark, cancels stale requests, and leaves stored rates visible
+when context is missing or unavailable. Multiple permitted contexts differing in mark status or
+raw cruise flag remain ambiguous and fail instead of choosing an arbitrary value.
 
 No client-scoped role has `GAS_APPRAISAL_VIEW` today. Revisit client authorization before reusing
 the permit query for a client-facing feature.

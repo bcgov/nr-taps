@@ -133,7 +133,7 @@ function ReadDetailPanel({
         <InteriorReferenceDetails reference={detail.value.reference} />
       )}
       {detail.value?.kind === 'worksheet' && (
-        <OtherWorksheetDetails summary={detail.value.summary} auditApi={gasAuditApi} />
+        <OtherWorksheetDetails summary={detail.value.summary} auditApi={gasAuditApi} api={api} />
       )}
       {(detail.value?.kind === 'coast' || detail.value?.kind === 'interior') && (
         <EcasReferenceSections

@@ -1,6 +1,7 @@
 import { Button, TextInput } from '@carbon/react'
 import { useRef, useState } from 'react'
 import source from '../../../backend/src/test/resources/contracts/synthetic-workflow.json'
+import { syntheticFtaApi } from './synthetic-fta-api'
 import type {
   CoastReference,
   EcasInboxItem,
@@ -242,7 +243,9 @@ export default function WorkflowPreview() {
             </Button>
           </>
         )}
-        {detail?.kind === 'gas' && <GasStoredSummary summary={detail.summary} />}
+        {detail?.kind === 'gas' && (
+          <GasStoredSummary summary={detail.summary} api={syntheticFtaApi} />
+        )}
       </DetailSidePanel>
     </section>
   )

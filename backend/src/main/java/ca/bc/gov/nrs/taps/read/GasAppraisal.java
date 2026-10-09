@@ -117,7 +117,9 @@ public final class GasAppraisal {
       String forestDistrict,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate markExpiryDate,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate markExtendDate,
-      String ftaStatus) {}
+      String ftaStatus,
+      CodeOption markStatus,
+      Boolean cruiseBased) {}
 
   /** FTA details and worksheets are independent; either can be missing. */
   public record SearchResult(Page appraisals, FtaLicenceInformation licenceInformation) {
@@ -138,6 +140,7 @@ public final class GasAppraisal {
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate effectiveDate,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate expiryDate,
       List<String> timberMarks,
+      String primaryTimberMark,
       String referenceTypeCode,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate ceaseAdjustmentDate,
       List<StoredRate> rates) {

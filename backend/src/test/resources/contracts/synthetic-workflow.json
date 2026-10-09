@@ -140,6 +140,7 @@
     "effectiveDate": "2026-10-01",
     "expiryDate": null,
     "timberMarks": ["ZZ9999"],
+    "primaryTimberMark": "ZZ9999",
     "referenceTypeCode": null,
     "ceaseAdjustmentDate": null,
     "rates": [
@@ -202,7 +203,9 @@
       "forestDistrict": "Synthetic Coast District",
       "markExpiryDate": "2027-09-30",
       "markExtendDate": null,
-      "ftaStatus": "Synthetic active licence"
+      "ftaStatus": "Synthetic active licence",
+      "markStatus": {"code": "I", "description": "Synthetic issued mark"},
+      "cruiseBased": true
     }
   },
   "gasSearchResultWithoutAppraisals": {
@@ -222,7 +225,9 @@
       "forestDistrict": "Synthetic Coast District",
       "markExpiryDate": "2027-09-30",
       "markExtendDate": null,
-      "ftaStatus": "Synthetic active licence"
+      "ftaStatus": "Synthetic active licence",
+      "markStatus": {"code": "I", "description": "Synthetic issued mark"},
+      "cruiseBased": null
     }
   },
   "ecasInboxMultiMarkItems": [
@@ -366,6 +371,7 @@
       "ZZ9998",
       "ZZ9997"
     ],
+    "primaryTimberMark": "ZZ9998",
     "referenceTypeCode": null,
     "ceaseAdjustmentDate": null,
     "rates": [

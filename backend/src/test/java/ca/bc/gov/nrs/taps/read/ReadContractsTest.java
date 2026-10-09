@@ -310,7 +310,8 @@ class ReadContractsTest {
     ObjectNode json = (ObjectNode) mapper.readTree("""
         {"clientNumber":"00000001","licenseeName":"Mixed case name","licenceNumber":"X-001",
          "cuttingPermit":null,"fileTypeCode":null,"timberMark":null,"forestRegion":null,
-         "forestDistrict":null,"markExpiryDate":null,"markExtendDate":null,"ftaStatus":null}
+         "forestDistrict":null,"markExpiryDate":null,"markExtendDate":null,"ftaStatus":null,
+         "markStatus":null,"cruiseBased":null}
         """);
     json.put("cuttingPermit", permits);
     GasAppraisal.FtaLicenceInformation info =
@@ -319,7 +320,37 @@ class ReadContractsTest {
     assertThat(info.cuttingPermit()).isEqualTo(permits);
     assertThat(info.markExpiryDate()).isNull();
     assertThat(info.markExtendDate()).isNull();
+    assertThat(info.markStatus()).isNull();
+    assertThat(info.cruiseBased()).isNull();
     assertThat(mapper.readTree(mapper.writeValueAsBytes(info))).isEqualTo(json);
+  }
+
+  @Test
+  void searchLicenceStatusRemainsSeparateFromSummaryMarkStatusAndNullableCruise() throws IOException {
+    GasAppraisal.SearchResult result = mapper.treeToValue(fixture().get("gasSearchResult"), GasAppraisal.SearchResult.class);
+    assertThat(result.licenceInformation().ftaStatus()).isEqualTo("Synthetic active licence");
+    assertThat(result.licenceInformation().markStatus())
+        .isEqualTo(new CodeOption("I", "Synthetic issued mark"));
+    assertThat(result.licenceInformation().cruiseBased()).isTrue();
+    JsonNode json = mapper.valueToTree(result.licenceInformation());
+    assertThat(json.get("markStatus").get("code").asText()).isEqualTo("I");
+    assertThat(json.get("cruiseBased").isBoolean()).isTrue();
+    GasAppraisal.SearchResult other = mapper.treeToValue(fixture().get("gasSearchResultWithoutAppraisals"), GasAppraisal.SearchResult.class);
+    assertThat(other.licenceInformation().cruiseBased()).isNull();
+  }
+
+  @Test
+  void summaryPrimaryMarkRemainsOptionalAndIndependentOfMarksOrder() throws IOException {
+    ObjectNode json = (ObjectNode) fixture().get("gasMultiMarkAppraisedSummary");
+    json.put("primaryTimberMark", "ZZ9997");
+    GasAppraisal.AppraisedSummary summary = mapper.treeToValue(json, GasAppraisal.AppraisedSummary.class);
+    assertThat(summary.timberMarks()).containsExactly("ZZ9998", "ZZ9997");
+    assertThat(summary.primaryTimberMark()).isEqualTo("ZZ9997");
+    json.putNull("primaryTimberMark");
+    summary = mapper.treeToValue(json, GasAppraisal.AppraisedSummary.class);
+    assertThat(summary.primaryTimberMark()).isNull();
+    assertThat(summary.timberMarks()).hasSize(2);
+    assertThat(mapper.readTree(mapper.writeValueAsBytes(summary))).isEqualTo(json);
   }
 
   @Test
@@ -357,6 +388,7 @@ class ReadContractsTest {
     assertThat(result.appraisals().items()).extracting(GasAppraisal.Item::timberMark)
         .containsExactlyElementsOf(summary.timberMarks());
     assertThat(summary.timberMarks()).containsExactly("ZZ9998", "ZZ9997");
+    assertThat(summary.primaryTimberMark()).isEqualTo(reference.primaryTimberMark());
     assertThat(summary.ecasId()).isEqualTo(reference.header().ecasId());
     assertThat(summary.appraisalMethod()).isEqualTo(reference.header().appraisalMethod());
     assertThat(summary.rates().getFirst().totalStumpageRate()).isEqualTo(new BigDecimal("12.30"));

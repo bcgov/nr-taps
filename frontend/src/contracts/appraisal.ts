@@ -164,6 +164,8 @@ export type FtaLicenceInformation = {
   markExpiryDate: string | null
   markExtendDate: string | null
   ftaStatus: string | null
+  markStatus: CodeOption | null
+  cruiseBased: boolean | null
 }
 
 export type GasSearchResult = {
@@ -182,6 +184,7 @@ export type GasAppraisedSummary = {
   effectiveDate: string | null
   expiryDate: string | null
   timberMarks: string[]
+  primaryTimberMark: string | null
   referenceTypeCode: string | null
   ceaseAdjustmentDate: string | null
   rates: { rateId: string; effectiveDate: string; totalStumpageRate: string }[]

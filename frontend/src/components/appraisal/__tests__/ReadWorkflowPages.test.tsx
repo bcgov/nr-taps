@@ -130,6 +130,7 @@ test('searches, opens the selected ECAS reference and follows its immutable ID t
     ...syntheticReadApi,
     inbox: vi.fn(syntheticReadApi.inbox),
     relatedSummary: vi.fn(syntheticReadApi.relatedSummary),
+    licenceInformation: vi.fn(syntheticReadApi.licenceInformation),
   }
   mount(<EcasInboxReadPage api={api} />)
   expect(api.inbox).not.toHaveBeenCalled()
@@ -144,8 +145,49 @@ test('searches, opens the selected ECAS reference and follows its immutable ID t
   expect(await screen.findByRole('cell', { name: '12.30' })).toBeInTheDocument()
   expect(api.relatedSummary).toHaveBeenCalledWith('999900000002', expect.any(AbortSignal))
   expect(screen.getByText('COAST_MPS_TOA_N')).toBeInTheDocument()
+  await waitFor(() =>
+    expect(api.licenceInformation).toHaveBeenCalledWith(
+      '',
+      fixture.gasMultiMarkAppraisedSummary.primaryTimberMark,
+      expect.any(AbortSignal),
+    ),
+  )
+  expect(
+    within(screen.getByRole('region', { name: 'Worksheet FTA information' })).getByText(
+      fixture.gasMultiMarkAppraisedSummary.primaryTimberMark!,
+    ),
+  ).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Close' }))
   await waitFor(() => expect(launcher).toHaveFocus())
+})
+
+test('summary FTA uses its primary mark instead of the selected or first listed search mark', async () => {
+  const user = userEvent.setup()
+  const api = {
+    ...syntheticReadApi,
+    worksheet: vi.fn().mockResolvedValue({
+      ...fixture.gasMultiMarkAppraisedSummary,
+      primaryTimberMark: 'ZZ9997',
+      timberMarks: ['ZZ9998', 'ZZ9997'],
+    }),
+    licenceInformation: vi.fn(async (_licence: string, timberMark: string) => ({
+      ...fixture.gasSearchResult.licenceInformation!,
+      timberMark,
+      markStatus: { code: timberMark, description: `Mark ${timberMark}` },
+      cruiseBased: false,
+    })),
+  }
+  mount(<GasSearchReadPage api={api} />)
+  await user.type(screen.getByRole('textbox', { name: 'Timber mark' }), 'ZZ9998')
+  await user.click(screen.getByRole('button', { name: 'Search' }))
+  await user.click(
+    await screen.findByRole('button', { name: /Open APPRAISED worksheet .*mark ZZ9998/ }),
+  )
+  const context = within(await screen.findByRole('region', { name: 'Worksheet FTA information' }))
+  expect(await context.findByText('Mark ZZ9997')).toBeInTheDocument()
+  expect(context.queryByText('Mark ZZ9998')).not.toBeInTheDocument()
+  expect(api.licenceInformation).toHaveBeenCalledWith('', 'ZZ9997', expect.any(AbortSignal))
+  expect(api.worksheet).toHaveBeenCalledOnce()
 })
 
 test('never offers the related GAS action without its capability', async () => {

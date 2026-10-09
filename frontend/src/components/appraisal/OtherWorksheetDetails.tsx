@@ -5,6 +5,8 @@ import { GasStoredSummary } from './AppraisalDetails'
 import { displayCode } from './AppraisalResults'
 import type { GasAuditApi } from '@/service/gas-audit-service'
 import GasAuditDetails from './GasAuditDetails'
+import type { ReadApi } from '@/service/read-service'
+import GasFtaContext from './GasFtaContext'
 
 const yesNo = (value: boolean | null) => (value === null ? '—' : value ? 'Yes' : 'No')
 
@@ -112,11 +114,13 @@ function RateComponents({ rates }: { rates: StoredNonAppraisedRate[] }) {
 export default function OtherWorksheetDetails({
   summary,
   auditApi,
+  api,
 }: {
   summary: GasWorksheetSummary
   auditApi?: GasAuditApi
+  api?: Pick<ReadApi, 'licenceInformation'>
 }) {
-  if ('ecasId' in summary) return <GasStoredSummary summary={summary} />
+  if ('ecasId' in summary) return <GasStoredSummary summary={summary} api={api} />
   const historic = 'nonAppraisedRates' in summary
   return (
     <>
@@ -139,6 +143,11 @@ export default function OtherWorksheetDetails({
           </div>
         ))}
       </dl>
+      <GasFtaContext
+        key={`${summary.key.type}:${summary.key.worksheetId}`}
+        timberMark={summary.timberMark}
+        api={api}
+      />
       {historic ? (
         <>
           <dl className="taps-field-grid">

@@ -1,6 +1,7 @@
 import { ReadApiError, type ReadApi } from '@/service/read-service'
 import { workflowFixture as fixture } from './WorkflowPreview'
 import { nonAppraisedSample, nonAppraisedSampleItem } from './non-appraised-sample'
+import { syntheticFtaApi } from './synthetic-fta-api'
 
 const inbox = [...fixture.ecasInboxMultiMarkItems, fixture.ecasInboxItem]
 const worksheets = [
@@ -84,13 +85,14 @@ export const syntheticReadApi: ReadApi = {
           ? fixture.gasLicenceMarks
           : { licence, timberMarks: [] },
     ),
-  licenceInformation: async (licence, mark, signal) =>
-    delayed(
-      signal,
-      [fixture.gasSearchResult, fixture.gasSearchResultWithoutAppraisals]
-        .map((result) => result.licenceInformation)
-        .find(
-          (info) => info?.timberMark === mark && (!licence || info.licenceNumber === licence),
-        ) ?? null,
-    ),
+  licenceInformation: async (licence, mark, signal) => {
+    const info = [fixture.gasSearchResult, fixture.gasSearchResultWithoutAppraisals]
+      .map((result) => result.licenceInformation)
+      .find((info) => info?.timberMark === mark && (!licence || info.licenceNumber === licence))
+    return info
+      ? delayed(signal, info)
+      : !licence
+        ? syntheticFtaApi.licenceInformation('', mark, signal)
+        : delayed(signal, null)
+  },
 }

@@ -1,8 +1,13 @@
 import { render, screen, within } from '@testing-library/react'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 import type { CodeOption, GasHistoricSummary, GasNonAppraisedSummary } from '@/contracts/appraisal'
 import { workflowFixture } from '@/local-synthetic/WorkflowPreview'
 import OtherWorksheetDetails from '../OtherWorksheetDetails'
+import { syntheticFtaApi } from '@/local-synthetic/synthetic-fta-api'
+
+vi.mock('@/context/auth/AuthContext', () => ({
+  useAuth: () => ({ reloadSession: async () => {} }),
+}))
 
 const rate = {
   rateId: '999900000099',
@@ -70,7 +75,7 @@ test('historic summary retains flags, exact stored rates and separate rate compo
       },
     ],
   }
-  render(<OtherWorksheetDetails summary={summary} />)
+  render(<OtherWorksheetDetails summary={summary} api={syntheticFtaApi} />)
   expect(screen.getByText('Historic')).toBeInTheDocument()
   expect(screen.getByText('Yes')).toBeInTheDocument()
   expect(screen.getByText('No')).toBeInTheDocument()
@@ -134,7 +139,7 @@ test('non-appraised summary uses its own reference, classification and component
       },
     ],
   }
-  render(<OtherWorksheetDetails summary={summary} />)
+  render(<OtherWorksheetDetails summary={summary} api={syntheticFtaApi} />)
   expect(screen.getByText('Non-appraised')).toBeInTheDocument()
   expect(screen.getByText('Reference label')).toBeInTheDocument()
   expect(screen.getByText('ZONE')).toBeInTheDocument()
@@ -178,6 +183,7 @@ test('non-appraised summary uses its own reference, classification and component
 test('an empty selected-add-on list is explicit and does not imply a calculated zero cost', () => {
   render(
     <OtherWorksheetDetails
+      api={syntheticFtaApi}
       summary={{
         ...common,
         key: { type: 'NON_APPRAISED', worksheetId: '42' },
@@ -207,6 +213,7 @@ test.each([
   (appraisalMethod, timberSupplyBlock, expected) => {
     render(
       <OtherWorksheetDetails
+        api={syntheticFtaApi}
         summary={{
           ...common,
           appraisalMethod,
@@ -234,6 +241,8 @@ test.each([
 )
 
 test('appraised summary does not offer non-appraised history', () => {
-  render(<OtherWorksheetDetails summary={workflowFixture.gasAppraisedSummary} />)
+  render(
+    <OtherWorksheetDetails summary={workflowFixture.gasAppraisedSummary} api={syntheticFtaApi} />,
+  )
   expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument()
 })
