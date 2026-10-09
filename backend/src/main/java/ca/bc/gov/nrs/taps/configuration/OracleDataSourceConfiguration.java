@@ -9,6 +9,7 @@ import ca.bc.gov.nrs.taps.read.oracle.OracleEcasOrganizations;
 import ca.bc.gov.nrs.taps.read.oracle.OracleEcasReference;
 import ca.bc.gov.nrs.taps.read.oracle.OracleFtaLicenceInformation;
 import ca.bc.gov.nrs.taps.read.oracle.OracleGasSearch;
+import ca.bc.gov.nrs.taps.read.oracle.OracleGasAudit;
 import ca.bc.gov.nrs.taps.read.oracle.OracleLicenceMarks;
 import ca.bc.gov.nrs.taps.read.oracle.OracleOtherWorksheetSummary;
 import java.sql.SQLException;
@@ -58,6 +59,9 @@ public class OracleDataSourceConfiguration {
 
   @Bean
   OracleEcasAudit oracleEcasAudit(JdbcTemplate jdbc) { return new OracleEcasAudit(jdbc); }
+
+  @Bean
+  OracleGasAudit oracleGasAudit(JdbcTemplate jdbc) { return new OracleGasAudit(jdbc); }
 
   @Bean
   OracleEcasAttachments oracleEcasAttachments(JdbcTemplate jdbc) { return new OracleEcasAttachments(jdbc); }

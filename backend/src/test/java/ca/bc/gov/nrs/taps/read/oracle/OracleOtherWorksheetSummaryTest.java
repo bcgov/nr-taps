@@ -178,6 +178,7 @@ class OracleOtherWorksheetSummaryTest {
     when(rows.getString("REFERENCE_TYPE")).thenReturn(" REF ");
     when(rows.getDate("SDM_DECLARATION_ACCEPTANCE_DT")).thenReturn(Date.valueOf("2030-02-01"));
     when(rows.getString("TSB_NUMBER_CODE")).thenReturn(" T1 ");
+    when(rows.getString("TSB_DESCRIPTION")).thenReturn(" T1  - Synthetic block");
     when(rows.getString("APPRAISAL_FOREST_ZONE_CODE")).thenReturn(" Z1 ");
     when(rows.getString("NON_APPRAISED_RATE_TYPE_CODE")).thenReturn(" TYPE ");
     when(rows.getString("RATE_ADJUSTMENT_TYPE_CODE")).thenReturn("R");
@@ -196,7 +197,7 @@ class OracleOtherWorksheetSummaryTest {
     assertThat(summary.expiryDate()).isNull();
     assertThat(summary.referenceType()).isEqualTo(new CodeOption(" REF ", "Synthetic reference"));
     assertThat(summary.sdmDeclarationAcceptanceDate()).isEqualTo(LocalDate.of(2030, 2, 1));
-    assertThat(summary.tsbNumberCode()).isEqualTo(" T1 ");
+    assertThat(summary.timberSupplyBlock()).isEqualTo(new CodeOption(" T1 ", " T1  - Synthetic block"));
     assertThat(summary.appraisalForestZone()).isEqualTo(new CodeOption(" Z1 ", "Synthetic zone"));
     assertThat(summary.nonAppraisedRateType()).isEqualTo(new CodeOption(" TYPE ", "Synthetic rate type"));
     assertThat(summary.rateAdjustmentType()).isEqualTo(new CodeOption("R", "Synthetic adjustment"));
@@ -241,7 +242,9 @@ class OracleOtherWorksheetSummaryTest {
         "C.APPRAISAL_FOREST_ZONE_CODE = record_scope.APPRAISAL_FOREST_ZONE_CODE",
         "C.NON_APPRAISED_RATE_TYPE_CODE = record_scope.NON_APPRAISED_RATE_TYPE_CODE",
         "C.RATE_ADJUSTMENT_TYPE_CODE = record_scope.RATE_ADJUSTMENT_TYPE_CODE");
-    assertThat(sql.split("SYSDATE BETWEEN C.EFFECTIVE_DATE AND C.EXPIRY_DATE", -1)).hasSize(6);
+    assertThat(sql).contains("record_scope.TSB_NUMBER_CODE || ' - ' || C.DESCRIPTION FROM TSB_NUMBER_CODE C",
+        "C.TSB_NUMBER_CODE = record_scope.TSB_NUMBER_CODE");
+    assertThat(sql.split("SYSDATE BETWEEN C.EFFECTIVE_DATE AND C.EXPIRY_DATE", -1)).hasSize(7);
   }
 
   @Test

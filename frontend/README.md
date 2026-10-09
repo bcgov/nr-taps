@@ -63,7 +63,8 @@ Reloading resets it.
   with no worksheets.
 - **Synthetic asynchronous read pages:** GAS licence `X99995` and mark `ZZ9995` open a fictional
   non-appraised summary with descriptive labels, nullable rate components and exact Upset Rate /
-  Total Rate values.
+  Total Rate values. Expand **History** for twelve fictional changes across two pages, including
+  a comment containing literal markup that must display as text.
 
 The preview source lives in `src/local-synthetic/`, with `LocalSyntheticPreview.tsx` as its UI.
 `local-synthetic.html` is guarded by Vite's built-in `import.meta.env.DEV` flag, which enables local

@@ -21,6 +21,7 @@ filters.
 | `GET /api/ecas/{ecasId}/attachments?page=0` | `ECAS_SUBMISSION_VIEW` | Document metadata, 50 per page. See [attachment visibility](#attachments). |
 | `GET /api/gas/worksheets?licence=&timberMark=&page=0` | `GAS_APPRAISAL_VIEW` | All three families, 10 per page. |
 | `GET /api/gas/worksheets/{type}/{worksheetId}` | `GAS_APPRAISAL_VIEW` | `APPRAISED`, `HISTORIC` or `NON_APPRAISED`. |
+| `GET /api/gas/worksheets/NON_APPRAISED/{worksheetId}/history?page=0` | `GAS_APPRAISAL_VIEW` | Changed worksheet/rate fields, 10 per page. |
 | `GET /api/gas/appraised/by-ecas/{ecasId}` | `GAS_APPRAISAL_VIEW` | Appraised summary for an ECAS ID. |
 | `GET /api/gas/licences/{licence}/marks` | `GAS_APPRAISAL_VIEW` | HA marks. Empty is valid. |
 | `GET /api/gas/licence-information?licence=&timberMark=` | `GAS_APPRAISAL_VIEW` | FTA licence panel. Mark required. |
@@ -317,6 +318,8 @@ space product/grade codes are preserved. Species/product/grade descriptions use 
 without an expiry filter; classification descriptions require
 `SYSDATE BETWEEN EFFECTIVE_DATE AND EXPIRY_DATE`. Grade labels use the grade code alone. Rates
 remain ordered by species/product/grade codes and rate ID, independently of their labels.
+Timber supply block uses a current code lookup and the `code - description` label; the UI displays
+it only for Coast worksheets. A missing description retains the stored code.
 
 For non-appraised rates, including historic worksheet components:
 
@@ -327,6 +330,29 @@ For non-appraised rates, including historic worksheet components:
 
 These are display calculations using exact decimal addition. Reading a summary does not persist
 rates, call pricing procedures, refresh a worksheet or run legacy model constructors.
+
+### Non-appraised history
+
+History is available for the `NON_APPRAISED` family. The reader first requires access to the
+current parent worksheet, using the same ownership scope as its summary. One SELECT compares
+stored worksheet and rate snapshots, counts changed fields and returns ten per page. No legacy
+model constructor or audit procedure is called.
+
+Each rate is compared only with its own previous snapshot. Baseline snapshots do not imply a
+change, and these insert/update snapshots cannot establish deletions. Comparisons use original
+typed values before formatting, so a date's changed time component is detected. The response
+contains the newer actor, modification time, attribute, value and transaction comment; rate ID
+identifies the affected row. Values and comments remain plain text, with null preserved.
+
+Results sort by modification time descending, then worksheet/rate source, audit ID descending
+and field order. Each event has a stable composite ID. Missing parent or access returns 404;
+an authorized worksheet with no changes returns an empty page. Negative pages return 400;
+pages beyond the end retain the total and return no items.
+
+The projection includes forest-zone, rate-type and adjustment changes, uses the grade value for
+grade changes, and compares each levy independently. These corrections are recorded in the
+[divergence register](intentional-legacy-divergences.md). Appraised and historic History remain
+outside this endpoint.
 
 ## Licence marks and FTA information
 

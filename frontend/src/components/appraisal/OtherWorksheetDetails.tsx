@@ -3,6 +3,8 @@ import type { GasWorksheetSummary, StoredNonAppraisedRate } from '@/contracts/ap
 import TableFrame from '../TableFrame'
 import { GasStoredSummary } from './AppraisalDetails'
 import { displayCode } from './AppraisalResults'
+import type { GasAuditApi } from '@/service/gas-audit-service'
+import GasAuditDetails from './GasAuditDetails'
 
 const yesNo = (value: boolean | null) => (value === null ? '—' : value ? 'Yes' : 'No')
 
@@ -107,7 +109,13 @@ function RateComponents({ rates }: { rates: StoredNonAppraisedRate[] }) {
   )
 }
 
-export default function OtherWorksheetDetails({ summary }: { summary: GasWorksheetSummary }) {
+export default function OtherWorksheetDetails({
+  summary,
+  auditApi,
+}: {
+  summary: GasWorksheetSummary
+  auditApi?: GasAuditApi
+}) {
   if ('ecasId' in summary) return <GasStoredSummary summary={summary} />
   const historic = 'nonAppraisedRates' in summary
   return (
@@ -230,7 +238,9 @@ export default function OtherWorksheetDetails({ summary }: { summary: GasWorkshe
             {(
               [
                 ['Reference type', displayCode(summary.referenceType)],
-                ['TSB', summary.tsbNumberCode],
+                ...(summary.appraisalMethod === 'C'
+                  ? [['Timber supply block', displayCode(summary.timberSupplyBlock)] as const]
+                  : []),
                 ['Forest zone', displayCode(summary.appraisalForestZone)],
                 ['Rate type', displayCode(summary.nonAppraisedRateType)],
                 ['Adjustment type', displayCode(summary.rateAdjustmentType)],
@@ -259,6 +269,7 @@ export default function OtherWorksheetDetails({ summary }: { summary: GasWorkshe
               ],
             }))}
           />
+          <GasAuditDetails worksheetId={summary.key.worksheetId} api={auditApi} />
         </>
       )}
     </>

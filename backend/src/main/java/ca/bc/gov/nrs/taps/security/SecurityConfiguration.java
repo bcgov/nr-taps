@@ -40,6 +40,7 @@ public class SecurityConfiguration {
                     "/api/ecas/audit/*", "/api/ecas/audit/*/events/*", "/api/ecas/*/attachments")
                 .hasAuthority(TapsCapability.ECAS_SUBMISSION_VIEW.authority())
                 .requestMatchers(HttpMethod.GET, "/api/gas/worksheets", "/api/gas/worksheets/*/*",
+                    "/api/gas/worksheets/NON_APPRAISED/*/history",
                     "/api/gas/appraised/by-ecas/*", "/api/gas/licences/*/marks", "/api/gas/licence-information",
                     "/api/gas/lookups")
                 .hasAuthority(TapsCapability.GAS_APPRAISAL_VIEW.authority());

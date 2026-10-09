@@ -31,11 +31,12 @@ provisioning alone does not establish that validation.
 | `ECAS_STATUS_DISPLAY_CLOCK` | Status choices retain inactive codes; the `active` display hint uses Oracle day boundaries instead of the legacy JVM clock. | Keeps display evaluation with the database query. Compare day boundaries and null/sentinel dates; see [code lists](oracle-reads.md#code-lists). |
 | `SCOPED_AUDIT_READS` | Audit reads re-check the submission and event and cap returned text with truncation flags. Import comments remain hidden. | Bounds response size while retaining parent scope. Verify event order, actors, labels and truncation; see [audit history](oracle-reads.md#audit-history). |
 | `ECAS_REFERENCE_AMBIGUITY` | Conflicting FTAS contexts or Coast major centres fail rather than selecting an unordered first row. | Avoids arbitrary reference defaults. Check parent/mark relationships and lookup cardinality; see [ECAS references](oracle-reads.md#ecas-references). |
+| `GAS_AUDIT_RATE_IDENTITY` | Non-appraised History compares snapshots within each rate ID and uses deterministic tie ordering and server pages. | Avoids false changes between different rate rows. It reports the changed grade, compares levies independently and includes stored classification changes. Source and local Oracle tests cover these corrections; deployed history comparison remains pending. See [non-appraised history](oracle-reads.md#non-appraised-history). |
 
 ## Read-path replacements
 
 These are implementation changes intended to preserve legacy results, not permission to remove
-shared procedures or change the schema. TAPS currently performs no Oracle writes or calculations.
+shared procedures or change the schema. TAPS currently performs no Oracle writes or pricing calculations.
 
 | ID or path | Legacy path | TAPS implementation |
 | --- | --- | --- |

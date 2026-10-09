@@ -4,7 +4,7 @@ TAPS combines ECAS and GAS2 using the existing Oracle schema and data through an
 
 ## Current status
 
-- Implemented: FAM/BC Gov SSO sign-in, scoped ECAS inbox (All Submissions and My To Do)/references/audit/attachment metadata, GAS search across all three worksheet families, licence-to-mark chooser, FTA information and stored summaries.
+- Implemented: FAM/BC Gov SSO sign-in, scoped ECAS inbox (All Submissions and My To Do)/references/audit/attachment metadata, GAS search across all three worksheet families, licence-to-mark chooser, FTA information, stored summaries and non-appraised history.
 - Oracle reads remain off by default and require the deployment configuration and acceptance checks before activation. PROD deployment is disabled.
 - Not implemented: assignment changes, editing/saving, pricing calculations, workflow, reports, file upload/download, notices, notifications, service-client APIs, file scanning, scheduled batch work and the inactivity warning. The Coast date form validates a local draft only.
 

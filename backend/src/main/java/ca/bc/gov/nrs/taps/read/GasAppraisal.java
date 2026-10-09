@@ -206,7 +206,7 @@ public final class GasAppraisal {
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate expiryDate,
       CodeOption referenceType,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate sdmDeclarationAcceptanceDate,
-      String tsbNumberCode,
+      CodeOption timberSupplyBlock,
       CodeOption appraisalForestZone,
       CodeOption nonAppraisedRateType,
       CodeOption rateAdjustmentType,

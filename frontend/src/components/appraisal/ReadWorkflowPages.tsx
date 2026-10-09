@@ -23,6 +23,7 @@ import useReadResource, { useLoadedTotal } from './useReadResource'
 import EcasSearchFiltersForm from './EcasSearchFilters'
 import useSessionFailure from './useReadSessionFailure'
 import EcasReferenceSections, { type EcasRelatedApis } from './EcasReferenceSections'
+import type { GasAuditApi } from '@/service/gas-audit-service'
 
 type Selection =
   | { kind: 'reference'; id: string; method: AppraisalMethod | null }
@@ -39,12 +40,14 @@ function ReadDetailPanel({
   launcherRef,
   api,
   relatedApis,
+  gasAuditApi,
 }: {
   selection: Selection | null
   setSelection: (selection: Selection | null) => void
   launcherRef: React.RefObject<HTMLElement | null>
   api: ReadApi
   relatedApis?: EcasRelatedApis
+  gasAuditApi?: GasAuditApi
 }) {
   const { can } = useAuth()
   const load = useCallback(
@@ -130,7 +133,7 @@ function ReadDetailPanel({
         <InteriorReferenceDetails reference={detail.value.reference} />
       )}
       {detail.value?.kind === 'worksheet' && (
-        <OtherWorksheetDetails summary={detail.value.summary} />
+        <OtherWorksheetDetails summary={detail.value.summary} auditApi={gasAuditApi} />
       )}
       {(detail.value?.kind === 'coast' || detail.value?.kind === 'interior') && (
         <EcasReferenceSections
@@ -273,7 +276,13 @@ export function EcasInboxReadPage({
 
 const emptyGas: GasFilters = { licence: '', timberMark: '' }
 
-export function GasSearchReadPage({ api = readApi }: { api?: ReadApi }) {
+export function GasSearchReadPage({
+  api = readApi,
+  gasAuditApi,
+}: {
+  api?: ReadApi
+  gasAuditApi?: GasAuditApi
+}) {
   const [draft, setDraft] = useState(emptyGas)
   const [lookupLicence, setLookupLicence] = useState('')
   const [query, setQuery] = useState<{ filters: GasFilters; page: number } | null>(null)
@@ -368,6 +377,7 @@ export function GasSearchReadPage({ api = readApi }: { api?: ReadApi }) {
         setSelection={setSelection}
         launcherRef={launcherRef}
         api={api}
+        gasAuditApi={gasAuditApi}
       />
     </section>
   )

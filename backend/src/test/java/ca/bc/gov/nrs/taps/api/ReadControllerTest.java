@@ -258,7 +258,7 @@ class ReadControllerTest {
         new BigDecimal("999.99"), new BigDecimal("999.99"), new BigDecimal("999.99"), new BigDecimal("999.99"));
     var summary = new GasAppraisal.NonAppraisedSummary(key, "A00001", "AA0001",
         AppraisalMethod.C, null, null, null,
-        new CodeOption("NEW", "Synthetic new appraisal"), null, "1201",
+        new CodeOption("NEW", "Synthetic new appraisal"), null, new CodeOption("1201", "1201 - Synthetic TSB"),
         new CodeOption("A", null), null, null, List.of(rate), List.of());
     when(other.nonAppraised(any(), eq(key))).thenReturn(Optional.of(summary));
     mvc.perform(get("/api/gas/worksheets/NON_APPRAISED/123").header("Authorization", "Bearer token"))

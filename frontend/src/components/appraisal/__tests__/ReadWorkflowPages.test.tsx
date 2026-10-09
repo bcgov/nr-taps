@@ -8,6 +8,7 @@ import { setViewportWidth } from '@/test-setup'
 import { syntheticReadApi } from '@/local-synthetic/synthetic-read-api'
 import { workflowFixture as fixture } from '@/local-synthetic/WorkflowPreview'
 import { nonAppraisedSample } from '@/local-synthetic/non-appraised-sample'
+import { syntheticGasAuditApi } from '@/local-synthetic/synthetic-gas-audit-api'
 import { ReadApiError } from '@/service/read-service'
 import type { EcasInboxPage } from '@/contracts/appraisal'
 import { EcasInboxReadPage, GasSearchReadPage } from '../ReadWorkflowPages'
@@ -178,7 +179,8 @@ test('preserves the licence chooser and FTA context when worksheets are empty', 
 
 test('opens the fictional non-appraised preview worksheet with labelled server rate totals', async () => {
   const user = userEvent.setup()
-  mount(<GasSearchReadPage api={syntheticReadApi} />)
+  const audit = { history: vi.fn(syntheticGasAuditApi.history) }
+  mount(<GasSearchReadPage api={syntheticReadApi} gasAuditApi={audit} />)
   await user.type(screen.getByRole('textbox', { name: 'Licence' }), nonAppraisedSample.licence!)
   await screen.findByRole('option', { name: nonAppraisedSample.timberMark! })
   await user.click(screen.getByRole('button', { name: 'Search' }))
@@ -193,6 +195,26 @@ test('opens the fictional non-appraised preview worksheet with labelled server r
   expect(rates.getByRole('cell', { name: '14.70' })).toBeInTheDocument()
   expect(rates.getByRole('cell', { name: 'UNKNOWN' })).toBeInTheDocument()
   expect(screen.getByText('Synthetic forest zone')).toBeInTheDocument()
+  expect(audit.history).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: 'History' }))
+  const history = within(
+    await screen.findByRole('region', { name: 'Non-appraised worksheet history' }),
+  )
+  await history.findByText('<script>Fictional comment as text</script>')
+  expect(
+    within(history.getByRole('table', { name: 'Worksheet history' })).getAllByRole('row'),
+  ).toHaveLength(11)
+  await user.click(history.getByRole('button', { name: 'Next page' }))
+  await history.findByText('2026-10-11T09:00:00')
+  expect(
+    within(history.getByRole('table', { name: 'Worksheet history' })).getAllByRole('row'),
+  ).toHaveLength(3)
+  expect(audit.history).toHaveBeenLastCalledWith(
+    nonAppraisedSample.key.worksheetId,
+    1,
+    expect.any(AbortSignal),
+  )
+  expect(history.queryByText('<script>Fictional comment as text</script>')).not.toBeInTheDocument()
 })
 
 test('retains worksheet rows when the separate FTA request fails and retries only that request', async () => {

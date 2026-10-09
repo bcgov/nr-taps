@@ -11,7 +11,7 @@ export const nonAppraisedSample: GasNonAppraisedSummary = {
   expiryDate: '2027-09-30',
   referenceType: { code: 'SYN', description: 'Synthetic reference type' },
   sdmDeclarationAcceptanceDate: null,
-  tsbNumberCode: 'SYN',
+  timberSupplyBlock: { code: 'SYN', description: 'SYN - Synthetic timber supply block' },
   appraisalForestZone: { code: 'Z', description: 'Synthetic forest zone' },
   nonAppraisedRateType: { code: 'S', description: 'Synthetic stored rate type' },
   rateAdjustmentType: { code: 'N', description: 'Synthetic adjustment type' },

@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import { expect, test } from 'vitest'
-import type { GasHistoricSummary, GasNonAppraisedSummary } from '@/contracts/appraisal'
+import type { CodeOption, GasHistoricSummary, GasNonAppraisedSummary } from '@/contracts/appraisal'
+import { workflowFixture } from '@/local-synthetic/WorkflowPreview'
 import OtherWorksheetDetails from '../OtherWorksheetDetails'
 
 const rate = {
@@ -94,6 +95,7 @@ test('historic summary retains flags, exact stored rates and separate rate compo
   expect(grades.getByRole('cell', { name: '02' })).toBeInTheDocument()
   expect(grades.getByRole('cell', { name: '40.50' })).toBeInTheDocument()
   expect(screen.queryByRole('table', { name: 'Selected rate add-ons' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument()
 })
 
 test('non-appraised summary uses its own reference, classification and component fields', () => {
@@ -102,7 +104,7 @@ test('non-appraised summary uses its own reference, classification and component
     key: { type: 'NON_APPRAISED', worksheetId: '999900000090' },
     referenceType: { code: 'REF', description: 'Reference label' },
     sdmDeclarationAcceptanceDate: '2026-10-01',
-    tsbNumberCode: 'TSB',
+    timberSupplyBlock: { code: 'TSB', description: 'TSB - Synthetic block' },
     appraisalForestZone: { code: 'ZONE', description: null },
     nonAppraisedRateType: null,
     rateAdjustmentType: { code: 'ADJ', description: 'Adjustment label' },
@@ -170,6 +172,7 @@ test('non-appraised summary uses its own reference, classification and component
   expect(addons.getByRole('cell', { name: '2000-01-02T12:34:56' })).toBeInTheDocument()
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   expect(screen.queryByRole('table', { name: 'Historic species' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute('aria-expanded', 'false')
 })
 
 test('an empty selected-add-on list is explicit and does not imply a calculated zero cost', () => {
@@ -180,7 +183,7 @@ test('an empty selected-add-on list is explicit and does not imply a calculated 
         key: { type: 'NON_APPRAISED', worksheetId: '42' },
         referenceType: null,
         sdmDeclarationAcceptanceDate: null,
-        tsbNumberCode: null,
+        timberSupplyBlock: null,
         appraisalForestZone: null,
         nonAppraisedRateType: null,
         rateAdjustmentType: null,
@@ -192,4 +195,45 @@ test('an empty selected-add-on list is explicit and does not imply a calculated 
   expect(screen.getByText('No selected rate add-ons recorded.')).toBeInTheDocument()
   expect(screen.queryByRole('table', { name: 'Selected rate add-ons' })).not.toBeInTheDocument()
   expect(screen.queryByText('0.00')).not.toBeInTheDocument()
+})
+
+test.each([
+  ['C', { code: 'SYN', description: 'SYN - Synthetic block' }, 'SYN - Synthetic block'],
+  ['C', { code: 'SYN', description: null }, 'SYN'],
+  ['C', null, '—'],
+  ['I', { code: 'SYN', description: 'SYN - Synthetic block' }, null],
+] as ['C' | 'I', CodeOption | null, string | null][])(
+  'timber supply block respects method %s and stored label availability: %j',
+  (appraisalMethod, timberSupplyBlock, expected) => {
+    render(
+      <OtherWorksheetDetails
+        summary={{
+          ...common,
+          appraisalMethod,
+          key: { type: 'NON_APPRAISED', worksheetId: '999900000090' },
+          referenceType: null,
+          sdmDeclarationAcceptanceDate: null,
+          timberSupplyBlock,
+          appraisalForestZone: null,
+          nonAppraisedRateType: null,
+          rateAdjustmentType: null,
+          rates: [],
+          selectedRateAddons: [],
+        }}
+      />,
+    )
+    if (expected === null) {
+      expect(screen.queryByText('Timber supply block')).not.toBeInTheDocument()
+      expect(screen.queryByText('SYN - Synthetic block')).not.toBeInTheDocument()
+    } else {
+      expect(
+        within(screen.getByText('Timber supply block').parentElement!).getByText(expected),
+      ).toBeInTheDocument()
+    }
+  },
+)
+
+test('appraised summary does not offer non-appraised history', () => {
+  render(<OtherWorksheetDetails summary={workflowFixture.gasAppraisedSummary} />)
+  expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument()
 })

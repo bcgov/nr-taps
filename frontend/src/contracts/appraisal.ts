@@ -231,7 +231,7 @@ export type GasNonAppraisedSummary = {
   expiryDate: string | null
   referenceType: CodeOption | null
   sdmDeclarationAcceptanceDate: string | null
-  tsbNumberCode: string | null
+  timberSupplyBlock: CodeOption | null
   appraisalForestZone: CodeOption | null
   nonAppraisedRateType: CodeOption | null
   rateAdjustmentType: CodeOption | null

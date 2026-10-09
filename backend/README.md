@@ -83,7 +83,7 @@ From the SQL in [`read/oracle`](src/main/java/ca/bc/gov/nrs/taps/read/oracle). N
 unqualified, so the database team needs to confirm the owner and synonym of each object for the
 proxy account. Don't assume one owner because the test fixture has one.
 
-`SELECT` on these 54 objects:
+`SELECT` on these 57 objects:
 
 | Objects | Used for |
 | --- | --- |
@@ -96,6 +96,7 @@ proxy account. Don't assume one owner because the test fixture has one.
 | `ADS_SUPPORT_DOCUMENT`, `APPRAISAL_DOCUMENT_TYPE_CODE`, `APPRAISAL_ATTACHMENT_XREF` | Attachment inventory |
 | `APPRAISED_WORKSHEET`, `HISTORIC_APPRAISED_WORKSHEET`, `NON_APPRAISED_WORKSHEET` | Worksheet parents |
 | `APPRAISED_STUMPAGE_RATE`, `NON_APPRAISED_STUMPAGE_RATE` | Stored rates |
+| `NON_APPRAISED_WORKSHEET_AUD`, `NON_APPRAISED_STUMPAGE_RTE_AUD`, `GAS_TRANSACTION` | Non-appraised worksheet history |
 | `HAULING_AUTHORITY`, `HARVESTING_AUTHORITY`, `HARVESTING_HAULING_XREF` | Licence/mark/permit links and ownership |
 | `BLANKET_ROAD_MARK`, `PRIVATE_MARK_CERTIFICATE` | Road/private FTA context |
 | `FOREST_FILE_CLIENT`, `FOREST_CLIENT`, `V_CLIENT_PUBLIC` | Client links and names (`V_CLIENT_PUBLIC` is a view in the real schema, a table in the fixture) |

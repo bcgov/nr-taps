@@ -113,6 +113,9 @@ public final class OracleOtherWorksheetSummary {
       """;
 
   private static final String NON_APPRAISED_LABELS = """
+      , (SELECT record_scope.TSB_NUMBER_CODE || ' - ' || C.DESCRIPTION FROM TSB_NUMBER_CODE C
+           WHERE C.TSB_NUMBER_CODE = record_scope.TSB_NUMBER_CODE
+             AND SYSDATE BETWEEN C.EFFECTIVE_DATE AND C.EXPIRY_DATE) AS TSB_DESCRIPTION
       , (SELECT C.DESCRIPTION FROM WORKSHEET_REFERENCE_TYPE_CODE C
            WHERE C.WORKSHEET_REFERENCE_TYPE_CODE = record_scope.REFERENCE_TYPE
              AND SYSDATE BETWEEN C.EFFECTIVE_DATE AND C.EXPIRY_DATE) AS REFERENCE_TYPE_DESCRIPTION
@@ -230,7 +233,8 @@ public final class OracleOtherWorksheetSummary {
                 }
                 parent = new NonAppraisedParent(Header.read(rows),
                     option(rows, "REFERENCE_TYPE", "REFERENCE_TYPE_DESCRIPTION"),
-                    localDate(rows, "SDM_DECLARATION_ACCEPTANCE_DT"), rows.getString("TSB_NUMBER_CODE"),
+                    localDate(rows, "SDM_DECLARATION_ACCEPTANCE_DT"),
+                    option(rows, "TSB_NUMBER_CODE", "TSB_DESCRIPTION"),
                     option(rows, "APPRAISAL_FOREST_ZONE_CODE", "APPRAISAL_FOREST_ZONE_DESCRIPTION"),
                     option(rows, "NON_APPRAISED_RATE_TYPE_CODE", "NON_APPRAISED_RATE_TYPE_DESCRIPTION"),
                     option(rows, "RATE_ADJUSTMENT_TYPE_CODE", "RATE_ADJUSTMENT_TYPE_DESCRIPTION"));
@@ -366,6 +370,6 @@ public final class OracleOtherWorksheetSummary {
   private record HistoricParent(Header header, String calculation, Boolean toa, Boolean quarterly,
       Boolean active, String policy, LocalDate cease) {}
 
-  private record NonAppraisedParent(Header header, CodeOption reference, LocalDate sdm, String tsb,
+  private record NonAppraisedParent(Header header, CodeOption reference, LocalDate sdm, CodeOption tsb,
       CodeOption zone, CodeOption rateType, CodeOption adjustmentType) {}
 }
