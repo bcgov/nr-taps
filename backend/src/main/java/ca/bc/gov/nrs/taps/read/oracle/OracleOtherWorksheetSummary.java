@@ -20,7 +20,7 @@ import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
 
-/** Stored worksheets and rates for the historic and non-appraised families; no calculation. */
+/** Stored worksheets and rates, with code labels and non-appraised display totals. */
 public final class OracleOtherWorksheetSummary {
   private static final String PARENT = """
       SELECT 0 AS ROW_KIND, P.*,
@@ -112,6 +112,40 @@ public final class OracleOtherWorksheetSummary {
         JOIN HISTORIC_COAST_SPECIES_GRADE G ON G.HISTORIC_APPRAISED_WRKSHEET_ID = P.WORKSHEET_ID
       """;
 
+  private static final String NON_APPRAISED_LABELS = """
+      , (SELECT record_scope.TSB_NUMBER_CODE || ' - ' || C.DESCRIPTION FROM TSB_NUMBER_CODE C
+           WHERE C.TSB_NUMBER_CODE = record_scope.TSB_NUMBER_CODE
+             AND SYSDATE BETWEEN C.EFFECTIVE_DATE AND C.EXPIRY_DATE) AS TSB_DESCRIPTION
+      , (SELECT C.DESCRIPTION FROM WORKSHEET_REFERENCE_TYPE_CODE C
+           WHERE C.WORKSHEET_REFERENCE_TYPE_CODE = record_scope.REFERENCE_TYPE
+             AND SYSDATE BETWEEN C.EFFECTIVE_DATE AND C.EXPIRY_DATE) AS REFERENCE_TYPE_DESCRIPTION
+      , (SELECT C.DESCRIPTION FROM APPRAISAL_FOREST_ZONE_CODE C
+           WHERE C.APPRAISAL_FOREST_ZONE_CODE = record_scope.APPRAISAL_FOREST_ZONE_CODE
+             AND SYSDATE BETWEEN C.EFFECTIVE_DATE AND C.EXPIRY_DATE) AS APPRAISAL_FOREST_ZONE_DESCRIPTION
+      , (SELECT C.DESCRIPTION FROM NON_APPRAISED_RATE_TYPE_CODE C
+           WHERE C.NON_APPRAISED_RATE_TYPE_CODE = record_scope.NON_APPRAISED_RATE_TYPE_CODE
+             AND SYSDATE BETWEEN C.EFFECTIVE_DATE AND C.EXPIRY_DATE) AS NON_APPRAISED_RATE_TYPE_DESCRIPTION
+      , (SELECT C.DESCRIPTION FROM RATE_ADJUSTMENT_TYPE_CODE C
+           WHERE C.RATE_ADJUSTMENT_TYPE_CODE = record_scope.RATE_ADJUSTMENT_TYPE_CODE
+             AND SYSDATE BETWEEN C.EFFECTIVE_DATE AND C.EXPIRY_DATE) AS RATE_ADJUSTMENT_TYPE_DESCRIPTION
+      """;
+
+  // Selected scale codes use code-only lookups, including literal spaces and expired codes.
+  // Scalar subqueries preserve missing-label rows and reject duplicate labels without multiplying rates.
+  private static final String RATE_LABELS = """
+      SELECT S.*,
+             CASE WHEN S.ROW_KIND = 2 THEN
+               (SELECT C.DESCRIPTION FROM SCALE_SPECIES_CODE C
+                 WHERE C.SCALE_SPECIES_CODE = S.SCALE_SPECIES_CODE) END AS SCALE_SPECIES_DESCRIPTION,
+             CASE WHEN S.ROW_KIND = 2 THEN
+               (SELECT C.DESCRIPTION FROM SCALE_PRODUCT_CODE C
+                 WHERE C.SCALE_PRODUCT_CODE = S.SCALE_PRODUCT_CODE) END AS SCALE_PRODUCT_DESCRIPTION,
+             CASE WHEN S.ROW_KIND = 2 THEN
+               (SELECT C.DESCRIPTION FROM SCALE_GRADE_CODE C
+                 WHERE C.SCALE_GRADE_CODE = S.SCALE_GRADE_CODE) END AS SCALE_GRADE_DESCRIPTION
+        FROM summary_rows S
+      """;
+
   private final JdbcTemplate jdbc;
 
   public OracleOtherWorksheetSummary(JdbcTemplate jdbc) {
@@ -197,10 +231,13 @@ public final class OracleOtherWorksheetSummary {
                 if (parent != null) {
                   throw new IncorrectResultSizeDataAccessException(1, 2);
                 }
-                parent = new NonAppraisedParent(Header.read(rows), rows.getString("REFERENCE_TYPE"),
-                    localDate(rows, "SDM_DECLARATION_ACCEPTANCE_DT"), rows.getString("TSB_NUMBER_CODE"),
-                    rows.getString("APPRAISAL_FOREST_ZONE_CODE"), rows.getString("NON_APPRAISED_RATE_TYPE_CODE"),
-                    rows.getString("RATE_ADJUSTMENT_TYPE_CODE"));
+                parent = new NonAppraisedParent(Header.read(rows),
+                    option(rows, "REFERENCE_TYPE", "REFERENCE_TYPE_DESCRIPTION"),
+                    localDate(rows, "SDM_DECLARATION_ACCEPTANCE_DT"),
+                    option(rows, "TSB_NUMBER_CODE", "TSB_DESCRIPTION"),
+                    option(rows, "APPRAISAL_FOREST_ZONE_CODE", "APPRAISAL_FOREST_ZONE_DESCRIPTION"),
+                    option(rows, "NON_APPRAISED_RATE_TYPE_CODE", "NON_APPRAISED_RATE_TYPE_DESCRIPTION"),
+                    option(rows, "RATE_ADJUSTMENT_TYPE_CODE", "RATE_ADJUSTMENT_TYPE_DESCRIPTION"));
               }
               case 2 -> {
                 checkRateParent(rows, key);
@@ -233,12 +270,14 @@ public final class OracleOtherWorksheetSummary {
     // Table and column names are constants. One statement keeps parent and children consistent.
     String active = key.type() == GasAppraisal.WorksheetType.HISTORIC
         ? " AND record_scope.ACTIVE_IND = 'Y'" : "";
+    String worksheetLabels = key.type() == GasAppraisal.WorksheetType.NON_APPRAISED
+        ? NON_APPRAISED_LABELS : "";
     String sql = "WITH record_scope AS (\n" + source + "), scoped_parent AS (\n"
         + "SELECT record_scope.*, (SELECT C.DESCRIPTION FROM " + statusTable + " C WHERE C."
         + statusColumn + " = record_scope.STATUS_CODE AND SYSDATE BETWEEN C.EFFECTIVE_DATE"
-        + " AND C.EXPIRY_DATE) AS STATUS_DESCRIPTION FROM record_scope\n"
-        + "WHERE record_scope.WORKSHEET_ID = ? AND " + scope.sql() + active + "\n)\n"
-        + PARENT + children
+        + " AND C.EXPIRY_DATE) AS STATUS_DESCRIPTION" + worksheetLabels + " FROM record_scope\n"
+        + "WHERE record_scope.WORKSHEET_ID = ? AND " + scope.sql() + active + "\n), summary_rows AS (\n"
+        + PARENT + children + ")\n" + RATE_LABELS
         + "ORDER BY ROW_KIND, RATE_EFFECTIVE_DATE, SCALE_SPECIES_CODE, SCALE_PRODUCT_CODE, SCALE_GRADE_CODE, RATE_ID, ADDON_CODE, DETAIL_ID";
     return jdbc.query(sql,
         statement -> {
@@ -283,10 +322,17 @@ public final class OracleOtherWorksheetSummary {
 
   private static GasAppraisal.StoredNonAppraisedRate nonAppraisedRate(ResultSet row) throws SQLException {
     return new GasAppraisal.StoredNonAppraisedRate(row.getString("RATE_ID"),
-        row.getString("SCALE_SPECIES_CODE"), row.getString("SCALE_PRODUCT_CODE"),
-        row.getString("SCALE_GRADE_CODE"), row.getBigDecimal("RESERVE_STUMPAGE_RATE"),
+        option(row, "SCALE_SPECIES_CODE", "SCALE_SPECIES_DESCRIPTION"),
+        option(row, "SCALE_PRODUCT_CODE", "SCALE_PRODUCT_DESCRIPTION"),
+        option(row, "SCALE_GRADE_CODE", "SCALE_GRADE_DESCRIPTION"), row.getBigDecimal("RESERVE_STUMPAGE_RATE"),
         row.getBigDecimal("BONUS_BID_AMOUNT"), row.getBigDecimal("DEVELOPMENT_LEVY"),
         row.getBigDecimal("SILVICULTURE_LEVY"));
+  }
+
+  private static CodeOption option(ResultSet row, String codeColumn, String descriptionColumn)
+      throws SQLException {
+    String code = row.getString(codeColumn);
+    return code == null ? null : new CodeOption(code, row.getString(descriptionColumn));
   }
 
   private static Boolean indicator(ResultSet row, String column) throws SQLException {
@@ -324,6 +370,6 @@ public final class OracleOtherWorksheetSummary {
   private record HistoricParent(Header header, String calculation, Boolean toa, Boolean quarterly,
       Boolean active, String policy, LocalDate cease) {}
 
-  private record NonAppraisedParent(Header header, String reference, LocalDate sdm, String tsb,
-      String zone, String rateType, String adjustmentType) {}
+  private record NonAppraisedParent(Header header, CodeOption reference, LocalDate sdm, CodeOption tsb,
+      CodeOption zone, CodeOption rateType, CodeOption adjustmentType) {}
 }

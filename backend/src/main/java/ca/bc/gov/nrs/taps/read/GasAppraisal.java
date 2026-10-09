@@ -3,6 +3,7 @@ package ca.bc.gov.nrs.taps.read;
 import ca.bc.gov.nrs.taps.domain.AppraisalMethod;
 import ca.bc.gov.nrs.taps.domain.LegacyIdentifiers;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -116,7 +117,9 @@ public final class GasAppraisal {
       String forestDistrict,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate markExpiryDate,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate markExtendDate,
-      String ftaStatus) {}
+      String ftaStatus,
+      CodeOption markStatus,
+      Boolean cruiseBased) {}
 
   /** FTA details and worksheets are independent; either can be missing. */
   public record SearchResult(Page appraisals, FtaLicenceInformation licenceInformation) {
@@ -137,6 +140,7 @@ public final class GasAppraisal {
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate effectiveDate,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate expiryDate,
       List<String> timberMarks,
+      String primaryTimberMark,
       String referenceTypeCode,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate ceaseAdjustmentDate,
       List<StoredRate> rates) {
@@ -194,7 +198,7 @@ public final class GasAppraisal {
     }
   }
 
-  /** Stored non-appraised worksheet and rate components; no derived total. */
+  /** Stored non-appraised worksheet with labelled rate components and display totals. */
   public record NonAppraisedSummary(
       Key key,
       String licence,
@@ -203,12 +207,12 @@ public final class GasAppraisal {
       CodeOption status,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate effectiveDate,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate expiryDate,
-      String referenceTypeCode,
+      CodeOption referenceType,
       @JsonFormat(shape = JsonFormat.Shape.STRING) LocalDate sdmDeclarationAcceptanceDate,
-      String tsbNumberCode,
-      String appraisalForestZoneCode,
-      String nonAppraisedRateTypeCode,
-      String rateAdjustmentTypeCode,
+      CodeOption timberSupplyBlock,
+      CodeOption appraisalForestZone,
+      CodeOption nonAppraisedRateType,
+      CodeOption rateAdjustmentType,
       List<StoredNonAppraisedRate> rates,
       List<SelectedRateAddon> selectedRateAddons) {
     public NonAppraisedSummary {
@@ -264,23 +268,40 @@ public final class GasAppraisal {
 
   public record StoredNonAppraisedRate(
       String rateId,
-      String scaleSpeciesCode,
-      String scaleProductCode,
-      String scaleGradeCode,
+      CodeOption scaleSpecies,
+      CodeOption scaleProduct,
+      CodeOption scaleGrade,
       @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal reserveStumpageRate,
       @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal bonusBidAmount,
       @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal developmentLevy,
       @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal silvicultureLevy) {
     public StoredNonAppraisedRate {
       rateId = LegacyIdentifiers.requiredId(rateId);
-      Objects.requireNonNull(scaleSpeciesCode, "scaleSpeciesCode");
-      Objects.requireNonNull(scaleProductCode, "scaleProductCode");
-      Objects.requireNonNull(scaleGradeCode, "scaleGradeCode");
+      Objects.requireNonNull(scaleSpecies, "scaleSpecies");
+      Objects.requireNonNull(scaleSpecies.code(), "scaleSpecies.code");
+      Objects.requireNonNull(scaleProduct, "scaleProduct");
+      Objects.requireNonNull(scaleProduct.code(), "scaleProduct.code");
+      Objects.requireNonNull(scaleGrade, "scaleGrade");
+      Objects.requireNonNull(scaleGrade.code(), "scaleGrade.code");
       Objects.requireNonNull(reserveStumpageRate, "reserveStumpageRate");
       reserveStumpageRate = nonAppraisedAmount(reserveStumpageRate);
       bonusBidAmount = nonAppraisedAmount(bonusBidAmount);
       developmentLevy = nonAppraisedAmount(developmentLevy);
       silvicultureLevy = nonAppraisedAmount(silvicultureLevy);
+    }
+
+    @JsonProperty(value = "upsetStumpageRate", access = JsonProperty.Access.READ_ONLY)
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    public BigDecimal upsetStumpageRate() {
+      return reserveStumpageRate
+          .add(silvicultureLevy == null ? BigDecimal.ZERO : silvicultureLevy)
+          .add(developmentLevy == null ? BigDecimal.ZERO : developmentLevy);
+    }
+
+    @JsonProperty(value = "totalStumpageRate", access = JsonProperty.Access.READ_ONLY)
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    public BigDecimal totalStumpageRate() {
+      return upsetStumpageRate().add(bonusBidAmount == null ? BigDecimal.ZERO : bonusBidAmount);
     }
   }
 

@@ -36,6 +36,8 @@ export type ReferenceHeader = {
   appraisalCategoryCode: string | null
   reappraisalReasonCode: string | null
   rateCalculationMethodCode: string | null
+  coniferousStandRateEligibility: CodeOption | null
+  deciduousStandRateEligibility: CodeOption | null
   effectiveDate: string | null
   expiryDate: string | null
   administrativeDistrict: CodeOption | null
@@ -107,6 +109,7 @@ export type EcasSortField =
   | 'SENT_TO_REGION_DATE'
   | 'UPDATE_DATE'
 export type EcasSearchFilters = {
+  mode?: 'MY_TO_DO' | 'ALL_SUBMISSIONS'
   ecasId: string
   licence: string
   timberMark: string
@@ -161,6 +164,8 @@ export type FtaLicenceInformation = {
   markExpiryDate: string | null
   markExtendDate: string | null
   ftaStatus: string | null
+  markStatus: CodeOption | null
+  cruiseBased: boolean | null
 }
 
 export type GasSearchResult = {
@@ -179,6 +184,7 @@ export type GasAppraisedSummary = {
   effectiveDate: string | null
   expiryDate: string | null
   timberMarks: string[]
+  primaryTimberMark: string | null
   referenceTypeCode: string | null
   ceaseAdjustmentDate: string | null
   rates: { rateId: string; effectiveDate: string; totalStumpageRate: string }[]
@@ -186,13 +192,15 @@ export type GasAppraisedSummary = {
 
 export type StoredNonAppraisedRate = {
   rateId: string
-  scaleSpeciesCode: string
-  scaleProductCode: string
-  scaleGradeCode: string
+  scaleSpecies: CodeOption
+  scaleProduct: CodeOption
+  scaleGrade: CodeOption
   reserveStumpageRate: string
   bonusBidAmount: string | null
   developmentLevy: string | null
   silvicultureLevy: string | null
+  upsetStumpageRate: string
+  totalStumpageRate: string
 }
 
 export type GasHistoricSummary = {
@@ -224,12 +232,12 @@ export type GasNonAppraisedSummary = {
   status: CodeOption | null
   effectiveDate: string | null
   expiryDate: string | null
-  referenceTypeCode: string | null
+  referenceType: CodeOption | null
   sdmDeclarationAcceptanceDate: string | null
-  tsbNumberCode: string | null
-  appraisalForestZoneCode: string | null
-  nonAppraisedRateTypeCode: string | null
-  rateAdjustmentTypeCode: string | null
+  timberSupplyBlock: CodeOption | null
+  appraisalForestZone: CodeOption | null
+  nonAppraisedRateType: CodeOption | null
+  rateAdjustmentType: CodeOption | null
   rates: StoredNonAppraisedRate[]
   selectedRateAddons: SelectedRateAddon[]
 }

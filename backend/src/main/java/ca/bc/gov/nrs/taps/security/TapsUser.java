@@ -10,7 +10,13 @@ public record TapsUser(
     String email,
     IdentityProvider identityProvider,
     String businessName,
-    List<RoleGrant> grants) {
+    List<RoleGrant> grants,
+    String legacyAccount) {
+
+  public TapsUser(String userId, String displayName, String email, IdentityProvider identityProvider,
+      String businessName, List<RoleGrant> grants) {
+    this(userId, displayName, email, identityProvider, businessName, grants, null);
+  }
 
   public TapsUser {
     grants = List.copyOf(grants);
@@ -41,5 +47,20 @@ public record TapsUser(
         .map(FamRoleName.Scope::value)
         .distinct()
         .toList();
+  }
+
+  /** An assigned queue must use a signed provider username, never the GUID audit fallback. */
+  public boolean ecasMyToDoAvailable() {
+    List<RoleGrant> ecasGrants = grants.stream()
+        .filter(grant -> grant.role().capabilities().contains(TapsCapability.ECAS_SUBMISSION_VIEW))
+        .filter(grant -> RoleGrant.accept(new FamRoleName(grant.role().name(),
+            grant.scope() == null ? List.of() : List.of(grant.scope())), identityProvider).isPresent())
+        .toList();
+    return !ecasGrants.isEmpty() && ((legacyAccount != null && !legacyAccount.isBlank())
+        || ecasGrants.stream().noneMatch(grant ->
+        switch (grant.role()) {
+          case TAPS_HEADQUARTERS, TAPS_REGION_APPRAISER, TAPS_DISTRICT_APPRAISER -> true;
+          default -> false;
+        }));
   }
 }

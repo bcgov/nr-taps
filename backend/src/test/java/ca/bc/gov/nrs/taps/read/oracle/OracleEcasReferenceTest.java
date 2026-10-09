@@ -112,6 +112,20 @@ class OracleEcasReferenceTest {
   }
 
   @Test
+  void readsStoredStandRateEligibilityWithoutInferringNewFormDefaults() throws SQLException {
+    references.coast(idir("TAPS_ADMIN"), "12345");
+    String sql = preparedSql();
+    assertThat(sql).contains(
+        "P.CONIF_STAND_RATE_ELIG_CODE, P.DECID_STAND_RATE_ELIG_CODE",
+        "SELECT S.DESCRIPTION FROM STAND_RATE_ELIGIBILITY_CODE S",
+        "S.STAND_RATE_ELIGIBILITY_CODE = P.CONIF_STAND_RATE_ELIG_CODE",
+        "S.STAND_RATE_ELIGIBILITY_CODE = P.DECID_STAND_RATE_ELIG_CODE");
+    assertThat(sql)
+        .doesNotContain("NVL(P.CONIF_STAND_RATE_ELIG_CODE", "NVL(P.DECID_STAND_RATE_ELIG_CODE",
+            "APP_METHOD_STAND_RATE_XREF", "SYSDATE");
+  }
+
+  @Test
   void preservesInteriorDateBoundaryAndLatestApprovedZoneFallback() throws SQLException {
     references.interior(idir("TAPS_ADMIN"), "12345");
     String sql = preparedSql();
@@ -190,16 +204,43 @@ class OracleEcasReferenceTest {
     when(rows.getTimestamp("APPRAISAL_EFFECTIVE_DATE")).thenReturn(null);
     when(rows.getObject("REVISION_COUNT", Integer.class)).thenReturn(null);
     when(rows.getString("SALVAGE_IND")).thenReturn(null);
+    when(rows.getString("CONIF_STAND_RATE_ELIG_CODE")).thenReturn(null);
+    when(rows.getString("CONIF_STAND_RATE_ELIG_DESCRIPTION")).thenReturn(null);
+    when(rows.getString("DECID_STAND_RATE_ELIG_CODE")).thenReturn("X");
+    when(rows.getString("DECID_STAND_RATE_ELIG_DESCRIPTION")).thenReturn(null);
     var reference = references.interior(idir("TAPS_ADMIN"), "12345").orElseThrow();
     assertThat(reference.header().revisionCount()).isNull();
     assertThat(reference.header().clientNumber()).isNull();
     assertThat(reference.header().licenseeName()).isNull();
     assertThat(reference.header().effectiveDate()).isNull();
     assertThat(reference.header().status()).isEqualTo(new CodeOption("CON", null));
+    assertThat(reference.header().coniferousStandRateEligibility())
+        .isEqualTo(new CodeOption(null, null));
+    assertThat(reference.header().deciduousStandRateEligibility())
+        .isEqualTo(new CodeOption("X", null));
     assertThat(reference.timberMarkRevisionCount()).isNull();
     assertThat(reference.pointOfAppraisal()).isEqualTo(new CodeOption(null, null));
     assertThat(reference.sellingPriceZoneCode()).isNull();
     assertThat(reference.salvage()).isNull();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"C", "I"})
+  void preservesNonDefaultStandRateEligibilityInBothReferenceVariants(String method)
+      throws SQLException {
+    parent(method);
+    oneMark();
+    when(rows.getString("CONIF_STAND_RATE_ELIG_CODE")).thenReturn("C");
+    when(rows.getString("CONIF_STAND_RATE_ELIG_DESCRIPTION")).thenReturn("Synthetic cruise grade");
+    when(rows.getString("DECID_STAND_RATE_ELIG_CODE")).thenReturn("A");
+    when(rows.getString("DECID_STAND_RATE_ELIG_DESCRIPTION")).thenReturn("Synthetic all grades");
+    EcasReference.Header header = method.equals("C")
+        ? references.coast(idir("TAPS_ADMIN"), "12345").orElseThrow().header()
+        : references.interior(idir("TAPS_ADMIN"), "12345").orElseThrow().header();
+    assertThat(header.coniferousStandRateEligibility())
+        .isEqualTo(new CodeOption("C", "Synthetic cruise grade"));
+    assertThat(header.deciduousStandRateEligibility())
+        .isEqualTo(new CodeOption("A", "Synthetic all grades"));
   }
 
   @Test
@@ -287,6 +328,10 @@ class OracleEcasReferenceTest {
     when(rows.getString("TSA_DESCRIPTION")).thenReturn("Synthetic TSA");
     when(rows.getString("TSB_CODE")).thenReturn("123");
     when(rows.getString("TSB_DESCRIPTION")).thenReturn("Synthetic TSB");
+    when(rows.getString("CONIF_STAND_RATE_ELIG_CODE")).thenReturn("S");
+    when(rows.getString("CONIF_STAND_RATE_ELIG_DESCRIPTION")).thenReturn("Sawlog Grades");
+    when(rows.getString("DECID_STAND_RATE_ELIG_CODE")).thenReturn("N");
+    when(rows.getString("DECID_STAND_RATE_ELIG_DESCRIPTION")).thenReturn("No Grades");
     when(rows.getString("REFERENCE_TIMBER_MARK")).thenReturn("A12345");
     when(rows.getString("REFERENCE_MARK")).thenReturn("R12345");
   }
@@ -305,7 +350,8 @@ class OracleEcasReferenceTest {
         LocalDate.of(2018, 10, 31), LocalDate.of(2019, 10, 31),
         new CodeOption("DZZ", "Synthetic admin"), new CodeOption("DXX", "Synthetic geo"),
         new CodeOption("A01", "Synthetic licence"), new CodeOption("12", "Synthetic TSA"),
-        new CodeOption("123", "Synthetic TSB")));
+        new CodeOption("123", "Synthetic TSB"), new CodeOption("S", "Sawlog Grades"),
+        new CodeOption("N", "No Grades")));
   }
 
   private String preparedSql() throws SQLException {

@@ -101,7 +101,7 @@ export const readApi: ReadApi = {
   ecasLookups: (signal) => readRequest('/api/ecas/lookups', signal),
   inbox: (filters, page, signal) =>
     readRequest(`/api/ecas/inbox?page=${page}`, signal, {
-      mode: 'ALL_SUBMISSIONS',
+      mode: filters.mode ?? 'ALL_SUBMISSIONS',
       ecasId: value(filters.ecasId),
       licence: value(filters.licence),
       timberMark: value(filters.timberMark),
@@ -119,7 +119,7 @@ export const readApi: ReadApi = {
         filters.managementUnitType === undefined ? undefined : value(filters.managementUnitType),
       managementUnitId:
         filters.managementUnitId === undefined ? undefined : value(filters.managementUnitId),
-      workedOnByUserId: filters.workedOnByUserId?.trim() || undefined,
+      workedOnByUserId: filters.workedOnByUserId?.trim().toUpperCase() || undefined,
       bctsFunded: filters.bctsFunded,
       certified: filters.certified,
       appraisalMethod: filters.appraisalMethod || undefined,

@@ -83,18 +83,21 @@ From the SQL in [`read/oracle`](src/main/java/ca/bc/gov/nrs/taps/read/oracle). N
 unqualified, so the database team needs to confirm the owner and synonym of each object for the
 proxy account. Don't assume one owner because the test fixture has one.
 
-`SELECT` on these 46 objects:
+`SELECT` on these 59 objects:
 
 | Objects | Used for |
 | --- | --- |
 | `APPRAISAL_DATA_SUBMISSION`, `APPRAISAL_DATA_SUBMISSION_CTRL`, `ADS_SUBMITTED_TIMBER_MARK` | ECAS records, marks and appraised parents |
-| `APPRAISAL_CATEGORY_CODE`, `APPRAISAL_STATUS_CODE`, `NON_APPRAISED_STATUS_CODE`, `REAPPRAISAL_REASON_CODE` | Code labels and choices |
+| `ADS_ASSIGNED_TO_USER` | Existing ECAS My To Do assignments |
+| `APPRAISAL_CATEGORY_CODE`, `APPRAISAL_STATUS_CODE`, `NON_APPRAISED_STATUS_CODE`, `REAPPRAISAL_REASON_CODE`, `STAND_RATE_ELIGIBILITY_CODE` | Code labels and choices |
 | `ORG_UNIT` | District/region rollup and labels |
 | `ECAS_AUDIT_EVENT`, `ECAS_ACTION_CODE`, `ECAS_AUDIT_COMMENT`, `ECAS_AUDIT_DETAIL` | Audit history and inbox audit filters |
 | `ECAS_SUBMITTED_FILE` | File metadata (no binary column) |
 | `ADS_SUPPORT_DOCUMENT`, `APPRAISAL_DOCUMENT_TYPE_CODE`, `APPRAISAL_ATTACHMENT_XREF` | Attachment inventory |
 | `APPRAISED_WORKSHEET`, `HISTORIC_APPRAISED_WORKSHEET`, `NON_APPRAISED_WORKSHEET` | Worksheet parents |
 | `APPRAISED_STUMPAGE_RATE`, `NON_APPRAISED_STUMPAGE_RATE` | Stored rates |
+| `NON_APPRAISED_WORKSHEET_AUD`, `NON_APPRAISED_STUMPAGE_RTE_AUD`, `GAS_TRANSACTION` | Non-appraised worksheet history |
+| `APPRAISED_WORKSHEET_AUD`, `APPRAISED_STUMPAGE_RATE_AUD` | Appraised worksheet history |
 | `HAULING_AUTHORITY`, `HARVESTING_AUTHORITY`, `HARVESTING_HAULING_XREF` | Licence/mark/permit links and ownership |
 | `BLANKET_ROAD_MARK`, `PRIVATE_MARK_CERTIFICATE` | Road/private FTA context |
 | `FOREST_FILE_CLIENT`, `FOREST_CLIENT`, `V_CLIENT_PUBLIC` | Client links and names (`V_CLIENT_PUBLIC` is a view in the real schema, a table in the fixture) |
@@ -104,6 +107,8 @@ proxy account. Don't assume one owner because the test fixture has one.
 | `INT_POINT_OF_APPRAISAL_CODE`, `POINT_OF_APPRAISAL` | Interior appraisal point and selling zone |
 | `TSA_NUMBER_CODE`, `TSB_NUMBER_CODE` | Management-unit labels |
 | `APPRAISAL_METHOD_CODE`, `RATE_ADJUSTMENT_TYPE_CODE` | GAS lookups |
+| `WORKSHEET_REFERENCE_TYPE_CODE`, `APPRAISAL_FOREST_ZONE_CODE`, `NON_APPRAISED_RATE_TYPE_CODE` | Non-appraised worksheet labels |
+| `SCALE_SPECIES_CODE`, `SCALE_PRODUCT_CODE`, `SCALE_GRADE_CODE` | Stored rate labels |
 | `NON_APPRAISED_WS_RATE_ADDON`, `NON_APPRAISED_RATE_ADDON_CODE` | Selected add-ons |
 | `HISTORIC_SPECIES`, `HISTORIC_COAST_SPECIES_GRADE` | Historic species and Coast grades |
 
@@ -116,7 +121,7 @@ DDL, schema ownership or `ANY` privilege.
 
 ## API reference
 
-`/api/me` exposes identity, grants, capabilities and read availability. Health probes are public; business routes require both the `oracle` profile and the matching capability. The [read API guide](../docs/oracle-reads.md#http-routes) lists all routes, page sizes, errors and contracts. It also records the SQL ownership mappings and family-specific behavior.
+`/api/me` exposes identity, grants, capabilities and read availability, including `ecasMyToDoAvailable`. Assigned queues require a signed provider username; the GUID audit fallback cannot identify legacy assignments. Health probes are public; business routes require both the `oracle` profile and the matching capability. The [read API guide](../docs/oracle-reads.md#http-routes) lists all routes, page sizes, errors and contracts. It also records the SQL ownership mappings and family-specific behavior.
 
 Review [intentional legacy divergences](../docs/intentional-legacy-divergences.md) separately when assessing parity.
 

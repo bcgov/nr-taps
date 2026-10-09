@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.Objects;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** ECAS05 all-submissions and direct-ID search, without the legacy temp-table procedure. */
+/** ECAS05 read-only searches without legacy assignment rebuilds or temp-table procedures. */
 public final class OracleEcasInbox {
   private final JdbcTemplate jdbc;
 

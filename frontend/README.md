@@ -61,6 +61,12 @@ Reloading resets it.
   marks and permits for one submission. **View related GAS worksheets** follows the fixture link.
   In GAS search, licence `X99998` shows the mark chooser and mark `ZZ9996` shows FTA information
   with no worksheets.
+- **Synthetic asynchronous read pages:** GAS licence `X99995` and mark `ZZ9995` open a fictional
+  non-appraised summary with descriptive labels, nullable rate components and exact Upset Rate /
+  Total Rate values. Expand **History** for twelve fictional changes across two pages, including
+  a comment containing literal markup that must display as text.
+  Appraised worksheets under licence `X99998` also expose their own synthetic History pages;
+  historic worksheets do not offer History.
 
 The preview source lives in `src/local-synthetic/`, with `LocalSyntheticPreview.tsx` as its UI.
 `local-synthetic.html` is guarded by Vite's built-in `import.meta.env.DEV` flag, which enables local
@@ -73,7 +79,9 @@ local synthetic preview. See the
 
 1. Switch sessions and open ECAS and GAS routes as allowed, forbidden and no-role users.
 2. Filters only apply on Search or Enter. Clear all empties the filters and removes the results
-   without searching.
+   without searching. ECAS starts and resets to All Submissions. When the backend enables
+   My To Do, changing mode also clears the results and any open detail panel. The local synthetic
+   My To Do listing is empty because its sample submissions are confirmed.
 3. Try each results state and the retry button.
 4. Open a row drawer at wide and narrow widths. Check initial focus, Escape, Tab and that focus
    returns to the row button.

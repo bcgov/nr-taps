@@ -28,6 +28,7 @@ import java.sql.Timestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
@@ -148,6 +149,10 @@ class OracleOtherWorksheetSummaryTest {
         .containsExactly("2", "3");
     assertThat(summary.nonAppraisedRates().getFirst().bonusBidAmount()).isNull();
     assertThat(summary.nonAppraisedRates().getFirst().developmentLevy()).isEqualTo(new BigDecimal("0.00"));
+    assertThat(summary.nonAppraisedRates().getFirst().scaleSpecies())
+        .isEqualTo(new CodeOption(" SP ", "Synthetic species"));
+    assertThat(summary.nonAppraisedRates().getFirst().upsetStumpageRate()).isEqualTo(new BigDecimal("3.90"));
+    assertThat(summary.nonAppraisedRates().getFirst().totalStumpageRate()).isEqualTo(new BigDecimal("3.90"));
     cleanup(true);
   }
 
@@ -173,9 +178,14 @@ class OracleOtherWorksheetSummaryTest {
     when(rows.getString("REFERENCE_TYPE")).thenReturn(" REF ");
     when(rows.getDate("SDM_DECLARATION_ACCEPTANCE_DT")).thenReturn(Date.valueOf("2030-02-01"));
     when(rows.getString("TSB_NUMBER_CODE")).thenReturn(" T1 ");
+    when(rows.getString("TSB_DESCRIPTION")).thenReturn(" T1  - Synthetic block");
     when(rows.getString("APPRAISAL_FOREST_ZONE_CODE")).thenReturn(" Z1 ");
     when(rows.getString("NON_APPRAISED_RATE_TYPE_CODE")).thenReturn(" TYPE ");
     when(rows.getString("RATE_ADJUSTMENT_TYPE_CODE")).thenReturn("R");
+    when(rows.getString("REFERENCE_TYPE_DESCRIPTION")).thenReturn("Synthetic reference");
+    when(rows.getString("APPRAISAL_FOREST_ZONE_DESCRIPTION")).thenReturn("Synthetic zone");
+    when(rows.getString("NON_APPRAISED_RATE_TYPE_DESCRIPTION")).thenReturn("Synthetic rate type");
+    when(rows.getString("RATE_ADJUSTMENT_TYPE_DESCRIPTION")).thenReturn("Synthetic adjustment");
     nonAppraisedRate();
 
     var summary = summaries.nonAppraised(idir("TAPS_ADMIN"), key(GasAppraisal.WorksheetType.NON_APPRAISED)).orElseThrow();
@@ -185,15 +195,105 @@ class OracleOtherWorksheetSummaryTest {
     assertThat(summary.licence()).isEqualTo(" A00001 ");
     assertThat(summary.timberMark()).isEqualTo("ABC123");
     assertThat(summary.expiryDate()).isNull();
-    assertThat(summary.referenceTypeCode()).isEqualTo(" REF ");
+    assertThat(summary.referenceType()).isEqualTo(new CodeOption(" REF ", "Synthetic reference"));
     assertThat(summary.sdmDeclarationAcceptanceDate()).isEqualTo(LocalDate.of(2030, 2, 1));
-    assertThat(summary.tsbNumberCode()).isEqualTo(" T1 ");
-    assertThat(summary.appraisalForestZoneCode()).isEqualTo(" Z1 ");
-    assertThat(summary.nonAppraisedRateTypeCode()).isEqualTo(" TYPE ");
-    assertThat(summary.rateAdjustmentTypeCode()).isEqualTo("R");
+    assertThat(summary.timberSupplyBlock()).isEqualTo(new CodeOption(" T1 ", " T1  - Synthetic block"));
+    assertThat(summary.appraisalForestZone()).isEqualTo(new CodeOption(" Z1 ", "Synthetic zone"));
+    assertThat(summary.nonAppraisedRateType()).isEqualTo(new CodeOption(" TYPE ", "Synthetic rate type"));
+    assertThat(summary.rateAdjustmentType()).isEqualTo(new CodeOption("R", "Synthetic adjustment"));
     assertThat(summary.rates()).containsExactly(new GasAppraisal.StoredNonAppraisedRate("3",
-        " SP ", "PL", "A", new BigDecimal("5.10"), null, new BigDecimal("0.00"), new BigDecimal("-1.20")));
+        new CodeOption(" SP ", "Synthetic species"), new CodeOption("PL", "Synthetic product"),
+        new CodeOption("A", "Synthetic grade"), new BigDecimal("5.10"), null,
+        new BigDecimal("0.00"), new BigDecimal("-1.20")));
     assertThatThrownBy(() -> summary.rates().clear()).isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = GasAppraisal.WorksheetType.class, names = {"HISTORIC", "NON_APPRAISED"})
+  void selectedScaleLabelsUseOnlyCodeAndCannotMultiplyRates(GasAppraisal.WorksheetType type)
+      throws SQLException {
+    read(type, idir("TAPS_ADMIN"));
+    String sql = sql();
+    String rateLabels = sql.substring(sql.indexOf("SELECT S.*,"));
+    assertThat(rateLabels).contains(
+        "CASE WHEN S.ROW_KIND = 2 THEN",
+        "SELECT C.DESCRIPTION FROM SCALE_SPECIES_CODE C",
+        "C.SCALE_SPECIES_CODE = S.SCALE_SPECIES_CODE",
+        "SELECT C.DESCRIPTION FROM SCALE_PRODUCT_CODE C",
+        "C.SCALE_PRODUCT_CODE = S.SCALE_PRODUCT_CODE",
+        "SELECT C.DESCRIPTION FROM SCALE_GRADE_CODE C",
+        "C.SCALE_GRADE_CODE = S.SCALE_GRADE_CODE",
+        "AS SCALE_SPECIES_DESCRIPTION", "AS SCALE_PRODUCT_DESCRIPTION", "AS SCALE_GRADE_DESCRIPTION",
+        "ORDER BY ROW_KIND, RATE_EFFECTIVE_DATE, SCALE_SPECIES_CODE, SCALE_PRODUCT_CODE, SCALE_GRADE_CODE, RATE_ID")
+        .doesNotContain("SYSDATE", "EFFECTIVE_DATE AND", "JOIN SCALE_", "TRIM(", "ORDER BY DESCRIPTION");
+  }
+
+  @Test
+  void worksheetClassificationLabelsHaveInclusiveCurrentValidityAndScalarCardinality()
+      throws SQLException {
+    summaries.nonAppraised(idir("TAPS_ADMIN"), key(GasAppraisal.WorksheetType.NON_APPRAISED));
+    String sql = sql();
+    for (String table : List.of("WORKSHEET_REFERENCE_TYPE_CODE", "APPRAISAL_FOREST_ZONE_CODE",
+        "NON_APPRAISED_RATE_TYPE_CODE", "RATE_ADJUSTMENT_TYPE_CODE")) {
+      assertThat(sql).contains("SELECT C.DESCRIPTION FROM " + table + " C")
+          .doesNotContain("JOIN " + table);
+    }
+    assertThat(sql).contains("C.WORKSHEET_REFERENCE_TYPE_CODE = record_scope.REFERENCE_TYPE",
+        "C.APPRAISAL_FOREST_ZONE_CODE = record_scope.APPRAISAL_FOREST_ZONE_CODE",
+        "C.NON_APPRAISED_RATE_TYPE_CODE = record_scope.NON_APPRAISED_RATE_TYPE_CODE",
+        "C.RATE_ADJUSTMENT_TYPE_CODE = record_scope.RATE_ADJUSTMENT_TYPE_CODE");
+    assertThat(sql).contains("record_scope.TSB_NUMBER_CODE || ' - ' || C.DESCRIPTION FROM TSB_NUMBER_CODE C",
+        "C.TSB_NUMBER_CODE = record_scope.TSB_NUMBER_CODE");
+    assertThat(sql.split("SYSDATE BETWEEN C.EFFECTIVE_DATE AND C.EXPIRY_DATE", -1)).hasSize(7);
+  }
+
+  @Test
+  void missingLabelsKeepClassificationAndLiteralSpaceRateCodesWithoutDroppingRows() throws SQLException {
+    parent("I", null, null);
+    when(rows.next()).thenReturn(true, true, false);
+    when(rows.getInt("ROW_KIND")).thenReturn(0, 2);
+    when(rows.getString("NON_APPRAISED_PARENT_ID")).thenReturn("998877");
+    when(rows.getString("RATE_ID")).thenReturn("3");
+    when(rows.getString("REFERENCE_TYPE")).thenReturn("UNKNOWN");
+    when(rows.getString("APPRAISAL_FOREST_ZONE_CODE")).thenReturn("EXPIRED");
+    when(rows.getString("NON_APPRAISED_RATE_TYPE_CODE")).thenReturn("UNKNOWN");
+    when(rows.getString("RATE_ADJUSTMENT_TYPE_CODE")).thenReturn("EXPIRED");
+    nonAppraisedRate();
+    when(rows.getString("SCALE_PRODUCT_CODE")).thenReturn(" ");
+    when(rows.getString("SCALE_GRADE_CODE")).thenReturn(" ");
+    when(rows.getString("SCALE_SPECIES_DESCRIPTION")).thenReturn(null);
+    when(rows.getString("SCALE_PRODUCT_DESCRIPTION")).thenReturn(null);
+    when(rows.getString("SCALE_GRADE_DESCRIPTION")).thenReturn(null);
+    var summary = summaries.nonAppraised(idir("TAPS_ADMIN"), key(GasAppraisal.WorksheetType.NON_APPRAISED)).orElseThrow();
+    assertThat(summary.referenceType()).isEqualTo(new CodeOption("UNKNOWN", null));
+    assertThat(summary.appraisalForestZone()).isEqualTo(new CodeOption("EXPIRED", null));
+    assertThat(summary.nonAppraisedRateType()).isEqualTo(new CodeOption("UNKNOWN", null));
+    assertThat(summary.rateAdjustmentType()).isEqualTo(new CodeOption("EXPIRED", null));
+    assertThat(summary.rates()).hasSize(1);
+    assertThat(summary.rates().getFirst().scaleSpecies()).isEqualTo(new CodeOption(" SP ", null));
+    assertThat(summary.rates().getFirst().scaleProduct()).isEqualTo(new CodeOption(" ", null));
+    assertThat(summary.rates().getFirst().scaleGrade()).isEqualTo(new CodeOption(" ", null));
+  }
+
+  @Test
+  void nullClassificationCodesRemainNullEvenIfAResultDescriptionIsPresent() throws SQLException {
+    parent("I", null, null);
+    when(rows.next()).thenReturn(true, false);
+    when(rows.getString("REFERENCE_TYPE_DESCRIPTION")).thenReturn("Synthetic stray label");
+    var summary = summaries.nonAppraised(idir("TAPS_ADMIN"), key(GasAppraisal.WorksheetType.NON_APPRAISED)).orElseThrow();
+    assertThat(summary.referenceType()).isNull();
+    assertThat(summary.appraisalForestZone()).isNull();
+    assertThat(summary.nonAppraisedRateType()).isNull();
+    assertThat(summary.rateAdjustmentType()).isNull();
+  }
+
+  @Test
+  void duplicateScalarLabelsFailTheWholeReadAndReleaseResources() throws SQLException {
+    var error = new SQLException("Synthetic scalar lookup returned multiple rows", "21000", 1427);
+    when(statement.executeQuery()).thenThrow(error);
+    assertThatThrownBy(() -> summaries.nonAppraised(idir("TAPS_ADMIN"), key(GasAppraisal.WorksheetType.NON_APPRAISED)))
+        .isInstanceOf(DataAccessException.class).hasCause(error);
+    cleanup(false);
   }
 
   @Test
@@ -386,6 +486,9 @@ class OracleOtherWorksheetSummaryTest {
     when(rows.getString("SCALE_SPECIES_CODE")).thenReturn(" SP ");
     when(rows.getString("SCALE_PRODUCT_CODE")).thenReturn("PL");
     when(rows.getString("SCALE_GRADE_CODE")).thenReturn("A");
+    when(rows.getString("SCALE_SPECIES_DESCRIPTION")).thenReturn("Synthetic species");
+    when(rows.getString("SCALE_PRODUCT_DESCRIPTION")).thenReturn("Synthetic product");
+    when(rows.getString("SCALE_GRADE_DESCRIPTION")).thenReturn("Synthetic grade");
     when(rows.getBigDecimal("RESERVE_STUMPAGE_RATE")).thenReturn(new BigDecimal("5.10"));
     when(rows.getBigDecimal("DEVELOPMENT_LEVY")).thenReturn(BigDecimal.ZERO);
     when(rows.getBigDecimal("SILVICULTURE_LEVY")).thenReturn(new BigDecimal("-1.20"));

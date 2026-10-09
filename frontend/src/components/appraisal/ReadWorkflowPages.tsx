@@ -23,6 +23,7 @@ import useReadResource, { useLoadedTotal } from './useReadResource'
 import EcasSearchFiltersForm from './EcasSearchFilters'
 import useSessionFailure from './useReadSessionFailure'
 import EcasReferenceSections, { type EcasRelatedApis } from './EcasReferenceSections'
+import type { GasAuditApi } from '@/service/gas-audit-service'
 
 type Selection =
   | { kind: 'reference'; id: string; method: AppraisalMethod | null }
@@ -39,12 +40,14 @@ function ReadDetailPanel({
   launcherRef,
   api,
   relatedApis,
+  gasAuditApi,
 }: {
   selection: Selection | null
   setSelection: (selection: Selection | null) => void
   launcherRef: React.RefObject<HTMLElement | null>
   api: ReadApi
   relatedApis?: EcasRelatedApis
+  gasAuditApi?: GasAuditApi
 }) {
   const { can } = useAuth()
   const load = useCallback(
@@ -130,7 +133,7 @@ function ReadDetailPanel({
         <InteriorReferenceDetails reference={detail.value.reference} />
       )}
       {detail.value?.kind === 'worksheet' && (
-        <OtherWorksheetDetails summary={detail.value.summary} />
+        <OtherWorksheetDetails summary={detail.value.summary} auditApi={gasAuditApi} api={api} />
       )}
       {(detail.value?.kind === 'coast' || detail.value?.kind === 'interior') && (
         <EcasReferenceSections
@@ -157,6 +160,7 @@ function ReadDetailPanel({
 }
 
 const emptyEcas: EcasSearchFilters = {
+  mode: 'ALL_SUBMISSIONS',
   ecasId: '',
   licence: '',
   timberMark: '',
@@ -174,10 +178,14 @@ const emptyEcas: EcasSearchFilters = {
 export function EcasInboxReadPage({
   api = readApi,
   relatedApis,
+  gasAuditApi,
 }: {
   api?: ReadApi
   relatedApis?: EcasRelatedApis
+  gasAuditApi?: GasAuditApi
 }) {
+  const { state } = useAuth()
+  const myToDoAvailable = state.kind === 'signed-in' && state.session.ecasMyToDoAvailable === true
   const [draft, setDraft] = useState(emptyEcas)
   const [query, setQuery] = useState<{ filters: EcasSearchFilters; page: number } | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
@@ -200,11 +208,18 @@ export function EcasInboxReadPage({
     <section className="taps-page taps-fullbleed-page" aria-label="ECAS inbox search">
       <PageHeader
         title="Inbox Search"
-        subtitle="Search all appraisal data submissions available to you."
+        subtitle="Search appraisal data submissions available to you."
       />
       <EcasSearchFiltersForm
         draft={draft}
-        onChange={setDraft}
+        onChange={(filters) => {
+          if (filters.mode !== draft.mode) {
+            setSelection(null)
+            setQuery(null)
+          }
+          setDraft(filters)
+        }}
+        myToDoAvailable={myToDoAvailable}
         lookups={lookups.value}
         lookupLoading={lookups.loading}
         lookupError={lookups.error?.message}
@@ -212,7 +227,10 @@ export function EcasInboxReadPage({
         loading={results.loading}
         onSearch={() => {
           setSelection(null)
-          setQuery({ filters: { ...draft }, page: 0 })
+          setQuery({
+            filters: { ...draft, mode: myToDoAvailable ? draft.mode : 'ALL_SUBMISSIONS' },
+            page: 0,
+          })
         }}
         onReset={() => {
           setSelection(null)
@@ -253,6 +271,7 @@ export function EcasInboxReadPage({
         launcherRef={launcherRef}
         api={api}
         relatedApis={relatedApis}
+        gasAuditApi={gasAuditApi}
       />
     </section>
   )
@@ -260,7 +279,13 @@ export function EcasInboxReadPage({
 
 const emptyGas: GasFilters = { licence: '', timberMark: '' }
 
-export function GasSearchReadPage({ api = readApi }: { api?: ReadApi }) {
+export function GasSearchReadPage({
+  api = readApi,
+  gasAuditApi,
+}: {
+  api?: ReadApi
+  gasAuditApi?: GasAuditApi
+}) {
   const [draft, setDraft] = useState(emptyGas)
   const [lookupLicence, setLookupLicence] = useState('')
   const [query, setQuery] = useState<{ filters: GasFilters; page: number } | null>(null)
@@ -355,6 +380,7 @@ export function GasSearchReadPage({ api = readApi }: { api?: ReadApi }) {
         setSelection={setSelection}
         launcherRef={launcherRef}
         api={api}
+        gasAuditApi={gasAuditApi}
       />
     </section>
   )

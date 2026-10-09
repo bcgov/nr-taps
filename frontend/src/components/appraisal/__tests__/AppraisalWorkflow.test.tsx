@@ -13,6 +13,9 @@ import WorkflowPreview, { workflowFixture as fixture } from '@/local-synthetic/W
 import { EcasInboxResults, GasSearchResults } from '../AppraisalResults'
 import GasSearchFilters, { type GasFilters } from '../GasSearchFilters'
 
+const { reloadSession } = vi.hoisted(() => ({ reloadSession: vi.fn(async () => {}) }))
+vi.mock('@/context/auth/AuthContext', () => ({ useAuth: () => ({ reloadSession }) }))
+
 test('retains ECAS marks and permits sharing the same submission and opens the selected row', async () => {
   const user = userEvent.setup()
   const onOpen = vi.fn()
@@ -170,6 +173,10 @@ test('connects the Coast reference to both related GAS mark rows and exact store
   const summary = screen.getByRole('complementary', { name: 'Appraised worksheet 999900000011' })
   expect(within(summary).getByText('COAST_MPS_TOA_N')).toBeInTheDocument()
   expect(within(summary).getByRole('cell', { name: '12.30' })).toBeInTheDocument()
+  await user.click(within(summary).getByRole('button', { name: 'History' }))
+  expect(
+    await within(summary).findByText('<script>Fictional appraised comment as text</script>'),
+  ).toBeInTheDocument()
   await user.click(within(summary).getByRole('button', { name: 'Close' }))
   await waitFor(() => expect(launcher).toHaveFocus())
 })

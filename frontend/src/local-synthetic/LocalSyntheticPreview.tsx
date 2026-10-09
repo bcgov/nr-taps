@@ -68,6 +68,7 @@ function syntheticState(scenario: Scenario): AuthState {
           ? [Capability.GasClientReports]
           : []
   const session: Session = {
+    ecasMyToDoAvailable: scenario === 'staff',
     userId: 'synthetic-preview-user',
     displayName: 'Synthetic preview user',
     email: null,
@@ -110,7 +111,8 @@ function PreviewRoot() {
       <summary>Local synthetic UI preview</summary>
       <p>
         All accounts and sample rows are synthetic. Session controls only change this preview; they
-        do not log in or call TAPS services.
+        do not log in or call TAPS services. The My to do list sample is empty; an ECAS ID lookup
+        still finds sample records.
       </p>
       <div className="taps-preview-toolbar">
         <Select

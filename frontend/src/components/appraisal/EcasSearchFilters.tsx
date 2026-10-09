@@ -54,6 +54,7 @@ export default function EcasSearchFilters({
   lookupLoading,
   lookupError,
   onRetryLookups,
+  myToDoAvailable = false,
 }: {
   draft: Filters
   onChange: (filters: Filters) => void
@@ -64,6 +65,7 @@ export default function EcasSearchFilters({
   lookupLoading: boolean
   lookupError?: string
   onRetryLookups: () => void
+  myToDoAvailable?: boolean
 }) {
   const set = <K extends keyof Filters>(key: K, value: Filters[K]) =>
     onChange({ ...draft, [key]: value })
@@ -116,6 +118,17 @@ export default function EcasSearchFilters({
           Object.keys(additionalFilterErrors(draft)).length > 0
         }
       >
+        {myToDoAvailable && (
+          <Select
+            id="read-ecas-mode"
+            labelText="Search mode"
+            value={draft.mode ?? 'ALL_SUBMISSIONS'}
+            onChange={(event) => set('mode', event.target.value as Filters['mode'])}
+          >
+            <SelectItem value="ALL_SUBMISSIONS" text="All submissions" />
+            <SelectItem value="MY_TO_DO" text="My to do list" />
+          </Select>
+        )}
         <TextInput
           id="read-ecas-id"
           labelText="ECAS ID"

@@ -35,6 +35,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -123,6 +124,7 @@ class OracleAppraisedSummaryTest {
     when(rows.next()).thenReturn(true, true, true, true, true, true, false);
     when(rows.getInt("ROW_KIND")).thenReturn(0, 1, 1, 1, 2, 2);
     when(rows.getString("TIMBER_MARK")).thenReturn("ABC123", "ABC123", "XYZ987");
+    when(rows.getString("PRIMARY_TIMBER_MARK")).thenReturn("XYZ987");
     when(rows.getString("RATE_ID")).thenReturn("51", "52");
     when(rows.getDate("RATE_EFFECTIVE_DATE"))
         .thenReturn(Date.valueOf("2030-01-01"), Date.valueOf("2030-01-01"));
@@ -143,6 +145,7 @@ class OracleAppraisedSummaryTest {
     assertThat(summary.referenceTypeCode()).isEqualTo("REF");
     assertThat(summary.ceaseAdjustmentDate()).isEqualTo(LocalDate.of(2030, 11, 30));
     assertThat(summary.timberMarks()).containsExactly("ABC123", "ABC123", "XYZ987");
+    assertThat(summary.primaryTimberMark()).isEqualTo("XYZ987");
     assertThat(summary.rates()).containsExactly(
         new GasAppraisal.StoredRate("51", LocalDate.of(2030, 1, 1), new BigDecimal("12.30")),
         new GasAppraisal.StoredRate("52", LocalDate.of(2030, 1, 1), new BigDecimal("0.00")));
@@ -180,7 +183,47 @@ class OracleAppraisedSummaryTest {
     assertThat(summary.referenceTypeCode()).isNull();
     assertThat(summary.ceaseAdjustmentDate()).isNull();
     assertThat(summary.timberMarks()).isEmpty();
+    assertThat(summary.primaryTimberMark()).isNull();
     assertThat(summary.rates()).isEmpty();
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void bothSummaryRoutesReadPrimaryMarkOnlyFromTheAuthorizedSubmission(boolean byEcasId)
+      throws SQLException {
+    parent("I", "MPS", "N");
+    when(rows.next()).thenReturn(true, true, true, false);
+    when(rows.getInt("ROW_KIND")).thenReturn(0, 1, 1);
+    when(rows.getString("TIMBER_MARK")).thenReturn("ABC123", "XYZ987");
+    when(rows.getString("PRIMARY_TIMBER_MARK")).thenReturn("XYZ987");
+    var summary = (byEcasId ? summaries.byEcasId(idir("TAPS_ADMIN"), "12345")
+        : summaries.byTypedKey(idir("TAPS_ADMIN"), key)).orElseThrow();
+    assertThat(summary.primaryTimberMark()).isEqualTo("XYZ987");
+    assertThat(summary.timberMarks()).containsExactly("ABC123", "XYZ987");
+    assertThat(preparedSql()).contains("authorized_parent AS", "SELECT P.*, (SELECT M.TIMBER_MARK FROM ADS_SUBMITTED_TIMBER_MARK M",
+        "WHERE M.ECAS_ID = P.ECAS_ID AND M.PRIMARY_MARK_IND = 'Y') AS PRIMARY_TIMBER_MARK",
+        "FROM authorized_parent P")
+        .doesNotContain("ROWNUM", "FETCH FIRST", "MIN(M.TIMBER_MARK)", "MAX(M.TIMBER_MARK)");
+  }
+
+  @Test
+  void absentPrimaryMarkNeverFallsBackToTheFirstSubmittedMark() throws SQLException {
+    parent("I", "MPS", "N");
+    when(rows.next()).thenReturn(true, true, false);
+    when(rows.getInt("ROW_KIND")).thenReturn(0, 1);
+    when(rows.getString("TIMBER_MARK")).thenReturn("ABC123");
+    var summary = summaries.byTypedKey(idir("TAPS_ADMIN"), key).orElseThrow();
+    assertThat(summary.timberMarks()).containsExactly("ABC123");
+    assertThat(summary.primaryTimberMark()).isNull();
+  }
+
+  @Test
+  void multiplePrimaryMarksFailTheScalarLookupWithoutReturningAPartialSummary() throws SQLException {
+    var failure = new SQLException("Synthetic scalar primary lookup returned multiple rows", "21000", 1427);
+    when(statement.executeQuery()).thenThrow(failure);
+    assertThatThrownBy(() -> summaries.byTypedKey(idir("TAPS_ADMIN"), key))
+        .isInstanceOf(DataAccessException.class).hasCause(failure);
+    verifyCleanup(false);
   }
 
   @Test

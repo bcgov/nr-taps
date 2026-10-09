@@ -172,13 +172,29 @@ class OracleEcasInboxTest {
   }
 
   @Test
-  void unsupportedMyToDoDoesNotOpenAConnection() throws SQLException {
+  void assignedQueueWithoutReliableAccountDoesNotOpenAConnection() throws SQLException {
     var filters = new EcasInboxPlanTest.Filters();
     filters.mode = EcasInbox.Mode.MY_TO_DO;
 
-    assertThatThrownBy(() -> repository.search(idir("TAPS_ADMIN"), filters.search(), 0))
-        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> repository.search(idir("TAPS_HEADQUARTERS"), filters.search(), 0))
+        .isInstanceOf(IllegalArgumentException.class);
     verify(dataSource, never()).getConnection();
+  }
+
+  @Test
+  void myToDoAssignmentIsBoundInsideTheSingleCountAndPageStatement() throws SQLException {
+    var filters = new EcasInboxPlanTest.Filters();
+    filters.mode = EcasInbox.Mode.MY_TO_DO;
+    repository.search(EcasInboxPlanTest.assignedIdir("TAPS_DISTRICT_APPRAISER_DISTRICT-DZZ"), filters.search(), 0);
+    assertThat(sql()).containsOnlyOnce("EXISTS (SELECT 1 FROM ADS_ASSIGNED_TO_USER assigned")
+        .contains("assigned.ECAS_ID = record_scope.ECAS_ID AND assigned.USER_ID = ?",
+            "FROM scoped_rows", "PFU.FOREST_FILE_ID AS LICENCE")
+        .doesNotContain("JOIN ADS_ASSIGNED_TO_USER", "IDIR\\SYNTHETIC", "PKG_", "DELETE ", "INSERT ", "UPDATE ");
+    verify(statement).setString(1, "DZZ");
+    verify(statement).setString(2, "IDIR\\SYNTHETIC");
+    verify(statement).setLong(3, 1);
+    verify(statement).setLong(4, 100);
+    cleanup(true);
   }
 
   @Test
