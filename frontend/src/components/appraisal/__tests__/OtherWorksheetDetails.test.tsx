@@ -240,9 +240,9 @@ test.each([
   },
 )
 
-test('appraised summary does not offer non-appraised history', () => {
+test('appraised summary offers collapsed typed worksheet history', () => {
   render(
     <OtherWorksheetDetails summary={workflowFixture.gasAppraisedSummary} api={syntheticFtaApi} />,
   )
-  expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute('aria-expanded', 'false')
 })

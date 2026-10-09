@@ -65,6 +65,8 @@ Reloading resets it.
   non-appraised summary with descriptive labels, nullable rate components and exact Upset Rate /
   Total Rate values. Expand **History** for twelve fictional changes across two pages, including
   a comment containing literal markup that must display as text.
+  Appraised worksheets under licence `X99998` also expose their own synthetic History pages;
+  historic worksheets do not offer History.
 
 The preview source lives in `src/local-synthetic/`, with `LocalSyntheticPreview.tsx` as its UI.
 `local-synthetic.html` is guarded by Vite's built-in `import.meta.env.DEV` flag, which enables local

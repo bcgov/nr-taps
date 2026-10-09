@@ -9,6 +9,8 @@ import TableFrame from '../TableFrame'
 import { displayCode } from './AppraisalResults'
 import type { ReadApi } from '@/service/read-service'
 import GasFtaContext from './GasFtaContext'
+import GasAuditDetails from './GasAuditDetails'
+import type { GasAuditApi } from '@/service/gas-audit-service'
 
 const yesNo = (value: boolean | null) => (value === null ? '—' : value ? 'Yes' : 'No')
 
@@ -107,9 +109,11 @@ export function InteriorReferenceDetails({ reference }: { reference: InteriorRef
 export function GasStoredSummary({
   summary,
   api,
+  auditApi,
 }: {
   summary: GasAppraisedSummary
   api?: Pick<ReadApi, 'licenceInformation'>
+  auditApi?: GasAuditApi
 }) {
   return (
     <>
@@ -157,6 +161,7 @@ export function GasStoredSummary({
           </TableBody>
         </Table>
       </TableFrame>
+      <GasAuditDetails worksheetKey={summary.key} api={auditApi} />
     </>
   )
 }

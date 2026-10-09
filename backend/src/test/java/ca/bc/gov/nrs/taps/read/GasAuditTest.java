@@ -44,4 +44,15 @@ class GasAuditTest {
     assertThatThrownBy(() -> new GasAudit.HistoryPage(key, java.util.Collections.nCopies(11, item), 11, 0, 10))
         .isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  void equalWorksheetNumbersRetainDistinctSupportedFamilyKeys() throws Exception {
+    var appraised = new GasAppraisal.Key(GasAppraisal.WorksheetType.APPRAISED, "123");
+    var page = new GasAudit.HistoryPage(appraised, List.of(item), 1, 0, 10);
+    assertThat(page.key()).isNotEqualTo(key);
+    var mapper = Jackson2ObjectMapperBuilder.json().build();
+    JsonNode json = mapper.valueToTree(page);
+    assertThat(json.get("key").get("type").asText()).isEqualTo("APPRAISED");
+    assertThat(mapper.treeToValue(json, GasAudit.HistoryPage.class)).isEqualTo(page);
+  }
 }

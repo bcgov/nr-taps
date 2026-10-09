@@ -46,7 +46,11 @@ export default function AsyncReadPreview() {
         </Button>
       </div>
       {module === 'ecas' ? (
-        <EcasInboxReadPage api={syntheticReadApi} relatedApis={syntheticRelatedApis} />
+        <EcasInboxReadPage
+          api={syntheticReadApi}
+          relatedApis={syntheticRelatedApis}
+          gasAuditApi={syntheticGasAuditApi}
+        />
       ) : (
         <GasSearchReadPage api={syntheticReadApi} gasAuditApi={syntheticGasAuditApi} />
       )}

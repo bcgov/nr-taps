@@ -126,13 +126,14 @@ test('aborts an old mode request and ignores its late rows after a new mode sear
 
 test('searches, opens the selected ECAS reference and follows its immutable ID to a GAS summary', async () => {
   const user = userEvent.setup()
+  const audit = { history: vi.fn(syntheticGasAuditApi.history) }
   const api = {
     ...syntheticReadApi,
     inbox: vi.fn(syntheticReadApi.inbox),
     relatedSummary: vi.fn(syntheticReadApi.relatedSummary),
     licenceInformation: vi.fn(syntheticReadApi.licenceInformation),
   }
-  mount(<EcasInboxReadPage api={api} />)
+  mount(<EcasInboxReadPage api={api} gasAuditApi={audit} />)
   expect(api.inbox).not.toHaveBeenCalled()
   await user.click(screen.getByRole('button', { name: 'Search' }))
   const launcher = await screen.findByRole('button', { name: /Open ECAS .*mark ZZ9997/ })
@@ -157,8 +158,24 @@ test('searches, opens the selected ECAS reference and follows its immutable ID t
       fixture.gasMultiMarkAppraisedSummary.primaryTimberMark!,
     ),
   ).toBeInTheDocument()
+  expect(audit.history).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('button', { name: 'History' }))
+  const history = within(await screen.findByRole('region', { name: 'Appraised worksheet history' }))
+  await history.findByText('<script>Fictional appraised comment as text</script>')
+  expect(history.getByText('2026-10-12T10:00:00')).toBeInTheDocument()
+  expect(history.getByText('Discount Percent')).toBeInTheDocument()
+  expect(history.getByRole('cell', { name: '10.0' })).toBeInTheDocument()
+  await user.click(history.getByRole('button', { name: 'Next page' }))
+  await history.findByText('2026-10-02T10:00:00')
+  expect(audit.history).toHaveBeenLastCalledWith(
+    fixture.gasMultiMarkAppraisedSummary.key,
+    1,
+    expect.any(AbortSignal),
+  )
+  const lastSignal = audit.history.mock.calls.at(-1)![2]
   await user.click(screen.getByRole('button', { name: 'Close' }))
   await waitFor(() => expect(launcher).toHaveFocus())
+  expect(lastSignal.aborted).toBe(true)
 })
 
 test('summary FTA uses its primary mark instead of the selected or first listed search mark', async () => {
@@ -243,19 +260,16 @@ test('opens the fictional non-appraised preview worksheet with labelled server r
     await screen.findByRole('region', { name: 'Non-appraised worksheet history' }),
   )
   await history.findByText('<script>Fictional comment as text</script>')
+  expect(history.getByText('2026-10-12T09:00:00')).toBeInTheDocument()
   expect(
     within(history.getByRole('table', { name: 'Worksheet history' })).getAllByRole('row'),
   ).toHaveLength(11)
   await user.click(history.getByRole('button', { name: 'Next page' }))
-  await history.findByText('2026-10-11T09:00:00')
+  await history.findByText('2026-10-02T09:00:00')
   expect(
     within(history.getByRole('table', { name: 'Worksheet history' })).getAllByRole('row'),
   ).toHaveLength(3)
-  expect(audit.history).toHaveBeenLastCalledWith(
-    nonAppraisedSample.key.worksheetId,
-    1,
-    expect.any(AbortSignal),
-  )
+  expect(audit.history).toHaveBeenLastCalledWith(nonAppraisedSample.key, 1, expect.any(AbortSignal))
   expect(history.queryByText('<script>Fictional comment as text</script>')).not.toBeInTheDocument()
 })
 

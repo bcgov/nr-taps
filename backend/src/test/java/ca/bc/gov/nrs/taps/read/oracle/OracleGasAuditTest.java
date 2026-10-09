@@ -47,7 +47,7 @@ class OracleGasAuditTest {
   @Test
   void scopesBeforeSnapshotsAndBindsOneStatementForCountAndPage() throws SQLException {
     assertThat(audit.history(user("TAPS_DISTRICT_APPRAISER_DISTRICT-DZZ", "TAPS_REGION_APPRAISER_REGION-CARIBOO"),
-        "000123", 2)).isEmpty();
+        nonAppraised("000123"), 2)).isEmpty();
     String sql = sql();
     assertThat(sql).contains("FROM NON_APPRAISED_WORKSHEET W", "WORKSHEET_ID = ? AND (record_scope.ADMIN_DISTRICT_CODE = ? OR record_scope.ROLLUP_REGION_CODE = ?)",
         "FFC.FOREST_FILE_CLIENT_TYPE_CODE = 'A'", "FROM NON_APPRAISED_WORKSHEET_AUD A",
@@ -71,7 +71,7 @@ class OracleGasAuditTest {
 
   @Test
   void comparisonWindowsCannotCrossRatesFamiliesOrInventInitialChanges() throws SQLException {
-    audit.history(user("TAPS_ADMIN"), "123", 0);
+    audit.history(user("TAPS_ADMIN"), nonAppraised("123"), 0);
     String sql = sql();
     assertThat(sql).contains("PARTITION BY A.NON_APPRAISED_WORKSHEET_ID ORDER BY A.UPDATE_TIMESTAMP, A.NON_APPRAISED_WORKSHEET_AUD_ID",
         "PARTITION BY A.NON_APPRAISED_STUMPAGE_RATE_ID ORDER BY A.UPDATE_TIMESTAMP, A.NON_APPRAISED_STMPG_RTE_AUD_ID",
@@ -83,8 +83,78 @@ class OracleGasAuditTest {
   }
 
   @Test
+  void appraisedHistoryScopesCurrentAdsBeforeOwnWorksheetAndRateSnapshots() throws SQLException {
+    var key = new GasAppraisal.Key(GasAppraisal.WorksheetType.APPRAISED, "000123");
+    assertThat(audit.history(user("TAPS_DISTRICT_APPRAISER_DISTRICT-DZZ"), key, 1)).isEmpty();
+    String sql = sql();
+    assertThat(sql).contains("FROM APPRAISED_WORKSHEET AW",
+        "JOIN APPRAISAL_DATA_SUBMISSION ADS ON ADS.ECAS_ID = AW.ECAS_ID",
+        "WHERE WORKSHEET_ID = ? AND (record_scope.ADMIN_DISTRICT_CODE = ?)",
+        "FROM APPRAISED_WORKSHEET_AUD AWA", "FROM APPRAISED_STUMPAGE_RATE_AUD ASRA",
+        "P.WORKSHEET_ID = AWA.APPRAISED_WORKSHEET_ID", "P.WORKSHEET_ID = ASRA.APPRAISED_WORKSHEET_ID",
+        "ASRA.HISTORIC_APPRAISED_WRKSHEET_ID IS NULL",
+        "PARTITION BY AWA.APPRAISED_WORKSHEET_ID ORDER BY AWA.UPDATE_TIMESTAMP, AWA.APPRAISED_WORKSHEET_AUD_ID",
+        "PARTITION BY ASRA.APPRAISED_STUMPAGE_RATE_ID ORDER BY ASRA.UPDATE_TIMESTAMP, ASRA.APPRAISED_STUMPAGE_RATE_AUD_ID",
+        "WHERE AWA.PREVIOUS_ID IS NOT NULL", "WHERE ASRA.PREVIOUS_ID IS NOT NULL",
+        "FROM (SELECT COUNT(*) AS TOTAL FROM changed_fields) totals",
+        "ORDER BY EVENT_DATE DESC, SOURCE_ORDER ASC, SNAPSHOT_ID DESC, ATTRIBUTE_ORDINAL ASC",
+        "CASE WHEN C.SNAPSHOT_ID IS NOT NULL THEN")
+        .doesNotContain("NON_APPRAISED_STUMPAGE_RTE_AUD", "HISTORIC_APPRAISED_WORKSHEET", "GAS2_AUDIT",
+            "DZZ", "UPDATE ", "INSERT ", "DELETE ", "DECODE(AWA.ECAS_ID");
+    verify(statement).setLong(1, 123);
+    verify(statement).setString(2, "DZZ");
+    verify(statement).setLong(3, 11);
+    verify(statement).setLong(4, 20);
+    assertThat(sql.chars().filter(c -> c == '?').count()).isEqualTo(4);
+    cleanup();
+  }
+
+  @Test
+  void appraisedDatesAndNullableOverridesCompareTypedValuesBeforeFormatting() throws SQLException {
+    audit.history(user("TAPS_ADMIN"), new GasAppraisal.Key(GasAppraisal.WorksheetType.APPRAISED, "123"), 0);
+    assertThat(sql()).contains("DECODE(AWA.DISCOUNT_PERCENT, AWA.PREV_DISCOUNT_PERCENT, 0, 1)",
+        "DECODE(AWA.SDM_DECLARATION_ACCEPTANCE_DT, AWA.PREV_SDM_DATE, 0, 1)",
+        "WHEN 3 THEN TO_CHAR(AWA.SDM_DECLARATION_ACCEPTANCE_DT, 'YYYY-MM-DD')",
+        "DECODE(AWA.SILVICULTURE_COST_OVERRIDE, AWA.PREV_SILVICULTURE_COST, 0, 1)",
+        "DECODE(AWA.LOGGING_COST_OVERRIDE, AWA.PREV_LOGGING_COST, 0, 1)",
+        "DECODE(AWA.MANUFACTURING_COST_OVERRIDE, AWA.PREV_MANUFACTURING_COST, 0, 1)",
+        "TO_CHAR(AWA.DISCOUNT_PERCENT, 'FM990D0', 'NLS_NUMERIC_CHARACTERS=''.,''')",
+        "TO_CHAR(AWA.MANUFACTURING_COST_OVERRIDE, 'FM9999990', 'NLS_NUMERIC_CHARACTERS=''.,''')",
+        "DECODE(ASRA.STUMPAGE_RATE_EFFECTIVE_DATE, ASRA.PREV_EFFECTIVE_DATE, 0, 1)",
+        "DECODE(ASRA.TOTAL_STUMPAGE_RATE_AMOUNT, ASRA.PREV_TOTAL_RATE, 0, 1)",
+        "DECODE(ASRA.UPSET_STUMPAGE_RATE_OVERRIDE, ASRA.PREV_UPSET_OVERRIDE, 0, 1)",
+        "DECODE(ASRA.ADJUSTMENT_NOTICE_MESSAGE, ASRA.PREV_ADJUSTMENT_MESSAGE, 0, 1)",
+        "TO_CHAR(ASRA.TOTAL_STUMPAGE_RATE_AMOUNT, 'FM9990D00', 'NLS_NUMERIC_CHARACTERS=''.,''')")
+        .doesNotContain("DECODE(TO_CHAR", "DECODE(TRUNC", "NVL(AWA.", "NVL(ASRA.", "IS NOT NULL THEN TO_CHAR(AWA.SDM");
+  }
+
+  @Test
+  void historicFamilyIsRejectedBeforeJdbcEvenWithTheSameNumericId() {
+    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"),
+        new GasAppraisal.Key(GasAppraisal.WorksheetType.HISTORIC, "123"), 0))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("historic");
+    verifyNoInteractions(dataSource);
+  }
+
+  @Test
+  void equalNumericIdsDispatchSeparateFamilySourcesAndReturnTypedKeys() throws SQLException {
+    when(rows.next()).thenReturn(true, false, true, false);
+    when(rows.getLong("PARENT_COUNT")).thenReturn(1L);
+    var appraised = new GasAppraisal.Key(GasAppraisal.WorksheetType.APPRAISED, "123");
+    var nonAppraised = nonAppraised("123");
+    assertThat(audit.history(user("TAPS_ADMIN"), appraised, 0).orElseThrow().key()).isEqualTo(appraised);
+    assertThat(audit.history(user("TAPS_ADMIN"), nonAppraised, 0).orElseThrow().key()).isEqualTo(nonAppraised);
+    var capture = ArgumentCaptor.forClass(String.class);
+    verify(connection, times(2)).prepareStatement(capture.capture());
+    assertThat(capture.getAllValues().get(0)).contains("FROM APPRAISED_WORKSHEET_AUD AWA")
+        .doesNotContain("FROM NON_APPRAISED_WORKSHEET_AUD");
+    assertThat(capture.getAllValues().get(1)).contains("FROM NON_APPRAISED_WORKSHEET_AUD A")
+        .doesNotContain("FROM APPRAISED_WORKSHEET_AUD");
+  }
+
+  @Test
   void gradeAndEachNullableLevyCompareTheirOwnTypedPreviousValue() throws SQLException {
-    audit.history(user("TAPS_ADMIN"), "123", 0);
+    audit.history(user("TAPS_ADMIN"), nonAppraised("123"), 0);
     assertThat(sql()).contains("WHEN 3 THEN A.SCALE_GRADE_CODE",
         "DECODE(A.SCALE_GRADE_CODE, A.PREV_SCALE_GRADE_CODE, 0, 1)",
         "DECODE(A.BONUS_BID_AMOUNT, A.PREV_BONUS_BID_AMOUNT, 0, 1)",
@@ -102,7 +172,7 @@ class OracleGasAuditTest {
 
   @Test
   void missingScopeIsDeniedEvenForAnExistingNumericId() throws SQLException {
-    assertThat(audit.history(user("TAPS_HEADQUARTERS", "TAPS_VIEWER_DISTRICT-DZZ"), "123", 0)).isEmpty();
+    assertThat(audit.history(user("TAPS_HEADQUARTERS", "TAPS_VIEWER_DISTRICT-DZZ"), nonAppraised("123"), 0)).isEmpty();
     assertThat(sql()).contains("WHERE WORKSHEET_ID = ? AND (1 = 0)");
   }
 
@@ -110,7 +180,7 @@ class OracleGasAuditTest {
   void emptyHistoryAndOverflowPageKeepAuthorizedParentAndTotal() throws SQLException {
     when(rows.getLong("PARENT_COUNT")).thenReturn(1L);
     when(rows.getLong("TOTAL")).thenReturn(23L);
-    var page = audit.history(user("TAPS_ADMIN"), "123", Integer.MAX_VALUE).orElseThrow();
+    var page = audit.history(user("TAPS_ADMIN"), nonAppraised("123"), Integer.MAX_VALUE).orElseThrow();
     assertThat(page.key()).isEqualTo(new GasAppraisal.Key(GasAppraisal.WorksheetType.NON_APPRAISED, "123"));
     assertThat(page.items()).isEmpty();
     assertThat(page.total()).isEqualTo(23);
@@ -123,7 +193,7 @@ class OracleGasAuditTest {
   @Test
   void authorizedParentWithNoChangedFieldsReturnsAnEmptyHistory() throws SQLException {
     when(rows.getLong("PARENT_COUNT")).thenReturn(1L);
-    var page = audit.history(user("TAPS_ADMIN"), "123", 0).orElseThrow();
+    var page = audit.history(user("TAPS_ADMIN"), nonAppraised("123"), 0).orElseThrow();
     assertThat(page.items()).isEmpty();
     assertThat(page.total()).isZero();
     assertThat(page.page()).isZero();
@@ -143,7 +213,7 @@ class OracleGasAuditTest {
     when(rows.getString("ATTRIBUTE")).thenReturn("Grade", "Silviculture Levy");
     when(rows.getString("CHANGED_VALUE")).thenReturn(" ", (String) null);
     when(rows.getString("COMMENT_TEXT")).thenReturn("<b>Synthetic comment</b>", (String) null);
-    var page = audit.history(user("TAPS_ADMIN"), "123", 0).orElseThrow();
+    var page = audit.history(user("TAPS_ADMIN"), nonAppraised("123"), 0).orElseThrow();
     assertThat(page.items()).containsExactly(
         new GasAudit.Item("R:402:3", "201", "IDIR\\SYNTHETIC", LocalDateTime.of(2030, 1, 1, 12, 34, 56),
             "Grade", " ", "<b>Synthetic comment</b>"),
@@ -156,20 +226,20 @@ class OracleGasAuditTest {
   @ParameterizedTest
   @ValueSource(strings = {"0", "-1", "bad", "1234567890123"})
   void invalidIdStopsBeforeJdbc(String id) {
-    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), id, 0)).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), nonAppraised(id), 0)).isInstanceOf(IllegalArgumentException.class);
     verifyNoInteractions(dataSource);
   }
 
   @Test
   void negativePageStopsBeforeJdbc() {
-    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), "123", -1)).isInstanceOf(IllegalArgumentException.class);
+    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), nonAppraised("123"), -1)).isInstanceOf(IllegalArgumentException.class);
     verifyNoInteractions(dataSource);
   }
 
   @Test
   void ambiguousParentFailsTheWholeHistory() throws SQLException {
     when(rows.getLong("PARENT_COUNT")).thenReturn(2L);
-    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), "123", 0))
+    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), nonAppraised("123"), 0))
         .isInstanceOf(DataIntegrityViolationException.class).hasMessage("ambiguous history parent");
     cleanup();
   }
@@ -178,7 +248,7 @@ class OracleGasAuditTest {
   void aChildCannotBeReturnedForAnUnscopedParent() throws SQLException {
     when(rows.getString("EVENT_ID")).thenReturn("W:301:2");
     when(rows.getString("WORKSHEET_ID")).thenReturn("124");
-    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), "123", 0))
+    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), nonAppraised("123"), 0))
         .isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("requested worksheet");
   }
 
@@ -187,7 +257,7 @@ class OracleGasAuditTest {
     when(rows.getLong("PARENT_COUNT")).thenReturn(1L);
     when(rows.getString("EVENT_ID")).thenReturn("W:301:2");
     when(rows.getString("WORKSHEET_ID")).thenReturn("123");
-    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), "123", 0))
+    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), nonAppraised("123"), 0))
         .isInstanceOf(DataIntegrityViolationException.class).hasMessageContaining("timestamp");
   }
 
@@ -195,7 +265,7 @@ class OracleGasAuditTest {
   void queryFailurePropagatesWithoutPartialHistoryAndClosesResources() throws SQLException {
     var failure = new SQLException("Synthetic query failure", "42000");
     when(statement.executeQuery()).thenThrow(failure);
-    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), "123", 0))
+    assertThatThrownBy(() -> audit.history(user("TAPS_ADMIN"), nonAppraised("123"), 0))
         .isInstanceOf(DataAccessException.class).hasCause(failure);
     verify(statement).close();
     verify(connection).close();
@@ -211,6 +281,10 @@ class OracleGasAuditTest {
     verify(rows).close();
     verify(statement).close();
     verify(connection).close();
+  }
+
+  private static GasAppraisal.Key nonAppraised(String id) {
+    return new GasAppraisal.Key(GasAppraisal.WorksheetType.NON_APPRAISED, id);
   }
 
   private static TapsUser user(String... roles) {

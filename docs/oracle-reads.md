@@ -21,7 +21,7 @@ filters.
 | `GET /api/ecas/{ecasId}/attachments?page=0` | `ECAS_SUBMISSION_VIEW` | Document metadata, 50 per page. See [attachment visibility](#attachments). |
 | `GET /api/gas/worksheets?licence=&timberMark=&page=0` | `GAS_APPRAISAL_VIEW` | All three families, 10 per page. |
 | `GET /api/gas/worksheets/{type}/{worksheetId}` | `GAS_APPRAISAL_VIEW` | `APPRAISED`, `HISTORIC` or `NON_APPRAISED`. |
-| `GET /api/gas/worksheets/NON_APPRAISED/{worksheetId}/history?page=0` | `GAS_APPRAISAL_VIEW` | Changed worksheet/rate fields, 10 per page. |
+| `GET /api/gas/worksheets/{type}/{worksheetId}/history?page=0` | `GAS_APPRAISAL_VIEW` | `APPRAISED` or `NON_APPRAISED` changed fields, 10 per page. |
 | `GET /api/gas/appraised/by-ecas/{ecasId}` | `GAS_APPRAISAL_VIEW` | Appraised summary for an ECAS ID. |
 | `GET /api/gas/licences/{licence}/marks` | `GAS_APPRAISAL_VIEW` | HA marks. Empty is valid. |
 | `GET /api/gas/licence-information?licence=&timberMark=` | `GAS_APPRAISAL_VIEW` | FTA licence panel. Mark required. |
@@ -333,10 +333,11 @@ For non-appraised rates, including historic worksheet components:
 These are display calculations using exact decimal addition. Reading a summary does not persist
 rates, call pricing procedures, refresh a worksheet or run legacy model constructors.
 
-### Non-appraised history
+### Worksheet history
 
-History is available for the `NON_APPRAISED` family. The reader first requires access to the
-current parent worksheet, using the same ownership scope as its summary. One SELECT compares
+History is available for `APPRAISED` and `NON_APPRAISED` worksheets. The family and ID together
+identify the parent; equal numeric IDs in the two families stay separate. The reader first requires
+access to the current parent, using the same ownership scope as its summary. One SELECT compares
 stored worksheet and rate snapshots, counts changed fields and returns ten per page. No legacy
 model constructor or audit procedure is called.
 
@@ -351,10 +352,16 @@ and field order. Each event has a stable composite ID. Missing parent or access 
 an authorized worksheet with no changes returns an empty page. Negative pages return 400;
 pages beyond the end retain the total and return no items.
 
-The projection includes forest-zone, rate-type and adjustment changes, uses the grade value for
-grade changes, and compares each levy independently. These corrections are recorded in the
-[divergence register](intentional-legacy-divergences.md). Appraised and historic History remain
-outside this endpoint.
+Non-appraised history includes forest-zone, rate-type and adjustment changes, uses the grade value
+for grade changes, and compares each levy independently. Appraised history uses worksheet override/
+date snapshots and appraised-rate snapshots. It renders SDM dates independently of cease-adjustment
+dates, and keeps each appraised rate's snapshots separate. Discount values retain one decimal place;
+cost overrides are integral and monetary rates have two decimal places.
+
+These corrections are recorded in the [divergence register](intentional-legacy-divergences.md).
+Historic history, ECAS audit events and the separate non-appraised-component history for an
+appraised worksheet are outside this endpoint. The appraised audit tables do not store appraisal
+status, reference type or policy-version changes; the reader does not invent those events.
 
 ## Licence marks and FTA information
 

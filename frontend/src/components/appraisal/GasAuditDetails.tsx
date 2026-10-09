@@ -18,36 +18,56 @@ import AppNotification from '../AppNotification'
 import TableFrame from '../TableFrame'
 import useReadResource, { useLoadedTotal } from './useReadResource'
 import useReadSessionFailure from './useReadSessionFailure'
+import type { GasAuditWorksheetKey } from '@/contracts/gas-audit'
 
 export default function GasAuditDetails({
-  worksheetId,
+  worksheetKey,
   api = gasAuditApi,
 }: {
-  worksheetId: string
+  worksheetKey: GasAuditWorksheetKey
   api?: GasAuditApi
 }) {
-  return <HistoryAccordion key={worksheetId} worksheetId={worksheetId} api={api} />
+  return (
+    <HistoryAccordion
+      key={`${worksheetKey.type}:${worksheetKey.worksheetId}`}
+      worksheetKey={worksheetKey}
+      api={api}
+    />
+  )
 }
 
-function HistoryAccordion({ worksheetId, api }: { worksheetId: string; api: GasAuditApi }) {
+function HistoryAccordion({
+  worksheetKey,
+  api,
+}: {
+  worksheetKey: GasAuditWorksheetKey
+  api: GasAuditApi
+}) {
   const [open, setOpen] = useState(false)
   return (
     <Accordion className="taps-reference-sections">
       <AccordionItem title="History" onHeadingClick={({ isOpen }) => setOpen(isOpen)}>
-        {open && <HistoryContents worksheetId={worksheetId} api={api} />}
+        {open && <HistoryContents worksheetKey={worksheetKey} api={api} />}
       </AccordionItem>
     </Accordion>
   )
 }
 
-function HistoryContents({ worksheetId, api }: { worksheetId: string; api: GasAuditApi }) {
+function HistoryContents({
+  worksheetKey,
+  api,
+}: {
+  worksheetKey: GasAuditWorksheetKey
+  api: GasAuditApi
+}) {
+  const { type, worksheetId } = worksheetKey
   const [page, setPage] = useState(0)
   const history = useReadResource(
     useCallback(
       async (signal: AbortSignal) => {
-        const result = await api.history(worksheetId, page, signal)
+        const result = await api.history({ type, worksheetId }, page, signal)
         if (
-          result.key.type !== 'NON_APPRAISED' ||
+          result.key.type !== type ||
           result.key.worksheetId !== worksheetId ||
           result.page !== page ||
           result.size !== 10
@@ -55,13 +75,17 @@ function HistoryContents({ worksheetId, api }: { worksheetId: string; api: GasAu
           throw new ReadApiError(503)
         return result
       },
-      [api, worksheetId, page],
+      [api, type, worksheetId, page],
     ),
   )
   const total = useLoadedTotal(history.value?.total)
   useReadSessionFailure(history.error)
   return (
-    <section aria-label="Non-appraised worksheet history">
+    <section
+      aria-label={
+        type === 'APPRAISED' ? 'Appraised worksheet history' : 'Non-appraised worksheet history'
+      }
+    >
       {history.loading && <InlineLoading description="Loading history…" />}
       {history.error && (
         <>

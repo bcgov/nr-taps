@@ -38,30 +38,64 @@ const history: GasAuditHistoryPage = {
 const api = (): GasAuditApi => ({ history: vi.fn().mockResolvedValue(history) })
 beforeEach(() => vi.clearAllMocks())
 
-test('loads only on expansion and shows server values, rate identity and markup as plain text', async () => {
+test.each(['APPRAISED', 'NON_APPRAISED'] as const)(
+  'loads %s only on expansion and shows server values, rate identity and markup as plain text',
+  async (type) => {
+    const user = userEvent.setup()
+    const reader = api()
+    const worksheetKey = { type, worksheetId: history.key.worksheetId }
+    vi.mocked(reader.history).mockResolvedValue({ ...history, key: worksheetKey })
+    const { container } = render(<GasAuditDetails worksheetKey={worksheetKey} api={reader} />)
+    expect(reader.history).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: 'History' }))
+    const table = within(await screen.findByRole('table', { name: 'Worksheet history' }))
+    expect(table.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+      'Update user',
+      'Date modified',
+      'Attribute',
+      'Value',
+      'Comment',
+    ])
+    expect(table.getByText('<b>Bonus bid</b>')).toBeInTheDocument()
+    expect(table.getByText('<script>Plain comment</script>')).toBeInTheDocument()
+    expect(table.getByRole('cell', { name: '0.00' })).toBeInTheDocument()
+    expect(table.getByText('Rate 999900000096')).toBeInTheDocument()
+    expect(table.getByText('Rate 999900000097')).toBeInTheDocument()
+    expect(table.getAllByRole('cell', { name: '—' })).toHaveLength(3)
+    expect(container.querySelector('script, b')).toBeNull()
+    expect(reader.history).toHaveBeenCalledWith(worksheetKey, 0, expect.any(AbortSignal))
+  },
+)
+
+test('switching family with the same worksheet ID resets paging and ignores the prior page error', async () => {
   const user = userEvent.setup()
   const reader = api()
-  const { container } = render(
-    <GasAuditDetails worksheetId={history.key.worksheetId} api={reader} />,
-  )
-  expect(reader.history).not.toHaveBeenCalled()
+  const appraisedKey = { type: 'APPRAISED' as const, worksheetId: history.key.worksheetId }
+  let rejectOld!: (error: Error) => void
+  vi.mocked(reader.history)
+    .mockResolvedValueOnce({ ...history, total: 12 })
+    .mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectOld = reject
+        }),
+    )
+    .mockResolvedValueOnce({ ...history, key: appraisedKey, items: [], total: 0 })
+  const view = render(<GasAuditDetails worksheetKey={history.key} api={reader} />)
   await user.click(screen.getByRole('button', { name: 'History' }))
-  const table = within(await screen.findByRole('table', { name: 'Worksheet history' }))
-  expect(table.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
-    'Update user',
-    'Date modified',
-    'Attribute',
-    'Value',
-    'Comment',
-  ])
-  expect(table.getByText('<b>Bonus bid</b>')).toBeInTheDocument()
-  expect(table.getByText('<script>Plain comment</script>')).toBeInTheDocument()
-  expect(table.getByRole('cell', { name: '0.00' })).toBeInTheDocument()
-  expect(table.getByText('Rate 999900000096')).toBeInTheDocument()
-  expect(table.getByText('Rate 999900000097')).toBeInTheDocument()
-  expect(table.getAllByRole('cell', { name: '—' })).toHaveLength(3)
-  expect(container.querySelector('script, b')).toBeNull()
-  expect(reader.history).toHaveBeenCalledWith(history.key.worksheetId, 0, expect.any(AbortSignal))
+  await screen.findByRole('table', { name: 'Worksheet history' })
+  await user.click(screen.getByRole('button', { name: 'Next page' }))
+  await waitFor(() => expect(reader.history).toHaveBeenCalledTimes(2))
+  const oldSignal = vi.mocked(reader.history).mock.calls[1][2]
+  view.rerender(<GasAuditDetails worksheetKey={appraisedKey} api={reader} />)
+  expect(oldSignal.aborted).toBe(true)
+  expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute('aria-expanded', 'false')
+  await user.click(screen.getByRole('button', { name: 'History' }))
+  await screen.findByText('No history events on this page.')
+  expect(reader.history).toHaveBeenLastCalledWith(appraisedKey, 0, expect.any(AbortSignal))
+  await act(async () => rejectOld(new ReadApiError(503)))
+  expect(screen.queryByText('History unavailable')).not.toBeInTheDocument()
+  expect(screen.queryByText('<script>Plain comment</script>')).not.toBeInTheDocument()
 })
 
 test('retry hides private errors and pagination requests the server page without keeping old rows', async () => {
@@ -71,7 +105,7 @@ test('retry hides private errors and pagination requests the server page without
     .mockRejectedValueOnce(new Error('private database details'))
     .mockResolvedValueOnce({ ...history, total: 12 })
     .mockResolvedValueOnce({ ...history, items: [], total: 12, page: 1 })
-  render(<GasAuditDetails worksheetId={history.key.worksheetId} api={reader} />)
+  render(<GasAuditDetails worksheetKey={history.key} api={reader} />)
   await user.click(screen.getByRole('button', { name: 'History' }))
   await screen.findByText('History unavailable')
   expect(screen.queryByText('private database details')).not.toBeInTheDocument()
@@ -79,11 +113,7 @@ test('retry hides private errors and pagination requests the server page without
   await screen.findByRole('table', { name: 'Worksheet history' })
   await user.click(screen.getByRole('button', { name: 'Next page' }))
   await screen.findByText('No history events on this page.')
-  expect(reader.history).toHaveBeenLastCalledWith(
-    history.key.worksheetId,
-    1,
-    expect.any(AbortSignal),
-  )
+  expect(reader.history).toHaveBeenLastCalledWith(history.key, 1, expect.any(AbortSignal))
   expect(screen.queryByText('<script>Plain comment</script>')).not.toBeInTheDocument()
 })
 
@@ -95,7 +125,7 @@ test.each([
 ])('rejects a history response for another identity or page: %j', async (invalid) => {
   const reader = api()
   vi.mocked(reader.history).mockResolvedValue(invalid as unknown as GasAuditHistoryPage)
-  render(<GasAuditDetails worksheetId={history.key.worksheetId} api={reader} />)
+  render(<GasAuditDetails worksheetKey={history.key} api={reader} />)
   await userEvent.setup().click(screen.getByRole('button', { name: 'History' }))
   await screen.findByText('History unavailable')
   expect(screen.queryByText('<script>Plain comment</script>')).not.toBeInTheDocument()
@@ -112,7 +142,7 @@ test('collapsing history aborts the request and ignores late content', async () 
         release = resolve
       }),
   )
-  render(<GasAuditDetails worksheetId={history.key.worksheetId} api={reader} />)
+  render(<GasAuditDetails worksheetKey={history.key} api={reader} />)
   await user.click(screen.getByRole('button', { name: 'History' }))
   await waitFor(() => expect(reader.history).toHaveBeenCalledOnce())
   const signal = vi.mocked(reader.history).mock.calls[0][2]
@@ -142,24 +172,33 @@ test('changing worksheet collapses history and discards the previous request and
       items: [],
       total: 0,
     })
-  const view = render(<GasAuditDetails worksheetId={history.key.worksheetId} api={reader} />)
+  const view = render(<GasAuditDetails worksheetKey={history.key} api={reader} />)
   await user.click(screen.getByRole('button', { name: 'History' }))
   await waitFor(() => expect(reader.history).toHaveBeenCalledOnce())
   const signal = vi.mocked(reader.history).mock.calls[0][2]
-  view.rerender(<GasAuditDetails worksheetId="999900000999" api={reader} />)
+  view.rerender(
+    <GasAuditDetails
+      worksheetKey={{ type: 'NON_APPRAISED', worksheetId: '999900000999' }}
+      api={reader}
+    />,
+  )
   expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute('aria-expanded', 'false')
   expect(signal.aborted).toBe(true)
   await act(async () => release(history))
   await user.click(screen.getByRole('button', { name: 'History' }))
   await screen.findByText('No history events on this page.')
-  expect(reader.history).toHaveBeenLastCalledWith('999900000999', 0, expect.any(AbortSignal))
+  expect(reader.history).toHaveBeenLastCalledWith(
+    { type: 'NON_APPRAISED', worksheetId: '999900000999' },
+    0,
+    expect.any(AbortSignal),
+  )
   expect(screen.queryByText('<script>Plain comment</script>')).not.toBeInTheDocument()
 })
 
 test('a rejected session refreshes authentication', async () => {
   const reader = api()
   vi.mocked(reader.history).mockRejectedValue(new ReadApiError(401))
-  render(<GasAuditDetails worksheetId={history.key.worksheetId} api={reader} />)
+  render(<GasAuditDetails worksheetKey={history.key} api={reader} />)
   await userEvent.setup().click(screen.getByRole('button', { name: 'History' }))
   await waitFor(() => expect(reloadSession).toHaveBeenCalledOnce())
 })

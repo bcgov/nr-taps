@@ -2,6 +2,7 @@ package ca.bc.gov.nrs.taps.api;
 
 import ca.bc.gov.nrs.taps.domain.LegacyIdentifiers;
 import ca.bc.gov.nrs.taps.read.GasAudit;
+import ca.bc.gov.nrs.taps.read.GasAppraisal;
 import ca.bc.gov.nrs.taps.read.oracle.OracleGasAudit;
 import ca.bc.gov.nrs.taps.security.TapsUser;
 import org.slf4j.Logger;
@@ -24,13 +25,15 @@ public class GasAuditController {
 
   public GasAuditController(OracleGasAudit audit) { this.audit = audit; }
 
-  @GetMapping("/api/gas/worksheets/NON_APPRAISED/{worksheetId}/history")
+  @GetMapping("/api/gas/worksheets/{type:APPRAISED|NON_APPRAISED}/{worksheetId}/history")
   public GasAudit.HistoryPage history(@AuthenticationPrincipal TapsUser user,
-      @PathVariable String worksheetId, @RequestParam(defaultValue = "0") int page) {
+      @PathVariable GasAppraisal.WorksheetType type, @PathVariable String worksheetId,
+      @RequestParam(defaultValue = "0") int page) {
     String id = LegacyIdentifiers.requiredId(worksheetId);
     if (page < 0) throw new IllegalArgumentException("page must be non-negative");
     try {
-      return audit.history(user, id, page).orElseThrow(ReadController.ReadNotFoundException::new);
+      return audit.history(user, new GasAppraisal.Key(type, id), page)
+          .orElseThrow(ReadController.ReadNotFoundException::new);
     } catch (DataAccessException | IllegalArgumentException | IllegalStateException exception) {
       LOG.warn("event=taps_oracle_gas_history_failed failureType={}", exception.getClass().getSimpleName());
       throw new ReadController.ReadUnavailableException(exception);

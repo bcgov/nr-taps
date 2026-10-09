@@ -120,7 +120,8 @@ export default function OtherWorksheetDetails({
   auditApi?: GasAuditApi
   api?: Pick<ReadApi, 'licenceInformation'>
 }) {
-  if ('ecasId' in summary) return <GasStoredSummary summary={summary} api={api} />
+  if ('ecasId' in summary)
+    return <GasStoredSummary summary={summary} api={api} auditApi={auditApi} />
   const historic = 'nonAppraisedRates' in summary
   return (
     <>
@@ -278,7 +279,7 @@ export default function OtherWorksheetDetails({
               ],
             }))}
           />
-          <GasAuditDetails worksheetId={summary.key.worksheetId} api={auditApi} />
+          <GasAuditDetails worksheetKey={summary.key} api={auditApi} />
         </>
       )}
     </>

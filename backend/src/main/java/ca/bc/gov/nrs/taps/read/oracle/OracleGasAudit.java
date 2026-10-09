@@ -1,6 +1,5 @@
 package ca.bc.gov.nrs.taps.read.oracle;
 
-import ca.bc.gov.nrs.taps.domain.LegacyIdentifiers;
 import ca.bc.gov.nrs.taps.read.GasAppraisal;
 import ca.bc.gov.nrs.taps.read.GasAudit;
 import ca.bc.gov.nrs.taps.security.TapsCapability;
@@ -22,12 +21,17 @@ public final class OracleGasAudit {
     this.jdbc = Objects.requireNonNull(jdbc, "jdbc");
   }
 
-  public Optional<GasAudit.HistoryPage> history(TapsUser user, String worksheetId, int page) {
-    String id = LegacyIdentifiers.requiredId(worksheetId);
+  public Optional<GasAudit.HistoryPage> history(TapsUser user, GasAppraisal.Key key, int page) {
+    Objects.requireNonNull(key, "key");
+    if (key.type() == GasAppraisal.WorksheetType.HISTORIC) {
+      throw new IllegalArgumentException("historic worksheet history is not available");
+    }
+    String id = key.worksheetId();
     if (page < 0) throw new IllegalArgumentException("page must be non-negative");
-    var key = new GasAppraisal.Key(GasAppraisal.WorksheetType.NON_APPRAISED, id);
     var scope = ReadScopePredicate.forCapability(user, TapsCapability.GAS_APPRAISAL_VIEW);
-    return jdbc.query(GasAuditSql.select(scope), statement -> {
+    String sql = key.type() == GasAppraisal.WorksheetType.APPRAISED
+        ? AppraisedGasAuditSql.select(scope) : GasAuditSql.select(scope);
+    return jdbc.query(sql, statement -> {
       int parameter = 1;
       statement.setLong(parameter++, Long.parseLong(id));
       for (String value : scope.parameters()) statement.setString(parameter++, value);

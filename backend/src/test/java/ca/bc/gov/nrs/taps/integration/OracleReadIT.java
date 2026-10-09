@@ -345,13 +345,13 @@ class OracleReadIT {
     gasRateSnapshot(1001, 50001, 301, 1, "2026-01-01T10:00:00");
     gasRateSnapshot(1002, 50002, 301, 1, "2026-01-01T10:00:00");
     jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RTE_AUD SET SCALE_SPECIES_CODE = 'HE', SCALE_GRADE_CODE = 'B', RESERVE_STUMPAGE_RATE = 50 WHERE NON_APPRAISED_STMPG_RTE_AUD_ID = 1002");
-    assertThat(reader.history(CARIBOO, "301", 0).orElseThrow().total()).isZero();
+    assertThat(reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0).orElseThrow().total()).isZero();
 
     gasRateSnapshot(1003, 50001, 301, 2, "2026-01-02T10:00:00");
     jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RTE_AUD SET SCALE_GRADE_CODE = 'B', SILVICULTURE_LEVY = 2.50, UPDATE_USERID = 'IDIR\\SYNTHETIC-EDITOR' WHERE NON_APPRAISED_STMPG_RTE_AUD_ID = 1003");
     gasRateSnapshot(1004, 50002, 301, 2, "2026-01-02T10:00:00");
     jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RTE_AUD SET SCALE_SPECIES_CODE = 'HE', SCALE_GRADE_CODE = 'B', RESERVE_STUMPAGE_RATE = 50 WHERE NON_APPRAISED_STMPG_RTE_AUD_ID = 1004");
-    var changes = reader.history(CARIBOO, "301", 0).orElseThrow();
+    var changes = reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0).orElseThrow();
     assertThat(changes.total()).isEqualTo(2);
     assertThat(changes.items()).extracting(GasAudit.Item::attribute).containsExactly("Grade", "Silviculture Levy");
     assertThat(changes.items()).extracting(GasAudit.Item::value).containsExactly("B", "2.50");
@@ -364,7 +364,7 @@ class OracleReadIT {
 
     gasRateSnapshot(1005, 50001, 301, 2, "2026-01-03T10:00:00");
     jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RTE_AUD SET SCALE_GRADE_CODE = 'B' WHERE NON_APPRAISED_STMPG_RTE_AUD_ID = 1005");
-    var latest = reader.history(CARIBOO, "301", 0).orElseThrow();
+    var latest = reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0).orElseThrow();
     assertThat(latest.total()).isEqualTo(3);
     assertThat(latest.items().getFirst().attribute()).isEqualTo("Silviculture Levy");
     assertThat(latest.items().getFirst().value()).isNull();
@@ -384,8 +384,8 @@ class OracleReadIT {
           RATE_ADJUSTMENT_TYPE_CODE = 'F' WHERE NON_APPRAISED_WORKSHEET_ID = 301
         """);
     gasWorksheetSnapshot(2002, 301, 1, "2026-01-02T10:00:00");
-    var first = reader.history(CARIBOO, "301", 0).orElseThrow();
-    var second = reader.history(CARIBOO, "301", 1).orElseThrow();
+    var first = reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0).orElseThrow();
+    var second = reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 1).orElseThrow();
     assertThat(first.total()).isEqualTo(11);
     assertThat(first.items()).hasSize(10);
     assertThat(first.items()).filteredOn(change -> change.attribute().equals("Effective Date"))
@@ -410,15 +410,15 @@ class OracleReadIT {
       jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RTE_AUD SET RESERVE_STUMPAGE_RATE = ? WHERE NON_APPRAISED_STMPG_RTE_AUD_ID = ?", index, 3000 + index);
     }
     var reader = new OracleGasAudit(jdbc);
-    var first = reader.history(CARIBOO, "301", 0).orElseThrow();
-    var second = reader.history(CARIBOO, "301", 1).orElseThrow();
+    var first = reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0).orElseThrow();
+    var second = reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 1).orElseThrow();
     assertThat(first.total()).isEqualTo(12);
     assertThat(first.items()).hasSize(10).doesNotContainAnyElementsOf(second.items());
     assertThat(first.items().getFirst().eventId()).isEqualTo("R:3012:7");
     assertThat(first.items().getFirst().value()).isEqualTo("12.00");
     assertThat(second.items()).extracting(GasAudit.Item::eventId).containsExactly("R:3002:7", "R:3001:7");
-    assertThat(reader.history(CARIBOO, "301", 0).orElseThrow()).isEqualTo(first);
-    var beyondEnd = reader.history(CARIBOO, "301", Integer.MAX_VALUE).orElseThrow();
+    assertThat(reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0).orElseThrow()).isEqualTo(first);
+    var beyondEnd = reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), Integer.MAX_VALUE).orElseThrow();
     assertThat(beyondEnd.total()).isEqualTo(12);
     assertThat(beyondEnd.items()).isEmpty();
   }
@@ -426,18 +426,142 @@ class OracleReadIT {
   @Test
   void gasHistoryRequiresTheCurrentAuthorizedParentAndExcludesOtherFamilies() {
     var reader = new OracleGasAudit(jdbc);
-    assertThat(reader.history(CARIBOO, "301", 0).orElseThrow().items()).isEmpty();
-    assertThat(reader.history(OMINECA, "301", 0)).isEmpty();
-    assertThat(reader.history(idir(), "301", 0)).isEmpty();
+    assertThat(reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0).orElseThrow().items()).isEmpty();
+    assertThat(reader.history(OMINECA, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0)).isEmpty();
+    assertThat(reader.history(idir(), key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0)).isEmpty();
     gasRateSnapshot(4001, 50004, 301, 1, "2026-01-01T10:00:00");
     gasRateSnapshot(4002, 50004, 301, 1, "2026-01-02T10:00:00");
     jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RTE_AUD SET APPRAISED_WORKSHEET_ID = 101");
     jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RTE_AUD SET RESERVE_STUMPAGE_RATE = 99 WHERE NON_APPRAISED_STMPG_RTE_AUD_ID = 4002");
-    assertThat(reader.history(CARIBOO, "301", 0).orElseThrow().total()).isZero();
+    assertThat(reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0).orElseThrow().total()).isZero();
     jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RTE_AUD SET APPRAISED_WORKSHEET_ID = NULL, HISTORIC_APPRAISED_WRKSHEET_ID = 201");
-    assertThat(reader.history(CARIBOO, "301", 0).orElseThrow().total()).isZero();
+    assertThat(reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "301"), 0).orElseThrow().total()).isZero();
     jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RTE_AUD SET NON_APPRAISED_WORKSHEET_ID = 9999, HISTORIC_APPRAISED_WRKSHEET_ID = NULL");
-    assertThat(reader.history(ADMIN, "9999", 0)).isEmpty();
+    assertThat(reader.history(ADMIN, key(GasAppraisal.WorksheetType.NON_APPRAISED, "9999"), 0)).isEmpty();
+  }
+
+  @Test
+  void appraisedHistoryKeepsRateBaselinesAndIdenticalIdsInDifferentFamiliesSeparate() {
+    var reader = new OracleGasAudit(jdbc);
+    var appraised = key(GasAppraisal.WorksheetType.APPRAISED, "101");
+    gasAuditTransaction(1, "Synthetic initial states");
+    gasAuditTransaction(2, "Synthetic changed rate");
+    gasAppraisedRateSnapshot(7001, 50001, 101, 1, "2026-01-01T10:00:00");
+    gasAppraisedRateSnapshot(7002, 50002, 101, 1, "2026-01-01T10:00:00");
+    jdbc.update("UPDATE APPRAISED_STUMPAGE_RATE_AUD SET TOTAL_STUMPAGE_RATE_AMOUNT = 99.99 WHERE APPRAISED_STUMPAGE_RATE_AUD_ID = 7002");
+    assertThat(reader.history(CARIBOO, appraised, 0).orElseThrow().total()).isZero();
+    gasAppraisedRateSnapshot(7003, 50001, 101, 2, "2026-01-02T10:00:00");
+    jdbc.update("UPDATE APPRAISED_STUMPAGE_RATE_AUD SET TOTAL_STUMPAGE_RATE_AMOUNT = 12.34, UPDATE_USERID = 'SNAPSHOT-ACTOR' WHERE APPRAISED_STUMPAGE_RATE_AUD_ID = 7003");
+    var changes = reader.history(CARIBOO, appraised, 0).orElseThrow();
+    assertThat(changes.total()).isEqualTo(1);
+    assertThat(changes.items().getFirst().rateId()).isEqualTo("50001");
+    assertThat(changes.items().getFirst().attribute()).isEqualTo("Total Stumpage Rate");
+    assertThat(changes.items().getFirst().value()).isEqualTo("12.34");
+    assertThat(changes.items().getFirst().userId()).isEqualTo("SNAPSHOT-ACTOR");
+    assertThat(changes.items().getFirst().comment()).isEqualTo("Synthetic changed rate");
+
+    jdbc.update("""
+        INSERT INTO NON_APPRAISED_WORKSHEET
+        SELECT 101, TIMBER_MARK, APPRAISAL_METHOD_CODE, EFFECTIVE_DATE, EXPIRY_DATE,
+               NON_APPRAISED_STATUS_CODE, WORKSHEET_REFERENCE_TYPE_CODE, SDM_DECLARATION_ACCEPTANCE_DT,
+               TSB_NUMBER_CODE, APPRAISAL_FOREST_ZONE_CODE, NON_APPRAISED_RATE_TYPE_CODE, RATE_ADJUSTMENT_TYPE_CODE
+          FROM NON_APPRAISED_WORKSHEET WHERE NON_APPRAISED_WORKSHEET_ID = 301
+        """);
+    gasRateSnapshot(7001, 50001, 101, 1, "2026-01-01T10:00:00");
+    gasRateSnapshot(7003, 50001, 101, 2, "2026-01-02T10:00:00");
+    jdbc.update("UPDATE NON_APPRAISED_STUMPAGE_RTE_AUD SET SCALE_PRODUCT_CODE = '02' WHERE NON_APPRAISED_STMPG_RTE_AUD_ID = 7003");
+    var other = reader.history(CARIBOO, key(GasAppraisal.WorksheetType.NON_APPRAISED, "101"), 0).orElseThrow();
+    assertThat(other.items()).hasSize(1);
+    assertThat(other.items().getFirst().value()).isEqualTo("02");
+    assertThat(other.items().getFirst().eventId()).isEqualTo(changes.items().getFirst().eventId());
+    assertThat(other.key()).isNotEqualTo(changes.key());
+    assertThat(reader.history(CARIBOO, appraised, 0).orElseThrow()).isEqualTo(changes);
+  }
+
+  @Test
+  void appraisedWorksheetHistoryKeepsSdmIndependentAndFormatsOverrideValues() {
+    var reader = new OracleGasAudit(jdbc);
+    var appraised = key(GasAppraisal.WorksheetType.APPRAISED, "101");
+    gasAuditTransaction(1, null);
+    gasAppraisedWorksheetSnapshot(8001, 101, 1, "2026-01-01T10:00:00");
+    gasAppraisedWorksheetSnapshot(8002, 101, 1, "2026-01-02T10:00:00");
+    jdbc.update("UPDATE APPRAISED_WORKSHEET_AUD SET SDM_DECLARATION_ACCEPTANCE_DT = DATE '2026-02-03' WHERE APPRAISED_WORKSHEET_AUD_ID = 8002");
+    var sdmOnly = reader.history(CARIBOO, appraised, 0).orElseThrow();
+    assertThat(sdmOnly.total()).isEqualTo(1);
+    assertThat(sdmOnly.items().getFirst().attribute()).isEqualTo("SDM Declaration Acceptance Date");
+    assertThat(sdmOnly.items().getFirst().value()).isEqualTo("2026-02-03");
+
+    gasAppraisedWorksheetSnapshot(8003, 101, 1, "2026-01-03T10:00:00");
+    jdbc.update("""
+        UPDATE APPRAISED_WORKSHEET_AUD SET DISCOUNT_PERCENT = 0,
+          CEASE_ADJUSTMENT_DATE = DATE '2026-12-31', SILVICULTURE_COST_OVERRIDE = 0,
+          LOGGING_COST_OVERRIDE = -9999999, MANUFACTURING_COST_OVERRIDE = 9999999
+         WHERE APPRAISED_WORKSHEET_AUD_ID = 8003
+        """);
+    var values = reader.history(CARIBOO, appraised, 0).orElseThrow();
+    assertThat(values.total()).isEqualTo(7);
+    assertThat(values.items().subList(0, 6)).extracting(GasAudit.Item::value)
+        .containsExactly("0.0", "2026-12-31", null, "0", "-9999999", "9999999");
+    assertThat(values.items().subList(0, 6)).extracting(GasAudit.Item::attribute)
+        .containsExactly("Discount Percent", "Cease Adjustment Date", "SDM Declaration Acceptance Date",
+            "Silviculture Cost Override", "Logging Cost Override", "Manufacturing Cost Override");
+  }
+
+  @Test
+  void appraisedRateHistoryHasStablePagesAndPreservesAllEightRateFields() {
+    gasAuditTransaction(1, "Synthetic rate changes");
+    gasAppraisedRateSnapshot(9000, 50003, 101, 1, "2026-01-01T10:00:00");
+    jdbc.update("UPDATE APPRAISED_STUMPAGE_RATE_AUD SET TOTAL_STUMPAGE_RATE_AMOUNT = 0 WHERE APPRAISED_STUMPAGE_RATE_AUD_ID = 9000");
+    for (int index = 1; index <= 12; index++) {
+      gasAppraisedRateSnapshot(9000 + index, 50003, 101, 1, "2026-01-02T10:00:00");
+      jdbc.update("UPDATE APPRAISED_STUMPAGE_RATE_AUD SET TOTAL_STUMPAGE_RATE_AMOUNT = ? WHERE APPRAISED_STUMPAGE_RATE_AUD_ID = ?", index, 9000 + index);
+    }
+    var reader = new OracleGasAudit(jdbc);
+    var appraised = key(GasAppraisal.WorksheetType.APPRAISED, "101");
+    var first = reader.history(CARIBOO, appraised, 0).orElseThrow();
+    var second = reader.history(CARIBOO, appraised, 1).orElseThrow();
+    assertThat(first.total()).isEqualTo(12);
+    assertThat(first.items()).hasSize(10).doesNotContainAnyElementsOf(second.items());
+    assertThat(first.items().getFirst().eventId()).isEqualTo("R:9012:2");
+    assertThat(second.items()).extracting(GasAudit.Item::eventId).containsExactly("R:9002:2", "R:9001:2");
+    assertThat(reader.history(CARIBOO, appraised, Integer.MAX_VALUE).orElseThrow().items()).isEmpty();
+
+    gasAppraisedRateSnapshot(9013, 50003, 101, 1, "2026-01-03T10:00:00");
+    jdbc.update("""
+        UPDATE APPRAISED_STUMPAGE_RATE_AUD SET
+          STUMPAGE_RATE_EFFECTIVE_DATE = TO_DATE('2026-01-01 12:00:00', 'YYYY-MM-DD HH24:MI:SS'),
+          TOTAL_STUMPAGE_RATE_AMOUNT = 9999.99, STUMPAGE_RATE_OVERRIDE_IND = 'Y',
+          UPSET_STUMPAGE_RATE_OVERRIDE = -9999.99, LICENSEE_NOTICE_DELIVERY_IND = 'Y',
+          ARCHIVE_NOTICE_DELIVERY_IND = 'Y', NOTICE_CREATE_DATE = DATE '2026-01-03',
+          ADJUSTMENT_NOTICE_MESSAGE = '<b>Synthetic notice</b>'
+         WHERE APPRAISED_STUMPAGE_RATE_AUD_ID = 9013
+        """);
+    var allFields = reader.history(CARIBOO, appraised, 0).orElseThrow();
+    assertThat(allFields.total()).isEqualTo(20);
+    assertThat(allFields.items().subList(0, 8)).extracting(GasAudit.Item::value)
+        .containsExactly("2026-01-01", "9999.99", "Yes", "-9999.99", "Yes", "Yes", "2026-01-03", "<b>Synthetic notice</b>");
+  }
+
+  @Test
+  void appraisedHistoryRequiresCurrentAdsScopeAndExcludesHistoricalRateParents() {
+    var reader = new OracleGasAudit(jdbc);
+    var appraised = key(GasAppraisal.WorksheetType.APPRAISED, "101");
+    assertThat(reader.history(CARIBOO, appraised, 0).orElseThrow().total()).isZero();
+    assertThat(reader.history(OMINECA, appraised, 0)).isEmpty();
+    assertThat(reader.history(idir(), appraised, 0)).isEmpty();
+    assertThatThrownBy(() -> reader.history(ADMIN, key(GasAppraisal.WorksheetType.HISTORIC, "101"), 0))
+        .isInstanceOf(IllegalArgumentException.class);
+    gasAppraisedRateSnapshot(9501, 50004, 101, 1, "2026-01-01T10:00:00");
+    gasAppraisedRateSnapshot(9502, 50004, 101, 1, "2026-01-02T10:00:00");
+    jdbc.update("UPDATE APPRAISED_STUMPAGE_RATE_AUD SET TOTAL_STUMPAGE_RATE_AMOUNT = 9 WHERE APPRAISED_STUMPAGE_RATE_AUD_ID = 9502");
+    assertThat(reader.history(CARIBOO, appraised, 0).orElseThrow().total()).isEqualTo(1);
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET ADMIN_DISTRICT = 20 WHERE ECAS_ID = 1001");
+    assertThat(reader.history(CARIBOO, appraised, 0)).isEmpty();
+    assertThat(reader.history(OMINECA, appraised, 0).orElseThrow().total()).isEqualTo(1);
+    jdbc.update("UPDATE APPRAISED_STUMPAGE_RATE_AUD SET HISTORIC_APPRAISED_WRKSHEET_ID = 201");
+    assertThat(reader.history(ADMIN, appraised, 0).orElseThrow().total()).isZero();
+    jdbc.update("UPDATE APPRAISED_STUMPAGE_RATE_AUD SET APPRAISED_WORKSHEET_ID = 9999, HISTORIC_APPRAISED_WRKSHEET_ID = NULL");
+    assertThat(reader.history(ADMIN, key(GasAppraisal.WorksheetType.APPRAISED, "9999"), 0)).isEmpty();
   }
 
   @Test
@@ -857,6 +981,14 @@ class OracleReadIT {
           .andExpect(jsonPath("$.total").value(0)).andExpect(jsonPath("$.size").value(10));
       mvc.perform(get("/api/gas/worksheets/NON_APPRAISED/301/history").header("Authorization", "Bearer fixture-omineca"))
           .andExpect(status().isNotFound());
+      mvc.perform(get("/api/gas/worksheets/APPRAISED/101/history").header("Authorization", "Bearer fixture-cariboo"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.key.type").value("APPRAISED"))
+          .andExpect(jsonPath("$.key.worksheetId").value("101"))
+          .andExpect(jsonPath("$.total").value(0)).andExpect(jsonPath("$.size").value(10));
+      mvc.perform(get("/api/gas/worksheets/APPRAISED/101/history").header("Authorization", "Bearer fixture-omineca"))
+          .andExpect(status().isNotFound());
+      mvc.perform(get("/api/gas/worksheets/HISTORIC/201/history").header("Authorization", "Bearer fixture-cariboo"))
+          .andExpect(status().isForbidden());
       mvc.perform(get("/api/gas/licences/A00001/marks").header("Authorization", "Bearer fixture-cariboo"))
           .andExpect(status().isOk()).andExpect(jsonPath("$.timberMarks.length()").value(2));
       mvc.perform(get("/api/gas/licence-information?timberMark=PM0001")
@@ -921,6 +1053,25 @@ class OracleReadIT {
     var user = idir(roles);
     return new TapsUser(account, user.displayName(), user.email(), user.identityProvider(),
         user.businessName(), user.grants(), account);
+  }
+
+  private void gasAppraisedWorksheetSnapshot(long auditId, long worksheetId, long transactionId, String modified) {
+    var timestamp = java.sql.Timestamp.valueOf(LocalDateTime.parse(modified));
+    jdbc.update("""
+        INSERT INTO APPRAISED_WORKSHEET_AUD
+        SELECT ?, APPRAISED_WORKSHEET_ID, ?, ECAS_ID, 10, NULL, NULL, NULL, NULL, NULL,
+               ?, 'SYNTHETIC', ?, 'SYNTHETIC'
+          FROM APPRAISED_WORKSHEET WHERE APPRAISED_WORKSHEET_ID = ?
+        """, auditId, transactionId, timestamp, timestamp, worksheetId);
+  }
+
+  private void gasAppraisedRateSnapshot(long auditId, long rateId, long worksheetId, long transactionId, String modified) {
+    var timestamp = java.sql.Timestamp.valueOf(LocalDateTime.parse(modified));
+    jdbc.update("""
+        INSERT INTO APPRAISED_STUMPAGE_RATE_AUD VALUES
+        (?, ?, ?, DATE '2026-01-01', 1.00, 'N', 'N', 'N', NULL, NULL, ?, NULL,
+         ?, 'SYNTHETIC', ?, 'SYNTHETIC', NULL)
+        """, auditId, rateId, transactionId, worksheetId, timestamp, timestamp);
   }
 
   private void gasAuditTransaction(long id, String comment) {

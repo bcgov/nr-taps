@@ -173,6 +173,10 @@ test('connects the Coast reference to both related GAS mark rows and exact store
   const summary = screen.getByRole('complementary', { name: 'Appraised worksheet 999900000011' })
   expect(within(summary).getByText('COAST_MPS_TOA_N')).toBeInTheDocument()
   expect(within(summary).getByRole('cell', { name: '12.30' })).toBeInTheDocument()
+  await user.click(within(summary).getByRole('button', { name: 'History' }))
+  expect(
+    await within(summary).findByText('<script>Fictional appraised comment as text</script>'),
+  ).toBeInTheDocument()
   await user.click(within(summary).getByRole('button', { name: 'Close' }))
   await waitFor(() => expect(launcher).toHaveFocus())
 })

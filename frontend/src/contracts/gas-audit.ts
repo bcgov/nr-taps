@@ -8,8 +8,10 @@ export type GasAuditEvent = {
   comment: string | null
 }
 
+export type GasAuditWorksheetKey = { type: 'APPRAISED' | 'NON_APPRAISED'; worksheetId: string }
+
 export type GasAuditHistoryPage = {
-  key: { type: 'NON_APPRAISED'; worksheetId: string }
+  key: GasAuditWorksheetKey
   items: GasAuditEvent[]
   total: number
   page: number

@@ -1,14 +1,21 @@
-import type { GasAuditHistoryPage } from '@/contracts/gas-audit'
-import { readRequest } from './read-service'
+import type { GasAuditHistoryPage, GasAuditWorksheetKey } from '@/contracts/gas-audit'
+import { readRequest, ReadApiError } from './read-service'
 
 export interface GasAuditApi {
-  history(worksheetId: string, page: number, signal: AbortSignal): Promise<GasAuditHistoryPage>
+  history(
+    key: GasAuditWorksheetKey,
+    page: number,
+    signal: AbortSignal,
+  ): Promise<GasAuditHistoryPage>
 }
 
 export const gasAuditApi: GasAuditApi = {
-  history: (id, page, signal) =>
-    readRequest(
-      `/api/gas/worksheets/NON_APPRAISED/${encodeURIComponent(id)}/history?page=${page}`,
+  history: (key, page, signal) => {
+    if (key.type !== 'APPRAISED' && key.type !== 'NON_APPRAISED')
+      return Promise.reject(new ReadApiError(400))
+    return readRequest(
+      `/api/gas/worksheets/${key.type}/${encodeURIComponent(key.worksheetId)}/history?page=${page}`,
       signal,
-    ),
+    )
+  },
 }

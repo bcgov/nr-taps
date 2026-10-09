@@ -178,9 +178,11 @@ const emptyEcas: EcasSearchFilters = {
 export function EcasInboxReadPage({
   api = readApi,
   relatedApis,
+  gasAuditApi,
 }: {
   api?: ReadApi
   relatedApis?: EcasRelatedApis
+  gasAuditApi?: GasAuditApi
 }) {
   const { state } = useAuth()
   const myToDoAvailable = state.kind === 'signed-in' && state.session.ecasMyToDoAvailable === true
@@ -269,6 +271,7 @@ export function EcasInboxReadPage({
         launcherRef={launcherRef}
         api={api}
         relatedApis={relatedApis}
+        gasAuditApi={gasAuditApi}
       />
     </section>
   )
