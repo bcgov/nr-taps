@@ -138,11 +138,11 @@ class OracleGasAuditTest {
     when(rows.getString("WORKSHEET_ID")).thenReturn("123");
     when(rows.getString("EVENT_ID")).thenReturn("R:402:3", "R:403:6");
     when(rows.getString("RATE_ID")).thenReturn("201", "202");
-    when(rows.getString("USER_ID")).thenReturn("IDIR\\SYNTHETIC", null);
+    when(rows.getString("USER_ID")).thenReturn("IDIR\\SYNTHETIC", (String) null);
     when(rows.getTimestamp("EVENT_DATE")).thenReturn(Timestamp.valueOf("2030-01-01 12:34:56"));
     when(rows.getString("ATTRIBUTE")).thenReturn("Grade", "Silviculture Levy");
-    when(rows.getString("CHANGED_VALUE")).thenReturn(" ", null);
-    when(rows.getString("COMMENT_TEXT")).thenReturn("<b>Synthetic comment</b>", null);
+    when(rows.getString("CHANGED_VALUE")).thenReturn(" ", (String) null);
+    when(rows.getString("COMMENT_TEXT")).thenReturn("<b>Synthetic comment</b>", (String) null);
     var page = audit.history(user("TAPS_ADMIN"), "123", 0).orElseThrow();
     assertThat(page.items()).containsExactly(
         new GasAudit.Item("R:402:3", "201", "IDIR\\SYNTHETIC", LocalDateTime.of(2030, 1, 1, 12, 34, 56),
