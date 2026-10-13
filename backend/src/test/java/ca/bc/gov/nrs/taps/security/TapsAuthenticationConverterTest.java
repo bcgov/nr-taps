@@ -26,6 +26,8 @@ class TapsAuthenticationConverterTest {
                     "FAM:EXPIRES:2026-12-31:TAPS_VIEWER")));
 
     assertThat(user.userId()).isEqualTo("IDIR\\JSMITH");
+    assertThat(user.legacyAccount()).isEqualTo("IDIR\\JSMITH");
+    assertThat(user.ecasMyToDoAvailable()).isTrue();
     assertThat(user.displayName()).isEqualTo("Smith, Jane");
     assertThat(user.identityProvider()).isEqualTo(IdentityProvider.IDIR);
     assertThat(user.grants())
@@ -54,6 +56,7 @@ class TapsAuthenticationConverterTest {
     TapsUser user = converter.toUser(token);
 
     assertThat(user.userId()).isEqualTo("BCEID\\ACME-CLERK");
+    assertThat(user.legacyAccount()).isEqualTo("BCEID\\ACME-CLERK");
     assertThat(user.businessName()).isEqualTo("Acme Forest Products");
     assertThat(user.forestClients()).containsExactly("00001018", "00147603");
     assertThat(user.can(TapsCapability.ECAS_SUBMISSION_SUBMIT, client("00001018"))).isTrue();
@@ -171,7 +174,42 @@ class TapsAuthenticationConverterTest {
   void fallsBackToTheUpperCasedGuidWithoutAUsername() {
     Jwt token = token(Map.of("identity_provider", "idir", "idir_user_guid", "0a1b2c3d"));
 
-    assertThat(converter.toUser(token).userId()).isEqualTo("IDIR\\0A1B2C3D");
+    TapsUser user = converter.toUser(token);
+    assertThat(user.userId()).isEqualTo("IDIR\\0A1B2C3D");
+    assertThat(user.legacyAccount()).isNull();
+  }
+
+  @Test
+  void onlyTheSignedProviderUsernameCanSupplyTheLegacyAssignmentAccount() {
+    for (Object username : List.of(" ", 123, List.of("jsmith"))) {
+      TapsUser user = converter.toUser(token(Map.of(
+          "identity_provider", "azureidir", "idir_user_guid", "guid-only",
+          "idir_username", username, "bceid_username", "another-provider",
+          "display_name", "IDIR\\DISPLAY", "preferred_username", "IDIR\\PREFERRED",
+          "client_roles", List.of("TAPS_HEADQUARTERS"))));
+      assertThat(user.userId()).isEqualTo("IDIR\\GUID-ONLY");
+      assertThat(user.legacyAccount()).isNull();
+      assertThat(user.ecasMyToDoAvailable()).isFalse();
+      assertThat(user.can(TapsCapability.ECAS_SUBMISSION_VIEW)).isTrue();
+    }
+    TapsUser user = converter.toUser(token(Map.of(
+        "identity_provider", "bceidbusiness", "bceid_username", " acme-clerk ",
+        "bceid_user_guid", "different-guid", "idir_username", "another-provider",
+        "client_roles", List.of("TAPS_BCTS_FOREST_CLIENT-00001018"))));
+    assertThat(user.legacyAccount()).isEqualTo("BCEID\\ACME-CLERK");
+    assertThat(user.ecasMyToDoAvailable()).isTrue();
+  }
+
+  @Test
+  void guidOnlyUsersCanUseQueuesThatDoNotRequireAssignment() {
+    for (String role : List.of("TAPS_ADMIN", "TAPS_VIEWER_DISTRICT-DCC", "TAPS_REGION_CLERK_REGION-CARIBOO")) {
+      TapsUser user = converter.toUser(token(Map.of("identity_provider", "idir",
+          "idir_user_guid", "guid-only", "client_roles", List.of(role))));
+      assertThat(user.legacyAccount()).isNull();
+      assertThat(user.ecasMyToDoAvailable()).isTrue();
+    }
+    TapsUser withoutRoles = converter.toUser(token(Map.of("identity_provider", "idir", "idir_user_guid", "guid-only")));
+    assertThat(withoutRoles.ecasMyToDoAvailable()).isFalse();
   }
 
   @Test

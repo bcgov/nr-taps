@@ -63,8 +63,11 @@ public final class OracleAppraisedSummary {
     ReadScopePredicate scope =
         ReadScopePredicate.forCapability(user, TapsCapability.GAS_APPRAISAL_VIEW);
     String sql = "WITH record_scope AS (\n" + AppraisedScopeSql.SOURCE
-        + "), scoped_parent AS (\nSELECT * FROM record_scope WHERE record_scope."
-        + idColumn + " = ? AND " + scope.sql() + "\n)\n" + DETAILS;
+        + "), authorized_parent AS (\nSELECT * FROM record_scope WHERE record_scope."
+        + idColumn + " = ? AND " + scope.sql() + "\n), scoped_parent AS (\n"
+        + "SELECT P.*, (SELECT M.TIMBER_MARK FROM ADS_SUBMITTED_TIMBER_MARK M "
+        + "WHERE M.ECAS_ID = P.ECAS_ID AND M.PRIMARY_MARK_IND = 'Y') AS PRIMARY_TIMBER_MARK "
+        + "FROM authorized_parent P\n)\n" + DETAILS;
     return jdbc.query(
         sql,
         statement -> {
@@ -114,6 +117,7 @@ public final class OracleAppraisedSummary {
       CodeOption status,
       LocalDate effectiveDate,
       LocalDate expiryDate,
+      String primaryTimberMark,
       String referenceType,
       LocalDate ceaseAdjustmentDate) {
     static Parent read(ResultSet row) throws SQLException {
@@ -133,6 +137,7 @@ public final class OracleAppraisedSummary {
           new CodeOption(row.getString("STATUS_CODE"), row.getString("STATUS_DESCRIPTION")),
           localDate(row, "EFFECTIVE_DATE"),
           localDate(row, "EXPIRY_DATE"),
+          row.getString("PRIMARY_TIMBER_MARK"),
           row.getString("REFERENCE_TYPE"),
           localDate(row, "CEASE_ADJUSTMENT_DATE"));
     }
@@ -143,7 +148,7 @@ public final class OracleAppraisedSummary {
               .orElseThrow(() -> new DataIntegrityViolationException("unsupported summary variant"));
       return new GasAppraisal.AppraisedSummary(
           key, ecasId, appraisalMethod, variant, rateCalculationMethod, toaEligible, status,
-          effectiveDate, expiryDate, marks, referenceType, ceaseAdjustmentDate, rates);
+          effectiveDate, expiryDate, marks, primaryTimberMark, referenceType, ceaseAdjustmentDate, rates);
     }
   }
 

@@ -21,6 +21,7 @@ filters.
 | `GET /api/ecas/{ecasId}/attachments?page=0` | `ECAS_SUBMISSION_VIEW` | Document metadata, 50 per page. See [attachment visibility](#attachments). |
 | `GET /api/gas/worksheets?licence=&timberMark=&page=0` | `GAS_APPRAISAL_VIEW` | All three families, 10 per page. |
 | `GET /api/gas/worksheets/{type}/{worksheetId}` | `GAS_APPRAISAL_VIEW` | `APPRAISED`, `HISTORIC` or `NON_APPRAISED`. |
+| `GET /api/gas/worksheets/{type}/{worksheetId}/history?page=0` | `GAS_APPRAISAL_VIEW` | `APPRAISED` or `NON_APPRAISED` changed fields, 10 per page. |
 | `GET /api/gas/appraised/by-ecas/{ecasId}` | `GAS_APPRAISAL_VIEW` | Appraised summary for an ECAS ID. |
 | `GET /api/gas/licences/{licence}/marks` | `GAS_APPRAISAL_VIEW` | HA marks. Empty is valid. |
 | `GET /api/gas/licence-information?licence=&timberMark=` | `GAS_APPRAISAL_VIEW` | FTA licence panel. Mark required. |
@@ -58,7 +59,9 @@ Java records below and matching types in `frontend/src/contracts` define the fie
 - Stored amounts are exact two-decimal strings such as `"12.30"`: `NUMBER(6,2)` for `StoredRate`
   and ASR, `NUMBER(5,2)` for NASR components. Overflow or rounding is rejected. Reference
   quantities are `BigDecimal` JSON numbers.
-- No totals, breakdowns, policy costs or action flags are calculated.
+- Non-appraised Upset Rate and Total Rate are exact decimal sums of stored components, returned
+  as two-decimal strings. Their sums are not limited to an individual component column's range.
+  Policy costs, pricing breakdowns and action flags are not calculated.
 
 ## Record scope
 
@@ -99,18 +102,18 @@ with `getTimestamp().toLocalDateTime()`, keeping the time of day with no timezon
 
 ## ECAS search
 
-`EcasInbox.Search` accepts the fields below. `MY_TO_DO` listing fails before SQL runs because the
-assignment mapping is not implemented.
+`EcasInbox.Search` accepts the fields below. Both modes apply the caller's record scope and
+visibility rules. My To Do also applies the queue conditions described below.
 
 | Field | Rule |
 | --- | --- |
-| `mode` | `MY_TO_DO` (default, listing not built) or `ALL_SUBMISSIONS` |
+| `mode` | `MY_TO_DO` (API default) or `ALL_SUBMISSIONS` (UI default) |
 | `appraisalMethod` | `C`, `I` or `null` for both |
 | `licence`, `cuttingPermit` | Letters/digits, uppercased, max 10 / 3 |
 | `timberMark` | Uppercased, max 6 |
 | `clientNumber`, `clientLocationCode` | Padded to 8 / 2 characters |
 | `managementUnitType`, `managementUnitId` | Letters/digits, uppercased, max 1 / 4 |
-| `workedOnByUserId` | Max 30 |
+| `workedOnByUserId` | Trimmed, uppercased, max 30 |
 | `bctsFunded`, `certified` | `null` means no filter |
 | `orgUnitNumbers`, `statusCodes` | Empty means no filter |
 | `sortBy`, `sortDirection` | Enums, default `ECAS_ID` `DESC` |
@@ -132,7 +135,7 @@ assignment mapping is not implemented.
 Several `Item` rows can share an ECAS ID when a submission has several marks or permits. Don't
 group by ECAS ID, or by ECAS ID and mark.
 
-`OracleEcasInbox.search` supports `ALL_SUBMISSIONS` with 100-row pages. One scoped SELECT replaces
+`OracleEcasInbox.search` supports both modes with 100-row pages. One scoped SELECT replaces
 the legacy ECAS05 temporary-table DELETE/INSERT.
 
 - Sorting is by day with fixed tie-breakers.
@@ -140,11 +143,38 @@ the legacy ECAS05 temporary-table DELETE/INSERT.
   explicit mark can match a non-primary one.
 - Organization selections only narrow results.
 - A direct ECAS ID skips other criteria but keeps authorization, status visibility, organizations,
-  client/location and certification.
+  client/location and certification. It also keeps ministry viewer queue restrictions in My To Do.
 - Certified `false` includes null; BCTS `false` requires `N`. Worked-on requires an audit event.
   FTA cutting-permit expiry applies only when both bounds are set.
 - Client names come from `SIL_GET_CLIENT_NAME`. Native midnight bounds and day truncation stand in
   for the legacy SIL date-conversion helper (provisional).
+
+### My To Do
+
+Queue conditions stay inside each grant's scope; one role cannot supply another role's scope.
+The existing draft/scenario visibility rules apply in both modes.
+
+| Role | Listing conditions in addition to scope and visibility |
+| --- | --- |
+| Administrator | Status in `ACC`, `APP`, `BUP`, `CLR`, `DCL`, `DFT`, `FWD`, `GAS`, `RCD`, `RTN`, `SLD`, `RGN`, `SUB`, `SWI`, `SCN`, `VER`, `DTR`, `UNC`. |
+| Headquarters | Assigned to the caller. |
+| District appraiser | Assigned to the caller; status `SUB`, `RCD`, `RTN` or `SCN`. |
+| Region appraiser | Assigned to the caller; status `RGN`, `SWI`, `SCN`, `CLR`, `VER`, `DTR`, `SLD` or `UNC`. Requires a matching tenure row; `VER`/`DTR` require BCTS funding `N`. |
+| Viewer / region clerk | Status `SUB`/`RCD`/`RTN` for viewer, `RGN`/`SWI` for region clerk. These restrictions also apply to direct IDs. |
+| BCTS / BCTS submitter | Status `DFT`, `CLR`, `BUP`, `VER` or `DCL`. |
+| Licensee / licensee submitter | Status `DFT`, `CLR` or `DCL`. |
+| Licensee viewer | No additional queue condition. |
+
+Except for the ministry viewer restrictions, direct-ID searches bypass queue statuses and
+assignments. Assigned listings read `ADS_ASSIGNED_TO_USER` using the signed identity provider's
+username, normalized to the legacy account format. They never use a request's worked-on filter,
+an OIDC subject or a GUID fallback as the assignment identity. Without that username, a caller
+with an assigned-queue role cannot list My To Do; the request fails before JDBC.
+
+`/api/me.ecasMyToDoAvailable` enables the UI mode selector. Changing mode clears results and
+requires a new search; Clear all restores All Submissions. Reading queues never refreshes or
+changes legacy assignments. Provider-account matching and role behavior still require deployed
+acceptance against the shared database.
 
 ## ECAS references
 
@@ -152,6 +182,10 @@ the legacy ECAS05 temporary-table DELETE/INSERT.
 with its own revision count), cruise volume, areas and major centre. `Interior` adds its single
 mark, mark revision count, point of appraisal, selling price zone, comparative cruise and salvage.
 These are read views, not the full editing forms.
+
+Both reference headers include stored Coniferous and Deciduous Stand Rate Eligibility as code and
+description pairs. Descriptions come from `STAND_RATE_ELIGIBILITY_CODE`; missing descriptions keep
+the stored code, and missing codes remain absent rather than applying new-form defaults.
 
 `OracleEcasReference.coast` and `.interior` use ADS ownership and `EcasReadPredicate`, which ties
 draft/scenario visibility to each FAM grant.
@@ -265,6 +299,8 @@ client changes and authorization.
 - One statement: a scoped parent CTE plus tagged UNION ALL rows, so marks and rates don't
   multiply. Marks in mark order, rates by effective date then rate ID.
 - Null TOA becomes `'N'` (legacy `NVL`); other non-Y/N values fail.
+- `primaryTimberMark` comes from the submitted mark explicitly flagged primary. Missing primary
+  stays null; multiple primary rows fail. The full sorted mark list is retained independently.
 - Status is a LEFT JOIN, so a missing or expired description doesn't hide the record. Search status
   exclusions don't apply.
 
@@ -276,7 +312,56 @@ relationships fail.
 **`OracleOtherWorksheetSummary`** (`historic`, `nonAppraised`) needs the exact family key. ASR/NASR
 children must match the family foreign key. It returns stored headers, rates, historic species,
 Coast grades and selected add-ons. Add-ons keep the legacy `code - description` label and expired
-selections. Available add-ons, costs and eligibility aren't included; nothing is calculated.
+selections. Available add-ons, costs and eligibility aren't included.
+
+Non-appraised worksheet classifications and rate species/product/grade return `CodeOption` values.
+Missing descriptions retain the original code; a missing classification remains `null`. Literal
+space product/grade codes are preserved. Species/product/grade descriptions use the stored code
+without an expiry filter; classification descriptions require
+`SYSDATE BETWEEN EFFECTIVE_DATE AND EXPIRY_DATE`. Grade labels use the grade code alone. Rates
+remain ordered by species/product/grade codes and rate ID, independently of their labels.
+Timber supply block uses a current code lookup and the `code - description` label; the UI displays
+it only for Coast worksheets. A missing description retains the stored code.
+
+For non-appraised rates, including historic worksheet components:
+
+- Upset Rate is reserve plus silviculture levy plus development levy.
+- Total Rate is Upset Rate plus bonus bid.
+- Reserve is required. Optional null components add zero to these totals but remain null in the
+  response so the UI distinguishes missing values from a stored zero.
+
+These are display calculations using exact decimal addition. Reading a summary does not persist
+rates, call pricing procedures, refresh a worksheet or run legacy model constructors.
+
+### Worksheet history
+
+History is available for `APPRAISED` and `NON_APPRAISED` worksheets. The family and ID together
+identify the parent; equal numeric IDs in the two families stay separate. The reader first requires
+access to the current parent, using the same ownership scope as its summary. One SELECT compares
+stored worksheet and rate snapshots, counts changed fields and returns ten per page. No legacy
+model constructor or audit procedure is called.
+
+Each rate is compared only with its own previous snapshot. Baseline snapshots do not imply a
+change, and these insert/update snapshots cannot establish deletions. Comparisons use original
+typed values before formatting, so a date's changed time component is detected. The response
+contains the newer actor, modification time, attribute, value and transaction comment; rate ID
+identifies the affected row. Values and comments remain plain text, with null preserved.
+
+Results sort by modification time descending, then worksheet/rate source, audit ID descending
+and field order. Each event has a stable composite ID. Missing parent or access returns 404;
+an authorized worksheet with no changes returns an empty page. Negative pages return 400;
+pages beyond the end retain the total and return no items.
+
+Non-appraised history includes forest-zone, rate-type and adjustment changes, uses the grade value
+for grade changes, and compares each levy independently. Appraised history uses worksheet override/
+date snapshots and appraised-rate snapshots. It renders SDM dates independently of cease-adjustment
+dates, and keeps each appraised rate's snapshots separate. Discount values retain one decimal place;
+cost overrides are integral and monetary rates have two decimal places.
+
+These corrections are recorded in the [divergence register](intentional-legacy-divergences.md).
+Historic history, ECAS audit events and the separate non-appraised-component history for an
+appraised worksheet are outside this endpoint. The appraised audit tables do not store appraisal
+status, reference type or policy-version changes; the reader does not invent those events.
 
 ## Licence marks and FTA information
 
@@ -293,18 +378,29 @@ Both readers use `FtaScopeSql` with `GAS_APPRAISAL_VIEW`. Scope is the mark's di
 file/mark pair authorized, ordered by mark, no road-only marks. An EXISTS check stops duplicate
 ownership rows from repeating marks.
 
-`OracleFtaLicenceInformation.find` returns the eleven-field licence panel:
+`OracleFtaLicenceInformation.find` returns licence details and separate summary context:
 
 - Mark required, licence optional. Mark-only reads find files through HA and blanket-road records.
 - Handles permit, private and road contexts. No worksheet needed.
-- Status is licence status; client name is `FOREST_CLIENT.CLIENT_NAME`.
+- `ftaStatus` remains licence status for the search panel; client name is `FOREST_CLIENT.CLIENT_NAME`.
+- `markStatus` is the summary's FTA Status: harvesting-authority status for permits, private-mark
+  status for private marks, and tenure-file status for road marks. Labels have no expiry filter.
+- `cruiseBased` comes from the harvesting authority. Y/N maps to true/false; missing or other
+  values remain null. Private and road contexts have no cruise flag and never default to false.
 - Displayed region is `PROV_FOREST_USE.FOREST_REGION`, which can differ from the rollup used for
   authorization.
+
 - Client is the distinct non-null S-link client, else the A-link client. Legacy took an unordered
   first row; we fail when there is more than one client or permitted context.
 - Cutting permits are joined with `, ` after scope filtering, so permits the user can't see are left
   out. Legacy used a 500-character buffer, so text over 498 characters fails. The query keeps the
   legacy split between the HA licence and the HVA file; don't add a file-equality check.
+
+Worksheet summaries load FTA context independently of the search filters. Appraised summaries
+use `primaryTimberMark`; historic and non-appraised summaries use their stored timber mark.
+The lookup validates the returned mark, cancels stale requests, and leaves stored rates visible
+when context is missing or unavailable. Multiple permitted contexts differing in mark status or
+raw cruise flag remain ambiguous and fail instead of choosing an arbitrary value.
 
 No client-scoped role has `GAS_APPRAISAL_VIEW` today. Revisit client authorization before reusing
 the permit query for a client-facing feature.

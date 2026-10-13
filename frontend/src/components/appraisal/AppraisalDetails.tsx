@@ -7,6 +7,10 @@ import type {
 } from '@/contracts/appraisal'
 import TableFrame from '../TableFrame'
 import { displayCode } from './AppraisalResults'
+import type { ReadApi } from '@/service/read-service'
+import GasFtaContext from './GasFtaContext'
+import GasAuditDetails from './GasAuditDetails'
+import type { GasAuditApi } from '@/service/gas-audit-service'
 
 const yesNo = (value: boolean | null) => (value === null ? '—' : value ? 'Yes' : 'No')
 
@@ -38,6 +42,8 @@ function HeaderDetails({ header }: { header: ReferenceHeader }) {
         ['Appraisal category', header.appraisalCategoryCode],
         ['Reappraisal reason', header.reappraisalReasonCode],
         ['Rate calculation method', header.rateCalculationMethodCode],
+        ['Coniferous stand rate eligibility', displayCode(header.coniferousStandRateEligibility)],
+        ['Deciduous stand rate eligibility', displayCode(header.deciduousStandRateEligibility)],
         ['Effective date', header.effectiveDate],
         ['Expiry date', header.expiryDate],
         ['Administrative district', displayCode(header.administrativeDistrict)],
@@ -100,7 +106,15 @@ export function InteriorReferenceDetails({ reference }: { reference: InteriorRef
   )
 }
 
-export function GasStoredSummary({ summary }: { summary: GasAppraisedSummary }) {
+export function GasStoredSummary({
+  summary,
+  api,
+  auditApi,
+}: {
+  summary: GasAppraisedSummary
+  api?: Pick<ReadApi, 'licenceInformation'>
+  auditApi?: GasAuditApi
+}) {
   return (
     <>
       <p>Stored worksheet and rate values. Calculated breakdowns aren't shown here.</p>
@@ -120,6 +134,11 @@ export function GasStoredSummary({ summary }: { summary: GasAppraisedSummary }) 
           ['Cease adjustment date', summary.ceaseAdjustmentDate],
           ['Timber marks', summary.timberMarks.join(', ')],
         ]}
+      />
+      <GasFtaContext
+        key={`APPRAISED:${summary.key.worksheetId}`}
+        timberMark={summary.primaryTimberMark}
+        api={api}
       />
       <h3>Stored rates</h3>
       <TableFrame ariaLabel="Stored stumpage rates">
@@ -142,6 +161,7 @@ export function GasStoredSummary({ summary }: { summary: GasAppraisedSummary }) 
           </TableBody>
         </Table>
       </TableFrame>
+      <GasAuditDetails worksheetKey={summary.key} api={auditApi} />
     </>
   )
 }

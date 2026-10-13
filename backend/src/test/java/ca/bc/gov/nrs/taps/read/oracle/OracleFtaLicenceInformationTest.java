@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.taps.read.GasAppraisal;
+import ca.bc.gov.nrs.taps.read.CodeOption;
 import ca.bc.gov.nrs.taps.security.FamRoleName;
 import ca.bc.gov.nrs.taps.security.IdentityProvider;
 import ca.bc.gov.nrs.taps.security.RoleGrant;
@@ -96,12 +97,18 @@ class OracleFtaLicenceInformationTest {
         "DISTRICT.ORG_UNIT_NO = P.FOREST_DISTRICT",
         "REGION.ORG_UNIT_NO = DISTRICT.ROLLUP_REGION_NO",
         "DISPLAY_REGION.ORG_UNIT_NO = PFU.FOREST_REGION");
+    assertThat(sql).contains("HVA.EXPIRY_DATE, HVA.EXTEND_DATE, HVA.CRUISE_BASED_IND",
+        "PMC.PRIVATE_MARK_EXPIRY_DATE, PMC.PRIVATE_MARK_EXTEND_DATE, NULL", "NULL, NULL, NULL, NULL");
     String aggregateAndDisplay = sql.substring(sql.indexOf(", permit_lists AS"));
     assertThat(aggregateAndDisplay).contains("FROM scoped_parents",
         "MARK_FAMILY = 'PERMIT' AND HVA_SKEY IS NOT NULL",
         "LISTAGG(CUTTING_PERMIT_ID || ', ', '')", "WITHIN GROUP (ORDER BY CUTTING_PERMIT_ID)",
         "TFSC.DESCRIPTION AS LICENCE_STATUS_DESC", "P.DISTRICT_ROW_ID IS NOT NULL",
-        "FROM HARVEST_AUTH_STATUS_CODE HASC", "FROM PRIVATE_MARK_STATUS_CODE PMSC")
+        "SELECT HASC.DESCRIPTION FROM HARVEST_AUTH_STATUS_CODE HASC",
+        "SELECT PMSC.DESCRIPTION FROM PRIVATE_MARK_STATUS_CODE PMSC",
+        "CASE WHEN P.MARK_FAMILY = 'ROAD' THEN PFU.FILE_STATUS_ST",
+        "ELSE P.MARK_STATUS END AS MARK_STATUS_CODE", "WHEN 'ROAD' THEN TFSC.DESCRIPTION",
+        "END AS MARK_STATUS_DESC", "P.CRUISE_BASED_IND")
         .doesNotContain("FROM mark_parents", "GAS2_COMMON.", "SYSDATE", "LISTAGG(DISTINCT");
     assertThat(sql.indexOf("SELECT * FROM record_scope WHERE (record_scope.ADMIN_DISTRICT_CODE = ?)"))
         .isLessThan(sql.indexOf("LISTAGG("));
@@ -173,14 +180,17 @@ class OracleFtaLicenceInformationTest {
     when(rows.getTimestamp("EXPIRY_DATE")).thenReturn(Timestamp.valueOf("2030-05-06 23:59:58"));
     when(rows.getTimestamp("EXTEND_DATE")).thenReturn(Timestamp.valueOf("2031-06-07 00:00:01"));
     when(rows.getString("LICENCE_STATUS_DESC")).thenReturn(" Licence Active ");
+    when(rows.getString("MARK_STATUS_CODE")).thenReturn("I");
+    when(rows.getString("MARK_STATUS_DESC")).thenReturn(" Issued Mark ");
+    when(rows.getString("CRUISE_BASED_IND")).thenReturn("y");
 
     assertThat(repository.find(idir("TAPS_ADMIN"), "A00001", "ZZ1234")).contains(
         new GasAppraisal.FtaLicenceInformation(
             "00000001", " Synthetic Licensee ", " A00001 ", "001, 002, 002", "A01", "ZZ1234",
             " Synthetic Region ", " Synthetic District ", LocalDate.of(2030, 5, 6),
-            LocalDate.of(2031, 6, 7), " Licence Active "));
+            LocalDate.of(2031, 6, 7), " Licence Active ", new CodeOption("I", " Issued Mark "), true));
     assertThat(capturedSql()).doesNotContain("APPRAISED_WORKSHEET", "APPRAISAL_DATA_SUBMISSION");
-    verify(rows, never()).getString("MARK_STATUS_DESC");
+    verify(rows).getString("MARK_STATUS_DESC");
     verifyCleanup(true);
   }
 
@@ -192,8 +202,42 @@ class OracleFtaLicenceInformationTest {
 
     assertThat(repository.find(idir("TAPS_ADMIN"), "A00001", "ZZ1234")).contains(
         new GasAppraisal.FtaLicenceInformation(
-            null, null, "A00001", null, null, "ZZ1234", null, null, null, null, null));
+            null, null, "A00001", null, null, "ZZ1234", null, null, null, null, null, null, null));
     verifyCleanup(true);
+  }
+
+  @ParameterizedTest
+  @MethodSource("cruiseIndicators")
+  void cruiseBasedUsesLegacyCaseInsensitiveNullableSemantics(String indicator, Boolean expected)
+      throws SQLException {
+    when(rows.next()).thenReturn(true, false);
+    when(rows.getString("CRUISE_BASED_IND")).thenReturn(indicator);
+    assertThat(repository.find(idir("TAPS_ADMIN"), "A00001", "ZZ1234").orElseThrow().cruiseBased())
+        .isEqualTo(expected);
+  }
+
+  @Test
+  void absentMarkDescriptionRetainsTheCodeWithoutReplacingLicenceStatus() throws SQLException {
+    when(rows.next()).thenReturn(true, false);
+    when(rows.getString("LICENCE_STATUS_DESC")).thenReturn("Licence Active");
+    when(rows.getString("MARK_STATUS_CODE")).thenReturn("I");
+    var information = repository.find(idir("TAPS_ADMIN"), "A00001", "ZZ1234").orElseThrow();
+    assertThat(information.ftaStatus()).isEqualTo("Licence Active");
+    assertThat(information.markStatus()).isEqualTo(new CodeOption("I", null));
+    assertThat(information.cruiseBased()).isNull();
+  }
+
+  @Test
+  void rawContextMetadataStaysDistinctBeforeNullableCruiseMapping() throws SQLException {
+    when(rows.next()).thenReturn(true, true, false);
+    when(rows.getString("MARK_STATUS_CODE")).thenReturn("I");
+    when(rows.getString("CRUISE_BASED_IND")).thenReturn("unknown");
+    assertThatThrownBy(() -> repository.find(idir("TAPS_ADMIN"), null, "ZZ1234"))
+        .isInstanceOf(IncorrectResultSizeDataAccessException.class);
+    String sql = capturedSql();
+    String select = sql.substring(sql.indexOf(", permit_lists AS"));
+    assertThat(select).contains("SELECT DISTINCT P.CLIENT_NUMBER", "MARK_STATUS_CODE", "MARK_STATUS_DESC", "P.CRUISE_BASED_IND")
+        .doesNotContain("NVL(P.CRUISE_BASED_IND", "UPPER(P.CRUISE_BASED_IND", "ROWNUM", "FETCH FIRST");
   }
 
   @Test
@@ -261,6 +305,15 @@ class OracleFtaLicenceInformationTest {
   }
 
   @Test
+  void conflictingScalarMarkLabelsFailWithoutMultiplyingContextRows() throws SQLException {
+    var failure = new SQLException("Synthetic scalar mark label returned multiple rows", "21000", 1427);
+    when(statement.executeQuery()).thenThrow(failure);
+    assertThatThrownBy(() -> repository.find(idir("TAPS_ADMIN"), "A00001", "ZZ1234"))
+        .isInstanceOf(DataAccessException.class).hasCause(failure);
+    verifyCleanup(false);
+  }
+
+  @Test
   void bindingFailureClosesTheStatementWithoutQuerying() throws SQLException {
     SQLException failure = new SQLDataException("Synthetic bind failure", "22000");
     doThrow(failure).when(statement).setString(2, "ZZ1234");
@@ -314,5 +367,11 @@ class OracleFtaLicenceInformationTest {
         Arguments.of("A00001", "   "),
         Arguments.of("A00001", "ZZ12345"),
         Arguments.of("ABCDEFGHIJK", "ZZ1234"));
+  }
+
+  static Stream<Arguments> cruiseIndicators() {
+    return Stream.of(Arguments.of("Y", true), Arguments.of("y", true),
+        Arguments.of("N", false), Arguments.of("n", false), Arguments.of(null, null),
+        Arguments.of("", null), Arguments.of("X", null), Arguments.of("unknown", null));
   }
 }

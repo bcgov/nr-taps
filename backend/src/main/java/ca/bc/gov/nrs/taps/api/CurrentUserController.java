@@ -36,7 +36,8 @@ public class CurrentUserController {
             .toList(),
         user.capabilities().stream().sorted().toList(),
         user.forestClients(),
-        readApiEnabled);
+        readApiEnabled,
+        readApiEnabled && user.ecasMyToDoAvailable());
   }
 
   public record CurrentUser(
@@ -48,7 +49,8 @@ public class CurrentUserController {
       List<Grant> roles,
       List<TapsCapability> capabilities,
       List<String> forestClients,
-      boolean readApiEnabled) {}
+      boolean readApiEnabled,
+      boolean ecasMyToDoAvailable) {}
 
   public record Grant(String role, List<FamRoleName.Scope> scopes) {}
 }

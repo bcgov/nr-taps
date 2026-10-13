@@ -61,9 +61,6 @@ public class ReadController {
     if (page < 0 || search.orgUnitNumbers().size() > 100 || search.statusCodes().size() > 100) {
       throw new IllegalArgumentException("invalid search bounds");
     }
-    if (search.mode() == EcasInbox.Mode.MY_TO_DO && search.ecasId() == null) {
-      throw new IllegalArgumentException("assignment search is not available");
-    }
     EcasInboxPlan.forUser(user, search, page);
     return read(() -> inbox.search(user, search, page));
   }

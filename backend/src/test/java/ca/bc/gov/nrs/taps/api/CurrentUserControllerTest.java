@@ -75,6 +75,7 @@ class CurrentUserControllerTest {
         .andExpect(jsonPath("$.identityProvider").value("BCEID_BUSINESS"))
         .andExpect(jsonPath("$.businessName").value("Acme Forest Products"))
         .andExpect(jsonPath("$.readApiEnabled").value(false))
+        .andExpect(jsonPath("$.ecasMyToDoAvailable").value(false))
         .andExpect(jsonPath("$.roles[0].role").value("TAPS_LICENSEE_VIEWER"))
         .andExpect(jsonPath("$.roles[0].scopes[0].type").value("FOREST_CLIENT"))
         .andExpect(jsonPath("$.roles[0].scopes[0].value").value("00001018"))

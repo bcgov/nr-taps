@@ -28,6 +28,7 @@ test('uses the access token and returns server-decided roles and capabilities', 
     userId: 'staff-1',
     roles: [{ role: 'TAPS_VIEWER', scopes: [{ type: 'DISTRICT', value: 'DCR' }] }],
     capabilities: ['ECAS_SUBMISSION_VIEW'],
+    ecasMyToDoAvailable: true,
   }
   fetch.mockResolvedValue({ ok: true, json: async () => session })
 

@@ -1,6 +1,7 @@
 package ca.bc.gov.nrs.taps.read.oracle;
 
 import ca.bc.gov.nrs.taps.read.GasAppraisal;
+import ca.bc.gov.nrs.taps.read.CodeOption;
 import ca.bc.gov.nrs.taps.security.TapsCapability;
 import ca.bc.gov.nrs.taps.security.TapsUser;
 import java.sql.ResultSet;
@@ -64,7 +65,8 @@ public final class OracleFtaLicenceInformation {
         rows.getString("FOREST_DISTRICT_NAME"),
         localDate(rows, "EXPIRY_DATE"),
         localDate(rows, "EXTEND_DATE"),
-        rows.getString("LICENCE_STATUS_DESC"));
+        rows.getString("LICENCE_STATUS_DESC"), markStatus(rows),
+        cruiseBased(rows.getString("CRUISE_BASED_IND")));
     // The SQL removes duplicate display rows. If distinct contexts remain we reject them rather than
     // pick one arbitrarily like the legacy code.
     if (rows.next()) {
@@ -76,5 +78,16 @@ public final class OracleFtaLicenceInformation {
   private static LocalDate localDate(ResultSet row, String column) throws SQLException {
     Timestamp value = row.getTimestamp(column);
     return value == null ? null : value.toLocalDateTime().toLocalDate();
+  }
+
+  private static CodeOption markStatus(ResultSet row) throws SQLException {
+    String code = row.getString("MARK_STATUS_CODE");
+    return code == null ? null : new CodeOption(code, row.getString("MARK_STATUS_DESC"));
+  }
+
+  private static Boolean cruiseBased(String value) {
+    if ("Y".equalsIgnoreCase(value)) return true;
+    if ("N".equalsIgnoreCase(value)) return false;
+    return null;
   }
 }

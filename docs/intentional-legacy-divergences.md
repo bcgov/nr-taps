@@ -25,17 +25,18 @@ provisioning alone does not establish that validation.
 | --- | --- | --- |
 | `PROVISIONAL_APPRAISED_OWNER` | Appraised GAS reads use the current ADS client and administrative district; ADSC supplies the method. Legacy GAS search used the ADSC client and some mark-based district paths. | Aligns with ECAS ownership, provisionally. ADS and ADSC can legitimately differ; this remains an assumption to validate, not an approved ownership-policy change. See [GAS summaries](oracle-reads.md#gas-summaries). |
 | `SCOPED_FTA_PERMIT_DISPLAY` | Scope is applied to each permit before aggregation, omitting permits outside the user's grant. | Avoids exposing hidden permit context. Check marks spanning districts/files; see [FTA information](oracle-reads.md#licence-marks-and-fta-information). |
-| `FTA_CONTEXT_AMBIGUITY` | Multiple preferred clients or permitted contexts fail rather than selecting an unordered first row. | Avoids presenting an arbitrary owner/context. Confirm real cardinality and error handling. |
+| `FTA_CONTEXT_AMBIGUITY` | Multiple preferred clients or permitted contexts fail rather than selecting an unordered first row. Status and raw cruise flag participate in context identity; multiple appraised primary marks also fail. | Avoids presenting an arbitrary owner, status or cruise value. Confirm real cardinality and error handling. |
 | `LICENCE_MARK_ORDER` | The HA-only licence-to-mark chooser orders results by timber mark. | Deterministic ordering; verify against legacy user expectations. Road-only marks remain outside this chooser. |
 | `ECAS_GRANT_VISIBILITY` | A single grant supplies both record scope and draft/scenario visibility. Client viewers provisionally follow the other industry roles' scenario exclusion. | Prevents combining unrelated grants. The client-viewer mapping still needs role acceptance; see [scope format](architecture.md#scope-format). |
 | `ECAS_STATUS_DISPLAY_CLOCK` | Status choices retain inactive codes; the `active` display hint uses Oracle day boundaries instead of the legacy JVM clock. | Keeps display evaluation with the database query. Compare day boundaries and null/sentinel dates; see [code lists](oracle-reads.md#code-lists). |
 | `SCOPED_AUDIT_READS` | Audit reads re-check the submission and event and cap returned text with truncation flags. Import comments remain hidden. | Bounds response size while retaining parent scope. Verify event order, actors, labels and truncation; see [audit history](oracle-reads.md#audit-history). |
 | `ECAS_REFERENCE_AMBIGUITY` | Conflicting FTAS contexts or Coast major centres fail rather than selecting an unordered first row. | Avoids arbitrary reference defaults. Check parent/mark relationships and lookup cardinality; see [ECAS references](oracle-reads.md#ecas-references). |
+| `GAS_AUDIT_RATE_IDENTITY` | Appraised and non-appraised History compare snapshots within each rate ID and use deterministic tie ordering and server pages. Family plus worksheet ID identifies the history. | Avoids false changes between different rate rows. It reports the changed grade, compares levies independently, includes stored non-appraised classifications and renders appraised SDM dates independently of cease dates. Source and local Oracle tests cover these corrections; deployed history comparison remains pending. See [worksheet history](oracle-reads.md#worksheet-history). |
 
 ## Read-path replacements
 
 These are implementation changes intended to preserve legacy results, not permission to remove
-shared procedures or change the schema. TAPS currently performs no Oracle writes or calculations.
+shared procedures or change the schema. TAPS currently performs no Oracle writes or pricing calculations.
 
 | ID or path | Legacy path | TAPS implementation |
 | --- | --- | --- |

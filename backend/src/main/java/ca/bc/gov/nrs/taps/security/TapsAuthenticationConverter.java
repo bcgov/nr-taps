@@ -59,7 +59,9 @@ public class TapsAuthenticationConverter implements Converter<Jwt, AbstractAuthe
         provider == IdentityProvider.BCEID_BUSINESS
             ? firstText(jwt, "bceid_business_name").orElse(null)
             : null,
-        grants);
+        grants,
+        firstText(jwt, provider.usernameClaim())
+            .map(account -> legacyAccount(provider, account)).orElse(null));
   }
 
   private List<String> roleNames(Jwt jwt) {
@@ -86,6 +88,10 @@ public class TapsAuthenticationConverter implements Converter<Jwt, AbstractAuthe
         firstText(jwt, provider.usernameClaim())
             .or(() -> firstText(jwt, provider.guidClaim()))
             .orElseThrow(() -> new InvalidBearerTokenException("The token has no user identity"));
+    return legacyAccount(provider, account);
+  }
+
+  private static String legacyAccount(IdentityProvider provider, String account) {
     return provider.auditPrefix() + "\\" + account.toUpperCase(Locale.ROOT);
   }
 

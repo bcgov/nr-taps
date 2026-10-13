@@ -30,7 +30,9 @@ public final class EcasReference {
       CodeOption geographicDistrict,
       CodeOption fileType,
       CodeOption timberSupplyArea,
-      CodeOption timberSupplyBlock) {
+      CodeOption timberSupplyBlock,
+      CodeOption coniferousStandRateEligibility,
+      CodeOption deciduousStandRateEligibility) {
     public Header {
       ecasId = LegacyIdentifiers.requiredId(ecasId);
       Objects.requireNonNull(appraisalMethod, "appraisalMethod");

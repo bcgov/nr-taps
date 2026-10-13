@@ -8,7 +8,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-/** ECAS05 all-submissions and direct-ID filters. Selected organizations only filter. */
+/** ECAS05 queue, all-submissions and direct-ID filters. Selected organizations only filter. */
 public final class EcasInboxPlan {
   private final String sql;
   private final List<String> parameters;
@@ -30,12 +30,13 @@ public final class EcasInboxPlan {
     if (page < 0) {
       throw new IllegalArgumentException("page must be non-negative");
     }
-    if (search.mode() != EcasInbox.Mode.ALL_SUBMISSIONS && search.ecasId() == null) {
-      throw new UnsupportedOperationException("MY_TO_DO requires a verified legacy user assignment mapping");
+    if (search.mode() == EcasInbox.Mode.MY_TO_DO && search.ecasId() == null
+        && !user.ecasMyToDoAvailable()) {
+      throw new IllegalArgumentException("My To Do requires a verified legacy username for assigned queues");
     }
     List<String> predicates = new ArrayList<>();
     List<String> parameters = new ArrayList<>();
-    var scope = EcasReadPredicate.forUser(user);
+    var scope = EcasReadPredicate.forInbox(user, search);
     predicates.add(scope.sql());
     parameters.addAll(scope.parameters());
     if (!search.orgUnitNumbers().isEmpty()) {

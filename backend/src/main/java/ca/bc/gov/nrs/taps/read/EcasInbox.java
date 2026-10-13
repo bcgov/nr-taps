@@ -6,6 +6,7 @@ import ca.bc.gov.nrs.taps.domain.LegacyIdentifiers;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 
 public final class EcasInbox {
   public static final int PAGE_SIZE = 100;
@@ -90,7 +91,9 @@ public final class EcasInbox {
       dateTypes = dateTypes == null ? List.of() : List.copyOf(dateTypes).stream().distinct().toList();
       managementUnitType = LegacyIdentifiers.managementUnitType(managementUnitType);
       managementUnitId = LegacyIdentifiers.managementUnitId(managementUnitId);
-      workedOnByUserId = LegacyIdentifiers.optionalText(workedOnByUserId, 30, "workedOnByUserId");
+      workedOnByUserId = LegacyIdentifiers.optionalText(
+          workedOnByUserId == null ? null : workedOnByUserId.toUpperCase(Locale.ROOT),
+          30, "workedOnByUserId");
       sortBy = sortBy == null ? SortField.ECAS_ID : sortBy;
       sortDirection = sortDirection == null ? SortDirection.DESC : sortDirection;
 

@@ -9,6 +9,7 @@ import ca.bc.gov.nrs.taps.read.EcasInbox;
 import ca.bc.gov.nrs.taps.security.FamRoleName;
 import ca.bc.gov.nrs.taps.security.IdentityProvider;
 import ca.bc.gov.nrs.taps.security.RoleGrant;
+import ca.bc.gov.nrs.taps.security.TapsRole;
 import ca.bc.gov.nrs.taps.security.TapsUser;
 import java.time.LocalDate;
 import java.util.Arrays;
@@ -16,6 +17,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class EcasInboxPlanTest {
   @Test
@@ -91,6 +93,11 @@ class EcasInboxPlanTest {
         "(record_scope.CERTIFIED_FLAG = 'N' OR record_scope.CERTIFIED_FLAG IS NULL)",
         "record_scope.ECAS_ID = ?", "record_scope.PRIMARY_MARK_IND = 'Y'")
         .doesNotContain("record_scope.LICENCE =", "record_scope.TIMBER_MARK =", "ECAS_AUDIT_EVENT");
+    if (mode == EcasInbox.Mode.MY_TO_DO) {
+      assertThat(plan.sql()).contains("record_scope.STATUS_CODE IN ('SUB','RCD','RTN')");
+    } else {
+      assertThat(plan.sql()).doesNotContain("record_scope.STATUS_CODE IN");
+    }
   }
 
   @Test
@@ -153,6 +160,32 @@ class EcasInboxPlanTest {
   }
 
   @Test
+  void workedOnUserIdIsNormalizedBeforeEveryBoundMatch() {
+    var filters = new Filters();
+    filters.worked = " idir\\SyntheticUser ";
+    var mixedCase = EcasInboxPlan.forUser(idir("TAPS_ADMIN"), filters.search(), 0);
+    filters.worked = "IDIR\\SYNTHETICUSER";
+    var upperCase = EcasInboxPlan.forUser(idir("TAPS_ADMIN"), filters.search(), 0);
+
+    assertThat(mixedCase.sql()).isEqualTo(upperCase.sql());
+    assertThat(mixedCase.parameters()).isEqualTo(upperCase.parameters())
+        .containsExactlyElementsOf(java.util.Collections.nCopies(5, "IDIR\\SYNTHETICUSER"));
+  }
+
+  @Test
+  void blankWorkedOnUserIdAddsNoActorFilterAndOverlongValueIsRejected() {
+    var filters = new Filters();
+    filters.worked = "   ";
+    var plan = EcasInboxPlan.forUser(idir("TAPS_ADMIN"), filters.search(), 0);
+    assertThat(plan.sql()).doesNotContain("ECAS_AUDIT_EVENT worked");
+    assertThat(plan.parameters()).isEmpty();
+
+    filters.worked = "IDIR\\" + "x".repeat(26);
+    assertThatThrownBy(filters::search).isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("workedOnByUserId exceeds 30 characters");
+  }
+
+  @Test
   void selectedDateTypesAreAnIntersectionWithInclusiveMidnightBounds() {
     var filters = new Filters();
     filters.dateTypes = List.of(EcasInbox.DateType.values());
@@ -195,13 +228,142 @@ class EcasInboxPlanTest {
   void modeAndPageAreValidatedBeforeAnyQueryCouldRun() {
     var filters = new Filters();
     filters.mode = EcasInbox.Mode.MY_TO_DO;
-    assertThatThrownBy(() -> EcasInboxPlan.forUser(idir("TAPS_ADMIN"), filters.search(), 0))
-        .isInstanceOf(UnsupportedOperationException.class).hasMessageContaining("assignment mapping");
+    assertThatThrownBy(() -> EcasInboxPlan.forUser(idir("TAPS_HEADQUARTERS"), filters.search(), 0))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("verified legacy username");
     assertThatThrownBy(() -> EcasInboxPlan.forUser(idir("TAPS_ADMIN"), new Filters().search(), -1))
         .isInstanceOf(IllegalArgumentException.class);
     var plan = EcasInboxPlan.forUser(idir("TAPS_ADMIN"), new Filters().search(), Integer.MAX_VALUE);
     assertThat(plan.firstRow()).isEqualTo(214_748_364_701L);
     assertThat(plan.lastRow()).isEqualTo(214_748_364_800L);
+  }
+
+  @ParameterizedTest
+  @CsvSource(delimiter = '|', value = {
+      "TAPS_ADMIN|ACC,APP,BUP,CLR,DCL,DFT,FWD,GAS,RCD,RTN,SLD,RGN,SUB,SWI,SCN,VER,DTR,UNC|false",
+      "TAPS_HEADQUARTERS|NONE|true",
+      "TAPS_REGION_APPRAISER|RGN,SWI,SCN,CLR,VER,DTR,SLD,UNC|true",
+      "TAPS_DISTRICT_APPRAISER|SUB,RCD,RTN,SCN|true",
+      "TAPS_REGION_CLERK|RGN,SWI|false",
+      "TAPS_VIEWER|SUB,RCD,RTN|false",
+      "TAPS_BCTS|DFT,CLR,BUP,VER,DCL|false",
+      "TAPS_BCTS_SUBMITTER|DFT,CLR,BUP,VER,DCL|false",
+      "TAPS_LICENSEE|DFT,CLR,DCL|false",
+      "TAPS_LICENSEE_SUBMITTER|DFT,CLR,DCL|false",
+      "TAPS_LICENSEE_VIEWER|NONE|false"
+  })
+  void eachRoleUsesItsQueueStatusesAndAssignmentRequirement(TapsRole role, String statuses,
+      boolean assigned) {
+    IdentityProvider provider = role.identityProviders().contains(IdentityProvider.IDIR)
+        ? IdentityProvider.IDIR : IdentityProvider.BCEID_BUSINESS;
+    FamRoleName.Scope scope = role.scopeType() == null ? null : new FamRoleName.Scope(role.scopeType(),
+        switch (role.scopeType()) {
+          case FamRoleName.REGION -> "CARIBOO";
+          case FamRoleName.DISTRICT -> "DZZ";
+          default -> "00000001";
+        });
+    var user = new TapsUser("audit", "Synthetic", null, provider, null,
+        List.of(new RoleGrant(role, scope)), provider.auditPrefix() + "\\SYNTHETIC");
+    var filters = new Filters();
+    filters.mode = EcasInbox.Mode.MY_TO_DO;
+    var plan = EcasInboxPlan.forUser(user, filters.search(), 0);
+    if (statuses.equals("NONE")) {
+      assertThat(plan.sql()).doesNotContain("record_scope.STATUS_CODE IN");
+    } else {
+      assertThat(plan.sql()).contains("record_scope.STATUS_CODE IN ('" + statuses.replace(",", "','") + "')");
+    }
+    assertThat(plan.sql().contains("ADS_ASSIGNED_TO_USER")).isEqualTo(assigned);
+    if (assigned) {
+      assertThat(plan.sql()).contains("assigned.ECAS_ID = record_scope.ECAS_ID AND assigned.USER_ID = ?")
+          .doesNotContain(user.legacyAccount(), "JOIN ADS_ASSIGNED_TO_USER");
+      assertThat(plan.parameters().getLast()).isEqualTo(user.legacyAccount());
+    }
+    assertThat(plan.sql().chars().filter(c -> c == '?').count()).isEqualTo(plan.parameters().size());
+  }
+
+  @Test
+  void mixedGrantsKeepQueueAndAssignmentInsideTheSameScopeAlternative() {
+    var filters = new Filters();
+    filters.mode = EcasInbox.Mode.MY_TO_DO;
+    var user = assignedIdir("TAPS_REGION_APPRAISER_REGION-CARIBOO", "TAPS_VIEWER_DISTRICT-DZZ");
+    var plan = EcasInboxPlan.forUser(user, filters.search(), 0);
+    String[] alternatives = plan.sql().split(" OR ");
+    assertThat(alternatives).hasSize(2);
+    assertThat(alternatives[0]).contains("record_scope.ROLLUP_REGION_CODE = ?",
+        "record_scope.STATUS_CODE IN ('RGN','SWI','SCN','CLR','VER','DTR','SLD','UNC')",
+        "ADS_ASSIGNED_TO_USER", "record_scope.LICENCE IS NOT NULL")
+        .doesNotContain("record_scope.ADMIN_DISTRICT_CODE", "'SUB','RCD','RTN'");
+    assertThat(alternatives[1]).contains("record_scope.ADMIN_DISTRICT_CODE = ?",
+        "record_scope.STATUS_CODE IN ('SUB','RCD','RTN')", "record_scope.STATUS_CODE <> ?")
+        .doesNotContain("ADS_ASSIGNED_TO_USER", "record_scope.ROLLUP_REGION_CODE");
+    assertThat(plan.parameters()).containsExactly("RCB", "IDIR\\SYNTHETIC", "DZZ", "DFT");
+  }
+
+  @Test
+  void requestActorFiltersNeverReplaceTheCallerAssignmentIdentity() {
+    var filters = new Filters();
+    filters.mode = EcasInbox.Mode.MY_TO_DO;
+    filters.worked = "IDIR\\OTHER";
+    var plan = EcasInboxPlan.forUser(assignedIdir("TAPS_HEADQUARTERS"), filters.search(), 0);
+    assertThat(plan.parameters()).containsExactly("IDIR\\SYNTHETIC", "IDIR\\OTHER", "IDIR\\OTHER",
+        "IDIR\\OTHER", "IDIR\\OTHER", "IDIR\\OTHER");
+    assertThat(plan.sql()).contains("assigned.USER_ID = ?", "worked.ENTRY_USERID = ?")
+        .doesNotContain("IDIR\\OTHER", "IDIR\\SYNTHETIC");
+  }
+
+  @Test
+  void oneMissingAssignedIdentityRejectsTheWholeQueueInsteadOfOmittingThatGrant() {
+    var filters = new Filters();
+    filters.mode = EcasInbox.Mode.MY_TO_DO;
+    var user = idir("TAPS_HEADQUARTERS", "TAPS_VIEWER_DISTRICT-DZZ");
+    assertThat(user.ecasMyToDoAvailable()).isFalse();
+    assertThatThrownBy(() -> EcasInboxPlan.forUser(user, filters.search(), 0))
+        .isInstanceOf(IllegalArgumentException.class);
+    filters.mode = EcasInbox.Mode.ALL_SUBMISSIONS;
+    assertThat(EcasInboxPlan.forUser(user, filters.search(), 0).sql()).doesNotContain("ADS_ASSIGNED_TO_USER");
+    filters.mode = EcasInbox.Mode.MY_TO_DO;
+    filters.id = "123";
+    assertThat(EcasInboxPlan.forUser(user, filters.search(), 0).sql()).doesNotContain("ADS_ASSIGNED_TO_USER");
+  }
+
+  @Test
+  void regionBctsOmissionUsesMatchedPfuAndPreservesOracleNullSemantics() {
+    var filters = new Filters();
+    filters.mode = EcasInbox.Mode.MY_TO_DO;
+    var user = assignedIdir("TAPS_REGION_APPRAISER_REGION-CARIBOO");
+    var omitted = EcasInboxPlan.forUser(user, filters.search(), 0);
+    assertThat(omitted.sql()).contains("record_scope.LICENCE IS NOT NULL",
+        "NOT (record_scope.STATUS_CODE IN ('VER','DTR') AND record_scope.SB_FUNDED_IND = 'Y')")
+        .doesNotContain("NVL", "COALESCE", "SB_FUNDED_IND IS NULL");
+    for (boolean funded : List.of(true, false)) {
+      filters.bcts = funded;
+      var explicit = EcasInboxPlan.forUser(user, filters.search(), 0);
+      assertThat(explicit.sql()).contains("record_scope.SB_FUNDED_IND = ?",
+          "NOT (record_scope.STATUS_CODE IN ('VER','DTR') AND record_scope.SB_FUNDED_IND = 'Y')")
+          .doesNotContain("record_scope.LICENCE IS NOT NULL", "SB_FUNDED_IND IS NULL");
+      assertThat(explicit.parameters()).containsExactly("RCB", "IDIR\\SYNTHETIC", funded ? "Y" : "N");
+    }
+    filters.id = "123";
+    var direct = EcasInboxPlan.forUser(user, filters.search(), 0);
+    assertThat(direct.sql()).doesNotContain("ADS_ASSIGNED_TO_USER", "record_scope.STATUS_CODE IN",
+        "record_scope.LICENCE IS NOT NULL", "SB_FUNDED_IND");
+    assertThat(direct.parameters()).containsExactly("RCB", "123");
+  }
+
+  @Test
+  void directIdRetainsRegionViewOnlyStatusesButNeverChangesReferenceAuthorization() {
+    var user = idir("TAPS_REGION_CLERK_REGION-CARIBOO");
+    var filters = new Filters();
+    filters.mode = EcasInbox.Mode.MY_TO_DO;
+    filters.id = "123";
+    assertThat(EcasInboxPlan.forUser(user, filters.search(), 0).sql())
+        .contains("record_scope.STATUS_CODE IN ('RGN','SWI')").doesNotContain("ADS_ASSIGNED_TO_USER");
+    assertThat(EcasReadPredicate.forUser(user).sql()).doesNotContain("record_scope.STATUS_CODE IN", "ADS_ASSIGNED_TO_USER");
+  }
+
+  static TapsUser assignedIdir(String... roles) {
+    TapsUser user = idir(roles);
+    return new TapsUser(user.userId(), user.displayName(), user.email(), user.identityProvider(),
+        user.businessName(), user.grants(), "IDIR\\SYNTHETIC");
   }
 
   static TapsUser idir(String... roles) {

@@ -5,6 +5,7 @@ import { ReadApiError } from '@/service/read-service'
 import { workflowFixture as fixture } from './WorkflowPreview'
 import type { EcasRelatedApis } from '@/components/appraisal/EcasReferenceSections'
 import { syntheticReadApi } from './synthetic-read-api'
+import { syntheticGasAuditApi } from './synthetic-gas-audit-api'
 
 const syntheticRelatedApis: EcasRelatedApis = {
   audit: {
@@ -32,7 +33,9 @@ export default function AsyncReadPreview() {
       <div className="taps-actions taps-preview-intro">
         <p>
           Synthetic asynchronous read preview. Uses the production page components with test
-          fixtures; no database or sign-in requests.
+          fixtures; no database or sign-in requests. In GAS search, licence X99995 and timber mark
+          ZZ9995 open a fictional non-appraised worksheet with labels, rate totals and paginated
+          history.
         </p>
         <Button
           kind="tertiary"
@@ -43,9 +46,13 @@ export default function AsyncReadPreview() {
         </Button>
       </div>
       {module === 'ecas' ? (
-        <EcasInboxReadPage api={syntheticReadApi} relatedApis={syntheticRelatedApis} />
+        <EcasInboxReadPage
+          api={syntheticReadApi}
+          relatedApis={syntheticRelatedApis}
+          gasAuditApi={syntheticGasAuditApi}
+        />
       ) : (
-        <GasSearchReadPage api={syntheticReadApi} />
+        <GasSearchReadPage api={syntheticReadApi} gasAuditApi={syntheticGasAuditApi} />
       )}
     </>
   )

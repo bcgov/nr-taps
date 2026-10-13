@@ -9,6 +9,7 @@ export type RoleGrant = { role: string; scopes: RoleScope[] }
 
 export type Session = {
   readApiEnabled?: boolean
+  ecasMyToDoAvailable?: boolean
   userId: string
   displayName: string
   email: string | null
