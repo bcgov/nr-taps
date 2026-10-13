@@ -42,6 +42,8 @@ public final class EcasReference {
   public record TimberMark(
       String timberMark, BigDecimal cruiseVolume, Boolean primary, Integer revisionCount) {}
 
+  public record SpeciesVolume(CodeOption species, BigDecimal volume, Integer revisionCount) {}
+
   public record Coast(
       Header header,
       String primaryTimberMark,
@@ -52,10 +54,15 @@ public final class EcasReference {
       BigDecimal initialMerchantableArea,
       BigDecimal pointOfAppraisalDistance,
       String majorCentreCode,
-      BigDecimal majorCentreDistance) {
+      BigDecimal majorCentreDistance,
+      List<SpeciesVolume> speciesVolumes,
+      BigDecimal singleTreeSelectionVolume,
+      BigDecimal secondGrowthConiferousVolume,
+      BigDecimal samplingErrorPercent) {
     public Coast {
       requireMethod(header, AppraisalMethod.C);
       timberMarks = List.copyOf(timberMarks);
+      speciesVolumes = List.copyOf(speciesVolumes);
     }
   }
 

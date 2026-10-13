@@ -32,6 +32,7 @@ import ca.bc.gov.nrs.taps.security.TapsUser;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.PortBinding;
 import com.github.dockerjava.api.model.Ports.Binding;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -871,6 +872,14 @@ class OracleReadIT {
     assertThat(coast.timberMarks()).extracting(EcasReference.TimberMark::timberMark).containsExactly("AA0001", "AA0002");
     assertThat(coast.primaryTimberMark()).isEqualTo("AA0001");
     assertThat(coast.netCruiseVolume()).isEqualByComparingTo("31.00");
+    assertThat(coast.speciesVolumes()).containsExactly(
+        new EcasReference.SpeciesVolume(new CodeOption("FI", "Synthetic fir"), new BigDecimal("10.25"), 4),
+        new EcasReference.SpeciesVolume(new CodeOption("HE", "Synthetic hemlock"), new BigDecimal("20.75"), 7));
+    assertThat(coast.speciesVolumes().stream().map(EcasReference.SpeciesVolume::volume)
+        .reduce(BigDecimal.ZERO, BigDecimal::add)).isEqualByComparingTo(coast.netCruiseVolume());
+    assertThat(coast.singleTreeSelectionVolume()).isEqualByComparingTo("0");
+    assertThat(coast.secondGrowthConiferousVolume()).isEqualByComparingTo("25");
+    assertThat(coast.samplingErrorPercent()).isEqualByComparingTo("9.5");
     assertThat(coast.header().licenseeName()).isEqualTo("Synthetic current owner");
     assertThat(coast.header().administrativeDistrict().code()).isEqualTo("DCA");
     assertThat(coast.header().timberSupplyArea().code()).isEqualTo("12");
@@ -891,6 +900,60 @@ class OracleReadIT {
     assertThat(reader.coast(OMINECA, "1001")).isEmpty();
     assertThat(reader.interior(CARIBOO, "1002")).isEmpty();
     assertThat(reader.interior(ADMIN, "1001")).isEmpty();
+  }
+
+  @Test
+  void coastSpeciesUseLegacyLookupVisibilityWhileTheTotalIncludesAllStoredRows() {
+    jdbc.update("INSERT INTO HDBS_TREE_SPECIES VALUES ('SP', NULL)");
+    jdbc.update("INSERT INTO ADS_SPECIES_VOLUME VALUES (1001, 'SP', NULL, NULL)");
+    jdbc.update("INSERT INTO ADS_SPECIES_VOLUME VALUES (1001, 'ZZ', 3.125, 9)");
+    var coast = new OracleEcasReference(jdbc).coast(CARIBOO, "1001").orElseThrow();
+
+    assertThat(coast.speciesVolumes()).extracting(row -> row.species().code())
+        .containsExactly("FI", "HE", "SP");
+    assertThat(coast.speciesVolumes().getLast()).isEqualTo(
+        new EcasReference.SpeciesVolume(new CodeOption("SP", null), null, null));
+    assertThat(coast.netCruiseVolume()).isEqualByComparingTo("34.125");
+    assertThat(coast.timberMarks()).hasSize(2);
+  }
+
+  @Test
+  void emptyCoastSpeciesAndNullScalarsRemainDistinctFromStoredZero() {
+    jdbc.update("DELETE FROM ADS_SPECIES_VOLUME WHERE ECAS_ID = 1001");
+    jdbc.update("""
+        UPDATE APPRAISAL_DATA_SUBMISSION SET SINGLE_TREE_SELECTION_VOLUME = NULL,
+               SECOND_GROWTH_CONIFER_VOLUME = NULL, STANDARD_ERROR_PCT = NULL WHERE ECAS_ID = 1001
+        """);
+    var reader = new OracleEcasReference(jdbc);
+    var coast = reader.coast(CARIBOO, "1001").orElseThrow();
+    assertThat(coast.speciesVolumes()).isEmpty();
+    assertThat(coast.netCruiseVolume()).isEqualByComparingTo("0");
+    assertThat(coast.timberMarks()).hasSize(2);
+    assertThat(coast.singleTreeSelectionVolume()).isNull();
+    assertThat(coast.secondGrowthConiferousVolume()).isNull();
+    assertThat(coast.samplingErrorPercent()).isNull();
+
+    jdbc.update("INSERT INTO ADS_SPECIES_VOLUME VALUES (1001, 'FI', NULL, 1)");
+    coast = reader.coast(CARIBOO, "1001").orElseThrow();
+    assertThat(coast.speciesVolumes()).singleElement().satisfies(row -> assertThat(row.volume()).isNull());
+    assertThat(coast.netCruiseVolume()).isEqualByComparingTo("0");
+  }
+
+  @Test
+  void coastSpeciesStayOnTheAuthorizedCoastParent() {
+    jdbc.update("INSERT INTO ADS_SPECIES_VOLUME VALUES (1002, 'FI', 999, 2)");
+    var reader = new OracleEcasReference(jdbc);
+    var coast = reader.coast(CARIBOO, "1001").orElseThrow();
+    assertThat(coast.speciesVolumes()).extracting(EcasReference.SpeciesVolume::volume)
+        .containsExactly(new BigDecimal("10.25"), new BigDecimal("20.75"));
+    assertThat(reader.coast(OMINECA, "1001")).isEmpty();
+    assertThat(reader.coast(idir(), "1001")).isEmpty();
+    assertThat(reader.coast(ADMIN, "1002")).isEmpty();
+    assertThat(reader.interior(OMINECA, "1002")).isPresent();
+
+    jdbc.update("UPDATE APPRAISAL_DATA_SUBMISSION SET APPRAISAL_STATUS_CODE = 'DFT' WHERE ECAS_ID = 1001");
+    var mixed = idir("TAPS_REGION_APPRAISER_REGION-OMINECA", "TAPS_VIEWER_DISTRICT-DCA");
+    assertThat(reader.coast(mixed, "1001")).isEmpty();
   }
 
   @Test
@@ -957,7 +1020,20 @@ class OracleReadIT {
           .andExpect(jsonPath("$.items[0].ecasId").value("1001"));
       mvc.perform(get("/api/ecas/references/C/1001").header("Authorization", "Bearer fixture-cariboo"))
           .andExpect(status().isOk()).andExpect(jsonPath("$.timberMarks.length()").value(2))
-          .andExpect(jsonPath("$.header.effectiveDate").value("2026-01-02"));
+          .andExpect(jsonPath("$.header.effectiveDate").value("2026-01-02"))
+          .andExpect(jsonPath("$.speciesVolumes.length()").value(2))
+          .andExpect(jsonPath("$.speciesVolumes[0].species.code").value("FI"))
+          .andExpect(jsonPath("$.speciesVolumes[0].species.description").value("Synthetic fir"))
+          .andExpect(jsonPath("$.speciesVolumes[0].volume").value(10.25))
+          .andExpect(jsonPath("$.speciesVolumes[0].revisionCount").value(4))
+          .andExpect(jsonPath("$.singleTreeSelectionVolume").value(0))
+          .andExpect(jsonPath("$.secondGrowthConiferousVolume").value(25))
+          .andExpect(jsonPath("$.samplingErrorPercent").value(9.5));
+      mvc.perform(get("/api/ecas/references/I/1002").header("Authorization", "Bearer fixture-omineca"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.speciesVolumes").doesNotExist())
+          .andExpect(jsonPath("$.singleTreeSelectionVolume").doesNotExist())
+          .andExpect(jsonPath("$.secondGrowthConiferousVolume").doesNotExist())
+          .andExpect(jsonPath("$.samplingErrorPercent").doesNotExist());
       mvc.perform(get("/api/gas/appraised/by-ecas/1001").header("Authorization", "Bearer fixture-cariboo"))
           .andExpect(status().isOk()).andExpect(jsonPath("$.key.worksheetId").value("101"))
           .andExpect(jsonPath("$.primaryTimberMark").value("AA0001"))

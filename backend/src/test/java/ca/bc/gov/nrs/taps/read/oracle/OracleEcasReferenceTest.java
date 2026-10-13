@@ -60,10 +60,12 @@ class OracleEcasReferenceTest {
         "record_scope.ECAS_ID = ? AND record_scope.APPRAISAL_METHOD_CODE = ?",
         "record_scope.ADMIN_DISTRICT_CODE = ?", "FROM scoped_parent P", "FROM enriched_parent P",
         "JOIN ADS_SUBMITTED_TIMBER_MARK M ON M.ECAS_ID = P.ECAS_ID",
-        "ORDER BY ROW_KIND, TIMBER_MARK");
+        "JOIN ADS_SPECIES_VOLUME V ON V.ECAS_ID = P.ECAS_ID",
+        "JOIN HDBS_TREE_SPECIES S ON S.HDBS_TREE_SPECIES = V.HDBS_TREE_SPECIES",
+        "WHERE P.APPRAISAL_METHOD_CODE = 'C'", "ORDER BY ROW_KIND, TIMBER_MARK, SPECIES_CODE");
     assertThat(sql).doesNotContain("ADSC.CLIENT_NUMBER", "PKG_", "UPDATE ", "INSERT ", "DELETE ",
         "12345", "DZZ", "APPRAISED_WORKSHEET");
-    assertThat(sql.split("UNION ALL", -1)).hasSize(2);
+    assertThat(sql.split("UNION ALL", -1)).hasSize(3);
     verify(statement).setLong(1, 12345L);
     verify(statement).setString(2, "C");
     verify(statement).setString(3, "DZZ");
@@ -141,10 +143,11 @@ class OracleEcasReferenceTest {
   }
 
   @Test
-  void preservesCoastMarkRowsRevisionsAndDecimalVolumes() throws SQLException {
+  void preservesIndependentCoastMarkAndSpeciesRowsWithTheirRevisionsAndDecimalVolumes()
+      throws SQLException {
     parent("C");
-    when(rows.next()).thenReturn(true, true, true, false);
-    when(rows.getInt("ROW_KIND")).thenReturn(0, 1, 1);
+    when(rows.next()).thenReturn(true, true, true, true, true, false);
+    when(rows.getInt("ROW_KIND")).thenReturn(0, 1, 1, 2, 2);
     when(rows.getString("TIMBER_MARK")).thenReturn("A12345", "B12345");
     when(rows.getString("PRIMARY_MARK_IND")).thenReturn("Y", "N");
     when(rows.getObject("MARK_REVISION_COUNT", Integer.class)).thenReturn(7, 3);
@@ -156,6 +159,14 @@ class OracleEcasReferenceTest {
     when(rows.getBigDecimal("POINT_OF_APPRAISAL_DISTANCE")).thenReturn(new BigDecimal("41.11"));
     when(rows.getString("MAJOR_CENTRE_CODE")).thenReturn("01");
     when(rows.getBigDecimal("ADS_LOCATION_DISTANCE_AVERAGE")).thenReturn(new BigDecimal("28.90"));
+    when(rows.getString("SPECIES_CODE")).thenReturn("FI", "HE");
+    when(rows.getString("SPECIES_DESCRIPTION")).thenReturn("Synthetic fir", "Synthetic hemlock");
+    when(rows.getBigDecimal("SPECIES_VOLUME"))
+        .thenReturn(new BigDecimal("1000.111"), new BigDecimal("234.456"));
+    when(rows.getObject("SPECIES_REVISION_COUNT", Integer.class)).thenReturn(8, 9);
+    when(rows.getBigDecimal("SINGLE_TREE_SELECTION_VOLUME")).thenReturn(new BigDecimal("0"));
+    when(rows.getBigDecimal("SECOND_GROWTH_CONIFER_VOLUME")).thenReturn(new BigDecimal("1000"));
+    when(rows.getBigDecimal("STANDARD_ERROR_PCT")).thenReturn(new BigDecimal("12.3"));
 
     var reference = references.coast(idir("TAPS_ADMIN"), "12345").orElseThrow();
     assertThat(reference.primaryTimberMark()).isEqualTo("A12345");
@@ -169,8 +180,37 @@ class OracleEcasReferenceTest {
     assertThat(reference.pointOfAppraisalDistance()).isEqualTo(new BigDecimal("41.11"));
     assertThat(reference.majorCentreCode()).isEqualTo("01");
     assertThat(reference.majorCentreDistance()).isEqualTo(new BigDecimal("28.90"));
+    assertThat(reference.speciesVolumes()).containsExactly(
+        new EcasReference.SpeciesVolume(new CodeOption("FI", "Synthetic fir"), new BigDecimal("1000.111"), 8),
+        new EcasReference.SpeciesVolume(new CodeOption("HE", "Synthetic hemlock"), new BigDecimal("234.456"), 9));
+    assertThat(reference.singleTreeSelectionVolume()).isEqualTo(new BigDecimal("0"));
+    assertThat(reference.secondGrowthConiferousVolume()).isEqualTo(new BigDecimal("1000"));
+    assertThat(reference.samplingErrorPercent()).isEqualTo(new BigDecimal("12.3"));
     assertHeader(reference.header(), AppraisalMethod.C);
     cleanup();
+  }
+
+  @Test
+  void coastSpeciesKeepNullDescriptionsVolumesRevisionsAndParentScalars() throws SQLException {
+    parent("C");
+    oneMark();
+    when(rows.next()).thenReturn(true, true, true, false);
+    when(rows.getInt("ROW_KIND")).thenReturn(0, 1, 2);
+    when(rows.getString("SPECIES_CODE")).thenReturn("FI");
+
+    var reference = references.coast(idir("TAPS_ADMIN"), "12345").orElseThrow();
+    assertThat(reference.speciesVolumes()).containsExactly(
+        new EcasReference.SpeciesVolume(new CodeOption("FI", null), null, null));
+    assertThat(reference.singleTreeSelectionVolume()).isNull();
+    assertThat(reference.secondGrowthConiferousVolume()).isNull();
+    assertThat(reference.samplingErrorPercent()).isNull();
+  }
+
+  @Test
+  void coastWithoutSpeciesReturnsAnEmptyList() throws SQLException {
+    parent("C");
+    oneMark();
+    assertThat(references.coast(idir("TAPS_ADMIN"), "12345").orElseThrow().speciesVolumes()).isEmpty();
   }
 
   @Test

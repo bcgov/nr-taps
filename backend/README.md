@@ -103,7 +103,7 @@ proxy account. Don't assume one owner because the test fixture has one.
 | `FOREST_FILE_CLIENT`, `FOREST_CLIENT`, `V_CLIENT_PUBLIC` | Client links and names (`V_CLIENT_PUBLIC` is a view in the real schema, a table in the fixture) |
 | `PROV_FOREST_USE`, `FILE_TYPE_CODE` | Licence data and filters |
 | `TENURE_FILE_STATUS_CODE`, `HARVEST_AUTH_STATUS_CODE`, `PRIVATE_MARK_STATUS_CODE` | FTA status labels |
-| `ADS_SPECIES_VOLUME`, `ADS_CUTTING_AUTHORITY_DETAIL` | Coast volume and major centre |
+| `ADS_SPECIES_VOLUME`, `HDBS_TREE_SPECIES`, `ADS_CUTTING_AUTHORITY_DETAIL` | Coast species volumes, species labels and major centre |
 | `INT_POINT_OF_APPRAISAL_CODE`, `POINT_OF_APPRAISAL` | Interior appraisal point and selling zone |
 | `TSA_NUMBER_CODE`, `TSB_NUMBER_CODE` | Management-unit labels |
 | `APPRAISAL_METHOD_CODE`, `RATE_ADJUSTMENT_TYPE_CODE` | GAS lookups |

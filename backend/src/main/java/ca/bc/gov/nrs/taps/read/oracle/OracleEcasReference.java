@@ -37,7 +37,8 @@ public final class OracleEcasReference {
       return new EcasReference.Coast(
           p.header(), p.selectedMark(), reference.marks(), p.referenceMark(), p.netCruiseVolume(),
           p.netMerchantableArea(), p.initialMerchantableArea(), p.pointOfAppraisalDistance(),
-          p.majorCentreCode(), p.majorCentreDistance());
+          p.majorCentreCode(), p.majorCentreDistance(), reference.speciesVolumes(),
+          p.singleTreeSelectionVolume(), p.secondGrowthConiferousVolume(), p.samplingErrorPercent());
     });
   }
 
@@ -78,6 +79,7 @@ public final class OracleEcasReference {
       throws SQLException {
     Parent parent = null;
     List<EcasReference.TimberMark> marks = new ArrayList<>();
+    List<EcasReference.SpeciesVolume> speciesVolumes = new ArrayList<>();
     while (rows.next()) {
       switch (rows.getInt("ROW_KIND")) {
         case 0 -> {
@@ -98,24 +100,36 @@ public final class OracleEcasReference {
               mark, rows.getBigDecimal("MARK_CRUISE_VOLUME"),
               indicator(rows, "PRIMARY_MARK_IND"), rows.getObject("MARK_REVISION_COUNT", Integer.class)));
         }
+        case 2 -> {
+          String species = rows.getString("SPECIES_CODE");
+          if (method != AppraisalMethod.C || species == null) {
+            throw new DataIntegrityViolationException("invalid coast reference species row");
+          }
+          speciesVolumes.add(new EcasReference.SpeciesVolume(
+              new CodeOption(species, rows.getString("SPECIES_DESCRIPTION")), rows.getBigDecimal("SPECIES_VOLUME"),
+              rows.getObject("SPECIES_REVISION_COUNT", Integer.class)));
+        }
         default -> throw new DataIntegrityViolationException("unknown reference row kind");
       }
     }
     if (parent == null) {
-      if (!marks.isEmpty()) {
-        throw new DataIntegrityViolationException("reference marks have no scoped parent");
+      if (!marks.isEmpty() || !speciesVolumes.isEmpty()) {
+        throw new DataIntegrityViolationException("reference children have no scoped parent");
       }
       return Optional.empty();
     }
-    return Optional.of(new Reference(parent, List.copyOf(marks)));
+    return Optional.of(new Reference(parent, List.copyOf(marks), List.copyOf(speciesVolumes)));
   }
 
-  private record Reference(Parent parent, List<EcasReference.TimberMark> marks) {}
+  private record Reference(Parent parent, List<EcasReference.TimberMark> marks,
+      List<EcasReference.SpeciesVolume> speciesVolumes) {}
 
   private record Parent(
       EcasReference.Header header, String selectedMark, String referenceMark,
       BigDecimal netCruiseVolume, BigDecimal netMerchantableArea, BigDecimal initialMerchantableArea,
       BigDecimal pointOfAppraisalDistance, String majorCentreCode, BigDecimal majorCentreDistance,
+      BigDecimal singleTreeSelectionVolume, BigDecimal secondGrowthConiferousVolume,
+      BigDecimal samplingErrorPercent,
       CodeOption pointOfAppraisal, String sellingPriceZoneCode, Boolean comparativeCruise,
       Boolean salvage) {
     static Parent read(ResultSet row) throws SQLException {
@@ -140,6 +154,8 @@ public final class OracleEcasReference {
           row.getBigDecimal("INITIAL_MERCHANTABLE_AREA"),
           row.getBigDecimal("POINT_OF_APPRAISAL_DISTANCE"), row.getString("MAJOR_CENTRE_CODE"),
           row.getBigDecimal("ADS_LOCATION_DISTANCE_AVERAGE"),
+          row.getBigDecimal("SINGLE_TREE_SELECTION_VOLUME"),
+          row.getBigDecimal("SECOND_GROWTH_CONIFER_VOLUME"), row.getBigDecimal("STANDARD_ERROR_PCT"),
           option(row, "POINT_OF_APPRAISAL_CODE", "POINT_OF_APPRAISAL_DESCRIPTION"),
           row.getString("SELLING_PRICE_ZONE_CODE"), indicator(row, "COMPARATIVE_CRUISE_IND"),
           indicator(row, "SALVAGE_IND"));

@@ -58,6 +58,14 @@ export type CoastReference = {
   }[]
   referenceMark: string | null
   netCruiseVolume: number | null
+  speciesVolumes: {
+    species: CodeOption
+    volume: number | null
+    revisionCount: number | null
+  }[]
+  singleTreeSelectionVolume: number | null
+  secondGrowthConiferousVolume: number | null
+  samplingErrorPercent: number | null
   netMerchantableArea: number | null
   initialMerchantableArea: number | null
   pointOfAppraisalDistance: number | null

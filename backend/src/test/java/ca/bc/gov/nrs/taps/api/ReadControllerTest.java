@@ -10,6 +10,7 @@ import ca.bc.gov.nrs.taps.configuration.JsonConfiguration;
 import ca.bc.gov.nrs.taps.domain.AppraisalMethod;
 import ca.bc.gov.nrs.taps.read.CodeOption;
 import ca.bc.gov.nrs.taps.read.EcasInbox;
+import ca.bc.gov.nrs.taps.read.EcasReference;
 import ca.bc.gov.nrs.taps.read.GasAppraisal;
 import ca.bc.gov.nrs.taps.read.oracle.*;
 import ca.bc.gov.nrs.taps.security.*;
@@ -249,6 +250,36 @@ class ReadControllerTest {
         .andExpect(jsonPath("$.effectiveDate").value("2026-10-01"))
         .andExpect(jsonPath("$.rates[0].totalStumpageRate").isString())
         .andExpect(jsonPath("$.rates[0].totalStumpageRate").value("12.30"));
+  }
+
+  @Test
+  void coastReferencePublishesSpeciesAndAdjacentQuantitiesWithoutChangingInteriorShape()
+      throws Exception {
+    signIn("TAPS_ADMIN", "azureidir");
+    var fixture = mapper.readTree(getClass().getResourceAsStream("/contracts/synthetic-workflow.json"));
+    var coast = mapper.treeToValue(fixture.get("ecasCoastMultiMarkReference"), EcasReference.Coast.class);
+    when(references.coast(any(), eq(coast.header().ecasId()))).thenReturn(Optional.of(coast));
+    mvc.perform(get("/api/ecas/references/C/" + coast.header().ecasId())
+        .header("Authorization", "Bearer token"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.timberMarks.length()").value(2))
+        .andExpect(jsonPath("$.speciesVolumes.length()").value(2))
+        .andExpect(jsonPath("$.speciesVolumes[0].species.code").value("FI"))
+        .andExpect(jsonPath("$.speciesVolumes[0].species.description").value("Synthetic fir"))
+        .andExpect(jsonPath("$.speciesVolumes[0].volume").isNumber())
+        .andExpect(jsonPath("$.speciesVolumes[0].volume").value(123.45))
+        .andExpect(jsonPath("$.speciesVolumes[0].revisionCount").value(5))
+        .andExpect(jsonPath("$.singleTreeSelectionVolume").value(0))
+        .andExpect(jsonPath("$.secondGrowthConiferousVolume").value(150))
+        .andExpect(jsonPath("$.samplingErrorPercent").value(9.5));
+
+    var interior = mapper.treeToValue(fixture.get("ecasInteriorReference"), EcasReference.Interior.class);
+    when(references.interior(any(), eq(interior.header().ecasId()))).thenReturn(Optional.of(interior));
+    mvc.perform(get("/api/ecas/references/I/" + interior.header().ecasId())
+        .header("Authorization", "Bearer token"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.speciesVolumes").doesNotExist())
+        .andExpect(jsonPath("$.singleTreeSelectionVolume").doesNotExist())
+        .andExpect(jsonPath("$.secondGrowthConiferousVolume").doesNotExist())
+        .andExpect(jsonPath("$.samplingErrorPercent").doesNotExist());
   }
 
   @Test

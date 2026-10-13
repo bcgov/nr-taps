@@ -394,6 +394,45 @@ class ReadContractsTest {
     assertThat(summary.rates().getFirst().totalStumpageRate()).isEqualTo(new BigDecimal("12.30"));
   }
 
+  @Test
+  void coastSpeciesQuantitiesStayNumericAndIndependentOfTimberMarks() throws IOException {
+    EcasReference.Coast reference = mapper.treeToValue(
+        fixture().get("ecasCoastMultiMarkReference"), EcasReference.Coast.class);
+    assertThat(reference.timberMarks()).hasSize(2);
+    assertThat(reference.speciesVolumes()).containsExactly(
+        new EcasReference.SpeciesVolume(new CodeOption("FI", "Synthetic fir"), new BigDecimal("123.45"), 5),
+        new EcasReference.SpeciesVolume(new CodeOption("HE", "Synthetic hemlock"), new BigDecimal("67.89"), 6));
+    assertThat(reference.singleTreeSelectionVolume()).isEqualByComparingTo("0");
+    assertThat(reference.secondGrowthConiferousVolume()).isEqualByComparingTo("150");
+    assertThat(reference.samplingErrorPercent()).isEqualByComparingTo("9.5");
+    assertThat(mapper.valueToTree(reference).at("/speciesVolumes/0/volume").isNumber()).isTrue();
+    assertThatThrownBy(() -> reference.speciesVolumes().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+  }
+
+  @Test
+  void coastSpeciesEmptyAndNullValuesRoundTripWithoutDefaults() throws IOException {
+    ObjectNode json = (ObjectNode) fixture().get("ecasCoastReference");
+    json.putArray("speciesVolumes");
+    json.putNull("singleTreeSelectionVolume");
+    json.putNull("secondGrowthConiferousVolume");
+    json.putNull("samplingErrorPercent");
+    var reference = mapper.treeToValue(json, EcasReference.Coast.class);
+    assertThat(reference.speciesVolumes()).isEmpty();
+    assertThat(reference.singleTreeSelectionVolume()).isNull();
+    assertThat(reference.secondGrowthConiferousVolume()).isNull();
+    assertThat(reference.samplingErrorPercent()).isNull();
+    assertThat(mapper.readTree(mapper.writeValueAsBytes(reference))).isEqualTo(json);
+
+    var row = new EcasReference.SpeciesVolume(new CodeOption("FI", null), null, null);
+    assertThat(mapper.readTree(mapper.writeValueAsBytes(row)))
+        .isEqualTo(mapper.readTree("""
+            {"species":{"code":"FI","description":null},"volume":null,"revisionCount":null}
+            """));
+    assertThat(mapper.valueToTree(mapper.treeToValue(fixture().get("ecasInteriorReference"),
+        EcasReference.Interior.class)).has("speciesVolumes")).isFalse();
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"0", "12.30", "9999.99", "-9999.99"})
   void storedRateAmountsAreExactWithinTheDeclaredPrecision(String amount) throws IOException {
