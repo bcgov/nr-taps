@@ -6,6 +6,10 @@
   min-inline-size: 0;
   inline-size: 100%;
 
+  th:last-child .cds--table-header-label {
+    text-align: inherit;
+  }
+
   td:first-child {
     white-space: normal;
     overflow-wrap: anywhere;
