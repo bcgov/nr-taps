@@ -11,6 +11,7 @@ import type { ReadApi } from '@/service/read-service'
 import GasFtaContext from './GasFtaContext'
 import GasAuditDetails from './GasAuditDetails'
 import type { GasAuditApi } from '@/service/gas-audit-service'
+import { formatDisplayDate } from '../iso-date'
 
 const yesNo = (value: boolean | null) => (value === null ? '—' : value ? 'Yes' : 'No')
 
@@ -44,8 +45,8 @@ function HeaderDetails({ header }: { header: ReferenceHeader }) {
         ['Rate calculation method', header.rateCalculationMethodCode],
         ['Coniferous stand rate eligibility', displayCode(header.coniferousStandRateEligibility)],
         ['Deciduous stand rate eligibility', displayCode(header.deciduousStandRateEligibility)],
-        ['Effective date', header.effectiveDate],
-        ['Expiry date', header.expiryDate],
+        ['Effective date', formatDisplayDate(header.effectiveDate)],
+        ['Expiry date', formatDisplayDate(header.expiryDate)],
         ['Administrative district', displayCode(header.administrativeDistrict)],
         ['Geographic district', displayCode(header.geographicDistrict)],
         ['File type', displayCode(header.fileType)],
@@ -90,7 +91,7 @@ export function CoastReferenceDetails({ reference }: { reference: CoastReference
             <TableHead>
               <TableRow>
                 <TableHeader>Species</TableHeader>
-                <TableHeader style={{ textAlign: 'right' }}>Volume (m³)</TableHeader>
+                <TableHeader className="taps-numeric-cell">Volume (m³)</TableHeader>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -101,7 +102,7 @@ export function CoastReferenceDetails({ reference }: { reference: CoastReference
                       ? `${row.species.code} - ${row.species.description}`
                       : displayCode(row.species)}
                   </TableCell>
-                  <TableCell style={{ textAlign: 'right' }}>{row.volume ?? '—'}</TableCell>
+                  <TableCell className="taps-numeric-cell">{row.volume ?? '—'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -109,14 +110,18 @@ export function CoastReferenceDetails({ reference }: { reference: CoastReference
         </TableFrame>
       )}
       <h3>Submitted timber marks</h3>
-      <ul className="taps-appraisal-mark-list">
-        {reference.timberMarks.map((mark) => (
-          <li key={mark.timberMark}>
-            {mark.timberMark ?? '—'} — volume {mark.cruiseVolume ?? '—'}; primary{' '}
-            {yesNo(mark.primary)}; mark revision {mark.revisionCount ?? '—'}
-          </li>
-        ))}
-      </ul>
+      {reference.timberMarks.length === 0 ? (
+        <p>No submitted timber marks are available for this submission.</p>
+      ) : (
+        <ul className="taps-appraisal-mark-list">
+          {reference.timberMarks.map((mark) => (
+            <li key={mark.timberMark}>
+              {mark.timberMark ?? '—'} — volume {mark.cruiseVolume ?? '—'}; primary{' '}
+              {yesNo(mark.primary)}; mark revision {mark.revisionCount ?? '—'}
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   )
 }
@@ -163,10 +168,10 @@ export function GasStoredSummary({
           ['Rate calculation method', summary.rateCalculationMethodCode],
           ['TOA eligible', yesNo(summary.toaEligible)],
           ['Status', displayCode(summary.status)],
-          ['Effective date', summary.effectiveDate],
-          ['Expiry date', summary.expiryDate],
+          ['Effective date', formatDisplayDate(summary.effectiveDate)],
+          ['Expiry date', formatDisplayDate(summary.expiryDate)],
           ['Reference type', summary.referenceTypeCode],
-          ['Cease adjustment date', summary.ceaseAdjustmentDate],
+          ['Cease adjustment date', formatDisplayDate(summary.ceaseAdjustmentDate)],
           ['Timber marks', summary.timberMarks.join(', ')],
         ]}
       />
@@ -176,26 +181,35 @@ export function GasStoredSummary({
         api={api}
       />
       <h3>Stored rates</h3>
-      <TableFrame ariaLabel="Stored stumpage rates">
-        <Table useZebraStyles size="md" aria-label="Stored stumpage rates">
-          <TableHead>
-            <TableRow>
-              <TableHeader>Rate ID</TableHeader>
-              <TableHeader>Effective date</TableHeader>
-              <TableHeader>Total stumpage rate</TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {summary.rates.map((rate) => (
-              <TableRow key={rate.rateId}>
-                <TableCell>{rate.rateId}</TableCell>
-                <TableCell>{rate.effectiveDate}</TableCell>
-                <TableCell>{rate.totalStumpageRate}</TableCell>
+      {summary.rates.length === 0 ? (
+        <p>No stored stumpage rates are recorded for this worksheet.</p>
+      ) : (
+        <TableFrame ariaLabel="Stored stumpage rates">
+          <Table
+            useZebraStyles
+            size="md"
+            aria-label="Stored stumpage rates"
+            className="taps-stored-rates-table"
+          >
+            <TableHead>
+              <TableRow>
+                <TableHeader>Rate ID</TableHeader>
+                <TableHeader>Effective date</TableHeader>
+                <TableHeader className="taps-numeric-cell">Total stumpage rate</TableHeader>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableFrame>
+            </TableHead>
+            <TableBody>
+              {summary.rates.map((rate) => (
+                <TableRow key={rate.rateId}>
+                  <TableCell>{rate.rateId}</TableCell>
+                  <TableCell>{formatDisplayDate(rate.effectiveDate)}</TableCell>
+                  <TableCell className="taps-numeric-cell">{rate.totalStumpageRate}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableFrame>
+      )}
       <GasAuditDetails worksheetKey={summary.key} api={auditApi} />
     </>
   )

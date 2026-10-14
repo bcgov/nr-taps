@@ -22,6 +22,7 @@ import {
 import SearchResultsTableFrame from '../SearchResultsTableFrame'
 import AppNotification from '../AppNotification'
 import CardTitle from '../CardTitle'
+import { formatDisplayDate } from '../iso-date'
 import './appraisal.scss'
 
 export const displayCode = (value: CodeOption | null) => value?.description ?? value?.code ?? '—'
@@ -100,7 +101,7 @@ export function EcasInboxResults({
               <TableCell>{item.cuttingPermit ?? '—'}</TableCell>
               <TableCell>{item.clientName ?? item.clientNumber ?? '—'}</TableCell>
               <TableCell>{displayCode(item.status)}</TableCell>
-              <TableCell>{item.effectiveDate ?? '—'}</TableCell>
+              <TableCell>{formatDisplayDate(item.effectiveDate)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -164,8 +165,8 @@ export function GasSearchResults({
                 ['Timber mark', info.timberMark],
                 ['Forest region', info.forestRegion],
                 ['Forest district', info.forestDistrict],
-                ['Mark expiry date', info.markExpiryDate],
-                ['Mark extension date', info.markExtendDate],
+                ['Mark expiry date', formatDisplayDate(info.markExpiryDate)],
+                ['Mark extension date', formatDisplayDate(info.markExtendDate)],
                 ['Licence status', info.ftaStatus],
               ] as const
             ).map(([label, value]) => (
@@ -238,8 +239,8 @@ export function GasSearchResults({
                 <TableCell>{item.timberMark ?? '—'}</TableCell>
                 <TableCell>{item.licence ?? '—'}</TableCell>
                 <TableCell>{displayCode(item.status)}</TableCell>
-                <TableCell>{item.effectiveDate ?? '—'}</TableCell>
-                <TableCell>{item.expiryDate ?? '—'}</TableCell>
+                <TableCell>{formatDisplayDate(item.effectiveDate)}</TableCell>
+                <TableCell>{formatDisplayDate(item.expiryDate)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -47,7 +47,7 @@ test('submits the selected mode only on Search and clears results when the mode 
   expect(screen.queryByRole('table', { name: 'ECAS submissions' })).not.toBeInTheDocument()
   expect(api.inbox).toHaveBeenCalledOnce()
   await user.click(screen.getByRole('button', { name: 'Search' }))
-  expect(await screen.findByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'No results found' })).toBeInTheDocument()
   expect(api.inbox).toHaveBeenLastCalledWith(
     expect.objectContaining({ mode: 'MY_TO_DO' }),
     0,
@@ -117,9 +117,9 @@ test('aborts an old mode request and ignores its late rows after a new mode sear
   await user.selectOptions(screen.getByRole('combobox', { name: 'Search mode' }), 'MY_TO_DO')
   expect(oldSignal?.aborted).toBe(true)
   await user.click(screen.getByRole('button', { name: 'Search' }))
-  await screen.findByRole('heading', { name: 'No results' })
+  await screen.findByRole('heading', { name: 'No results found' })
   await act(async () => releaseOld({ items: [fixture.ecasInboxItem], total: 250, page: 0 }))
-  expect(screen.getByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'No results found' })).toBeInTheDocument()
   expect(screen.queryByRole('table', { name: 'ECAS submissions' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Next page' })).not.toBeInTheDocument()
 })
@@ -243,7 +243,9 @@ test('switching reference aborts the old Coast species response and preserves de
   await user.click(interiorLauncher)
   await screen.findByRole('heading', { name: 'Interior reference' })
   expect(coastSignal.aborted).toBe(true)
-  await waitFor(() => expect(screen.getByRole('heading', { name: 'Read details' })).toHaveFocus())
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: 'Submission details' })).toHaveFocus(),
+  )
   await act(async () => releaseCoast(fixture.ecasCoastMultiMarkReference))
   expect(screen.queryByRole('table', { name: 'Volume by species' })).not.toBeInTheDocument()
   expect(screen.queryByText('Single tree selection volume (m³)')).not.toBeInTheDocument()
@@ -260,7 +262,7 @@ test('preserves the licence chooser and FTA context when worksheets are empty', 
   await screen.findByRole('option', { name: 'ZZ9996' })
   await user.selectOptions(screen.getByRole('combobox', { name: 'Timber mark' }), 'ZZ9996')
   await user.click(screen.getByRole('button', { name: 'Search' }))
-  expect(await screen.findByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'No results found' })).toBeInTheDocument()
   expect(
     within(screen.getByRole('region', { name: 'Licence information' })).getByText('ZZ9996'),
   ).toBeInTheDocument()

@@ -26,6 +26,20 @@ const syntheticRelatedApis: EcasRelatedApis = {
   },
 }
 
+export function SyntheticEcasInboxPage() {
+  return (
+    <EcasInboxReadPage
+      api={syntheticReadApi}
+      relatedApis={syntheticRelatedApis}
+      gasAuditApi={syntheticGasAuditApi}
+    />
+  )
+}
+
+export function SyntheticGasSearchPage() {
+  return <GasSearchReadPage api={syntheticReadApi} gasAuditApi={syntheticGasAuditApi} />
+}
+
 export default function AsyncReadPreview() {
   const [module, setModule] = useState<'ecas' | 'gas'>('ecas')
   return (
@@ -45,15 +59,7 @@ export default function AsyncReadPreview() {
           {module === 'ecas' ? 'GAS appraisal search' : 'ECAS inbox search'}
         </Button>
       </div>
-      {module === 'ecas' ? (
-        <EcasInboxReadPage
-          api={syntheticReadApi}
-          relatedApis={syntheticRelatedApis}
-          gasAuditApi={syntheticGasAuditApi}
-        />
-      ) : (
-        <GasSearchReadPage api={syntheticReadApi} gasAuditApi={syntheticGasAuditApi} />
-      )}
+      {module === 'ecas' ? <SyntheticEcasInboxPage /> : <SyntheticGasSearchPage />}
     </>
   )
 }

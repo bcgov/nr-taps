@@ -17,13 +17,17 @@ import { ApplicationPage, ApplicationScreenPage } from '@/components/Application
 import Dashboard from '@/components/Dashboard'
 import Layout from '@/components/Layout'
 import NotFound from '@/components/NotFound'
+import RequireAccess from '@/components/RequireAccess'
 import { AuthContext, type AuthContextValue, type AuthState } from '@/context/auth/AuthContext'
 import { Capability } from '@/context/auth/capabilities'
 import ThemeProvider from '@/context/theme/ThemeProvider'
 import type { Session } from '@/service/session-service'
 import ControlsSample from './ControlsSample'
 import WorkflowPreview from './WorkflowPreview'
-import AsyncReadPreview from './AsyncReadPreview'
+import AsyncReadPreview, {
+  SyntheticEcasInboxPage,
+  SyntheticGasSearchPage,
+} from './AsyncReadPreview'
 
 const scenarios = [
   { id: 'signed-out', label: 'Synthetic signed-out session' },
@@ -40,10 +44,10 @@ type Scenario = (typeof scenarios)[number]['id']
 const previewPaths = [
   { path: '/', label: 'TAPS dashboard' },
   { path: '/ecas', label: 'ECAS module' },
-  { path: '/ecas/ECAS05', label: 'ECAS Inbox Search shell' },
+  { path: '/ecas/ECAS05', label: 'ECAS Inbox Search' },
   { path: '/ecas/ECAS88', label: 'ECAS profile shell' },
   { path: '/gas', label: 'GAS module' },
-  { path: '/gas/showAppraisalSearch', label: 'GAS Appraisal Search shell' },
+  { path: '/gas/showAppraisalSearch', label: 'GAS Appraisal Search' },
   { path: '/gas/showAppraisedSummary', label: 'GAS appraised summary shell' },
   { path: '/gas/showNonAppraisedSummary', label: 'GAS non-appraised summary shell' },
   { path: '/ui-controls', label: 'Synthetic reusable controls' },
@@ -178,16 +182,30 @@ function createPreviewRouter() {
   const ecasScreenRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/ecas/$screenId',
-    component: () => (
-      <ApplicationScreenPage application="ecas" screenId={ecasScreenRoute.useParams().screenId} />
-    ),
+    component: () => {
+      const { screenId } = ecasScreenRoute.useParams()
+      return screenId === 'ECAS05' ? (
+        <RequireAccess capabilities={[Capability.EcasSubmissionView]}>
+          <SyntheticEcasInboxPage />
+        </RequireAccess>
+      ) : (
+        <ApplicationScreenPage application="ecas" screenId={screenId} />
+      )
+    },
   })
   const gasScreenRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/gas/$screenId',
-    component: () => (
-      <ApplicationScreenPage application="gas" screenId={gasScreenRoute.useParams().screenId} />
-    ),
+    component: () => {
+      const { screenId } = gasScreenRoute.useParams()
+      return screenId === 'showAppraisalSearch' ? (
+        <RequireAccess capabilities={[Capability.GasAppraisalView]}>
+          <SyntheticGasSearchPage />
+        </RequireAccess>
+      ) : (
+        <ApplicationScreenPage application="gas" screenId={screenId} />
+      )
+    },
   })
   const controlsRoute = createRoute({
     getParentRoute: () => rootRoute,

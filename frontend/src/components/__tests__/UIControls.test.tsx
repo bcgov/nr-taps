@@ -183,7 +183,7 @@ test('replaces stale table contents with a busy skeleton and then an empty state
 
   rerender(<SearchResultsTableFrame totalItems={0}>{resultTable}</SearchResultsTableFrame>)
   expect(screen.getByRole('status')).toHaveTextContent('0 results found')
-  expect(screen.getByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'No results found' })).toBeInTheDocument()
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
   expect(screen.getByRole('region', { name: 'Search results table' })).toHaveAttribute(
     'aria-busy',

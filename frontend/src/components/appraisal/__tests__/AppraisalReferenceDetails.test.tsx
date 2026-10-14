@@ -3,6 +3,27 @@ import { expect, test } from 'vitest'
 import { workflowFixture } from '@/local-synthetic/WorkflowPreview'
 import { CoastReferenceDetails, InteriorReferenceDetails } from '../AppraisalDetails'
 
+test('reference details display calendar dates in words and preserve unknown date values', () => {
+  render(
+    <CoastReferenceDetails
+      reference={{
+        ...workflowFixture.ecasCoastMultiMarkReference,
+        header: {
+          ...workflowFixture.ecasCoastMultiMarkReference.header,
+          effectiveDate: '2026-09-28',
+          expiryDate: 'unknown',
+        },
+      }}
+    />,
+  )
+  expect(
+    within(screen.getByText('Effective date').parentElement!).getByText('Sep 28, 2026'),
+  ).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Expiry date').parentElement!).getByText('unknown'),
+  ).toBeInTheDocument()
+})
+
 test('Coast reference displays each species once with exact stored quantities and units', () => {
   const reference = {
     ...workflowFixture.ecasCoastMultiMarkReference,
@@ -80,6 +101,18 @@ test('Interior reference does not acquire Coast species or cruise fields', () =>
   render(<InteriorReferenceDetails reference={workflowFixture.ecasInteriorReference} />)
   expect(screen.queryByRole('heading', { name: 'Volume by species' })).not.toBeInTheDocument()
   expect(screen.queryByText('Single tree selection volume (m³)')).not.toBeInTheDocument()
+})
+
+test('Coast reference states when no submitted timber marks are recorded', () => {
+  const { container } = render(
+    <CoastReferenceDetails
+      reference={{ ...workflowFixture.ecasCoastMultiMarkReference, timberMarks: [] }}
+    />,
+  )
+  expect(
+    screen.getByText('No submitted timber marks are available for this submission.'),
+  ).toBeInTheDocument()
+  expect(container.querySelector('.taps-appraisal-mark-list')).toBeNull()
 })
 
 test.each(['Coast', 'Interior'] as const)(

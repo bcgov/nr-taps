@@ -57,6 +57,9 @@ Reloading resets it.
   not appraisal screens).
 - **Synthetic reusable controls:** sample table with draft filters, loading/empty/error states and
   a detail drawer.
+- **Inbox Search and Appraisal Search:** normal preview navigation opens the real frontend search
+  and detail components with synthetic APIs, including audit, attachments and worksheet history.
+  Capability checks still apply; these pages make no HTTP requests.
 - **Synthetic ECAS and GAS workflow:** uses the backend contract fixture. ECAS rows include several
   marks and permits for one submission. **View related GAS worksheets** follows the fixture link.
   Coast references include Volume by Species and stored single-tree selection, second-growth
@@ -96,7 +99,10 @@ local synthetic preview. See the
 ## UI standards
 
 The team's UX/UI standards build on Carbon; anything they don't mention is Carbon as shipped.
-TAPS applies them as follows:
+The [written guidance](https://apps.nrs.gov.bc.ca/int/confluence/spaces/FSAST1/pages/308905682/UX+UI+standards)
+takes precedence over illustrative screenshots. Use the
+[LEXIS search patterns](https://www.figma.com/design/YK5SeF2OD7dxFN2yG3rW7S/LEXIS?node-id=4498-79848)
+and existing LEXIS components for the shared presentation. TAPS applies them as follows:
 
 - **Colour:** two blues replace Carbon's blue. Fill blue `#0073E6` sits behind white content (the
   header, primary buttons) in both themes. Text blue (`#005CB8` light, `#5CADFF` dark) is used for
@@ -106,6 +112,9 @@ TAPS applies them as follows:
   navigation opens expanded, collapses to an icon rail, remembers that choice and opens only from
   the toggle. Collapsed items have tooltips; a collapsed group holding the current page shows
   "Group: Page" and is marked current. Icons are text blue whether or not they're selected.
+  All rows are 48px high, including grouped links, whose labels start 16px beyond the group label.
+  **Support** sits below a divider at the foot of the panel, outside page navigation; **Report an
+  issue** opens an email to Heartwood@gov.bc.ca. Its icon and tooltip remain available when collapsed.
 - **Typography:** field labels use `label-02`, field and read-only values `body-02`/`body-compact-02`,
   and DataTable keeps Carbon's sizes. Headings: page title `heading-05`, sections and card titles
   `heading-03`, sub-sections `heading-compact-02`. Inside a side panel, each level moves down one step.
@@ -113,7 +122,12 @@ TAPS applies them as follows:
 - **Search pages:** add `taps-fullbleed-page` to the page. Filters sit four to a row, with
   **Clear all** (tertiary) and **Search** (primary) at the right. Results fill the content width,
   with the count, table and pagination on one grey panel. Rows that open a panel use
-  `taps-link-button`.
+  `taps-link-button`. Date ranges stay together on a row and stack at narrow widths. Headers can
+  wrap rather than forcing avoidable horizontal scrolling. Read-only calendar dates use month
+  names (for example, Sep 28, 2026); date inputs retain YYYY-MM-DD and timestamps retain their values.
+- **Detail tables:** rate, volume and percentage columns align right, including their headers.
+  Small stored-rate tables fit the drawer; wide tables retain keyboard-accessible scrolling.
+  Empty collections show a message. Stored numeric strings retain their precision.
 - **Return navigation:** pages reachable from the side navigation have no return link. A page one
   level below its parent shows "Back to <parent>" above the title, with an arrow icon, and returns
   to the parent with its filters intact. Deeper pages use a Carbon breadcrumb. Never use both.

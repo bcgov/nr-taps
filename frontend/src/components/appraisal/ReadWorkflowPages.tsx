@@ -111,7 +111,7 @@ function ReadDetailPanel({
       onClose={() => setSelection(null)}
     >
       <h2 id="read-detail-heading" tabIndex={-1}>
-        Read details
+        {selection?.kind === 'reference' ? 'Submission details' : 'Worksheet details'}
       </h2>
       {detail.loading && <InlineLoading description="Loading details…" />}
       {detail.error && (

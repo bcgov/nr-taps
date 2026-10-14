@@ -149,7 +149,7 @@ test('persists desktop collapse and exposes the active application in the icon r
 
   expect(localStorage.getItem(collapsedPreference)).toBe('true')
   const navigation = screen.getByRole('navigation', { name: 'Side navigation' })
-  expect(navigation).toHaveClass('is-collapsed')
+  expect(navigation.closest('.taps-navigation')).toHaveClass('is-collapsed')
   expect(within(navigation).getByRole('button', { name: 'ECAS' })).toHaveAttribute(
     'aria-current',
     'true',
@@ -235,7 +235,7 @@ test('focuses mobile navigation, makes main content inert, and returns focus aft
   expect(menu).toHaveFocus()
   expect(menu).toHaveAttribute('aria-expanded', 'false')
   expect(main).not.toHaveAttribute('inert')
-  expect(navigation).toHaveClass('is-collapsed')
+  expect(navigation.closest('.taps-navigation')).toHaveClass('is-collapsed')
   expect(screen.queryByRole('button', { name: 'Close navigation' })).not.toBeInTheDocument()
 })
 
@@ -294,6 +294,44 @@ test('provides the Dark theme switch with mouse and keyboard operation', async (
   expect(document.documentElement).toHaveAttribute('data-carbon-theme', 'white')
   expect(localStorage.getItem('taps.ui.theme')).toBe('white')
 })
+
+test.each([false, true])(
+  'keeps the support action outside page navigation with collapsed=%s',
+  async (collapsed) => {
+    localStorage.setItem(collapsedPreference, String(collapsed))
+    const user = userEvent.setup()
+    await renderRoute()
+    const navigation = await screen.findByRole('navigation', { name: 'Side navigation' })
+    const reportIssue = screen.getByRole('link', { name: 'Report an issue' })
+
+    expect(reportIssue).toHaveAttribute('href', 'mailto:Heartwood@gov.bc.ca')
+    expect(navigation).not.toContainElement(reportIssue)
+    if (collapsed) {
+      expect(screen.getByText('Support')).not.toBeVisible()
+      // JSDOM has no layout; give Carbon's auto-aligned tooltip a visible reference and viewport.
+      const geometry = [
+        vi.spyOn(document.documentElement, 'clientWidth', 'get').mockReturnValue(1024),
+        vi.spyOn(document.documentElement, 'clientHeight', 'get').mockReturnValue(768),
+        vi
+          .spyOn(reportIssue.parentElement!, 'getBoundingClientRect')
+          .mockReturnValue(new DOMRect(0, 600, 48, 48)),
+      ]
+      try {
+        act(() => within(navigation).getByRole('button', { name: 'GAS' }).focus())
+        await user.tab()
+        expect(reportIssue).toHaveFocus()
+        await waitFor(() => expect(reportIssue).toHaveAccessibleDescription('Report an issue'))
+        expect(document.getElementById(reportIssue.getAttribute('aria-describedby')!)).toBeVisible()
+        await user.tab()
+        expect(reportIssue).not.toHaveAttribute('aria-describedby')
+      } finally {
+        geometry.forEach((mock) => mock.mockRestore())
+      }
+    } else {
+      expect(screen.getByText('Support')).toBeVisible()
+    }
+  },
+)
 
 test('shows the login page without the shell and keeps the saved theme', async () => {
   localStorage.setItem('taps.ui.theme', 'g100')

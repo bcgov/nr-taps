@@ -59,7 +59,10 @@ export default function SearchResultsTableFrame({
                 showToolbar={false}
               />
             ) : totalItems === 0 ? (
-              <EmptyState title="No results" description="Try changing your search filters." />
+              <EmptyState
+                title="No results found"
+                description="No records match your search criteria. Try adjusting your filters and searching again."
+              />
             ) : (
               children
             )}

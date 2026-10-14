@@ -16,6 +16,47 @@ import GasSearchFilters, { type GasFilters } from '../GasSearchFilters'
 const { reloadSession } = vi.hoisted(() => ({ reloadSession: vi.fn(async () => {}) }))
 vi.mock('@/context/auth/AuthContext', () => ({ useAuth: () => ({ reloadSession }) }))
 
+test('search results display calendar dates in words and retain the original row dates', async () => {
+  const onOpen = vi.fn()
+  const item = { ...fixture.ecasInboxItem, effectiveDate: '2026-09-28' }
+  const { rerender } = render(<EcasInboxResults items={[item]} onOpen={onOpen} />)
+  expect(screen.getByRole('cell', { name: 'Sep 28, 2026' })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: /Open ECAS/ }))
+  expect(onOpen).toHaveBeenCalledWith(item, expect.any(HTMLButtonElement))
+
+  rerender(
+    <GasSearchResults
+      result={{
+        ...fixture.gasSearchResult,
+        licenceInformation: {
+          ...fixture.gasSearchResult.licenceInformation!,
+          markExpiryDate: '2027-01-01',
+          markExtendDate: null,
+        },
+        appraisals: {
+          ...fixture.gasSearchResult.appraisals,
+          items: [
+            {
+              ...fixture.gasSearchResult.appraisals.items[0],
+              effectiveDate: '2026-09-28',
+              expiryDate: '2026-12-31',
+            },
+          ],
+        },
+      }}
+      onOpen={onOpen}
+    />,
+  )
+  expect(screen.getByRole('cell', { name: 'Sep 28, 2026' })).toBeInTheDocument()
+  expect(screen.getByRole('cell', { name: 'Dec 31, 2026' })).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Mark expiry date').parentElement!).getByText('Jan 1, 2027'),
+  ).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Mark extension date').parentElement!).getByText('—'),
+  ).toBeInTheDocument()
+})
+
 test('retains ECAS marks and permits sharing the same submission and opens the selected row', async () => {
   const user = userEvent.setup()
   const onOpen = vi.fn()
@@ -78,7 +119,7 @@ test('shows all FTA fields independently when no worksheet rows exist', () => {
   expect(within(info).getByText('ZZ9996', { exact: true })).toBeInTheDocument()
   expect(within(info).getAllByRole('term')).toHaveLength(11)
   expect(screen.getByRole('status')).toHaveTextContent('0 results found')
-  expect(screen.getByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'No results found' })).toBeInTheDocument()
 })
 
 test('preserves aggregated permits, nullable licence values and rows without FTA data', () => {

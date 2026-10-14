@@ -207,6 +207,7 @@ export default function EcasSearchFilters({
         </Select>
         <FilterableMultiSelect<{ id: EcasDateType; text: string }>
           id="read-ecas-date-types"
+          className="taps-filter-date-types"
           titleText="Dates to match"
           placeholder="Select date fields"
           items={dateOptions}
