@@ -17,8 +17,8 @@ parameters:
     description: Value placed on the pod template to force a rollout when a reused image tag is rebuilt
     value: ""
   - name: SPRING_PROFILES_ACTIVE
-    description: Set to 'oracle' once the database secrets and grants are ready
-    value: ""
+    description: Oracle is enabled for every deployed backend
+    value: oracle
   - name: MIN_REPLICAS
     value: "1"
   - name: MAX_REPLICAS
@@ -50,18 +50,21 @@ parameters:
   - name: TAPS_OIDC_CLIENT_ID
     description: Public browser client ID expected in access tokens
     required: true
-  # Database settings come from the GitHub environment secrets and are only needed with the oracle profile.
+  # Every deployed backend requires its environment's database settings.
   - name: DATABASE_HOST
-    value: ""
+    required: true
+  - name: DATABASE_PORT
+    description: Oracle TCPS listener port
+    value: "1543"
   - name: DATABASE_SERVICE_NAME
-    value: ""
+    required: true
   - name: DATABASE_USER
-    value: ""
+    required: true
   - name: DATABASE_PASSWORD
-    value: ""
+    required: true
   - name: KEYSTORE_SECRET
     description: Passphrase for the truststore generated from the database certificate
-    value: ""
+    required: true
 
 objects:
   - apiVersion: apps/v1
@@ -98,17 +101,11 @@ objects:
           securityContext:
             runAsNonRoot: true
           initContainers:
-            # Writes /cert/jssecacerts from the database server's certificate. Does nothing without the oracle profile.
+            # Writes /cert/jssecacerts from the database server's certificate on every pod start.
             - name: ${NAME}-backend-init
               image: ghcr.io/bcgov/nr-forest-client/common:prod
               imagePullPolicy: Always
-              command:
-                - sh
-                - -c
-                - 'case ",$SPRING_PROFILES_ACTIVE," in *,oracle,*) exec sh /app/startup.sh;; esac'
               env:
-                - name: SPRING_PROFILES_ACTIVE
-                  value: ${SPRING_PROFILES_ACTIVE}
                 - name: ORACLEDB_HOST
                   value: ${DATABASE_HOST}
                 - name: ORACLEDB_SECRET
@@ -117,7 +114,7 @@ objects:
                       name: ${NAME}-backend-secret-${ZONE}
                       key: KEYSTORE_SECRET
                 - name: ORACLEDB_PORT
-                  value: "1543"
+                  value: ${DATABASE_PORT}
               volumeMounts:
                 - name: api-cert
                   mountPath: /cert
@@ -165,6 +162,8 @@ objects:
                   value: ${TAPS_OIDC_CLIENT_ID}
                 - name: DATABASE_HOST
                   value: ${DATABASE_HOST}
+                - name: DATABASE_PORT
+                  value: ${DATABASE_PORT}
                 - name: DATABASE_SERVICE_NAME
                   value: ${DATABASE_SERVICE_NAME}
                 - name: DATABASE_USER

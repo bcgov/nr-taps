@@ -39,9 +39,9 @@ Keep credentials out of Git, images, frontend config and the JDBC URL.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `SPRING_PROFILES_ACTIVE` | Empty | Include `oracle` to turn on the datasource, readers and routes. |
+| `SPRING_PROFILES_ACTIVE` | Empty locally; `oracle` in deployments | Include `oracle` locally to turn on the datasource, readers and routes. |
 | `DATABASE_HOST` | None | Required for TCPS. |
-| `DATABASE_PORT` | `1543` | TCPS port. |
+| `DATABASE_PORT` | `1543` | TCPS port; deployments read it from the environment's `PORT` secret. |
 | `DATABASE_SERVICE_NAME` | None | Required for TCPS. |
 | `DATABASE_USER` | None | Required with `oracle`. Proxy account. |
 | `DATABASE_PASSWORD` | None | Required with `oracle`. |

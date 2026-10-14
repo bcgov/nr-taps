@@ -26,6 +26,9 @@ on:
       database_host:
         description: Oracle host
         required: false
+      port:
+        description: Oracle TCPS listener port (defaults to 1543)
+        required: false
       database_service_name:
         description: Oracle service name
         required: false
@@ -55,7 +58,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       route_slot: ${{ steps.settings.outputs.route_slot }}
-      spring_profiles_active: ${{ steps.settings.outputs.spring_profiles_active }}
     steps:
       - name: Require OpenShift and FAM configuration
         id: settings
@@ -69,8 +71,8 @@ jobs:
           OC_TOKEN: ${{ secrets.oc_token }}
           TAPS_OIDC_ISSUER_URI: ${{ vars.TAPS_OIDC_ISSUER_URI }}
           TAPS_OIDC_CLIENT_ID: ${{ vars.TAPS_OIDC_CLIENT_ID }}
-          TAPS_ORACLE_ENABLED: ${{ vars.TAPS_ORACLE_ENABLED }}
           DATABASE_HOST: ${{ secrets.database_host }}
+          DATABASE_PORT: ${{ secrets.port || '1543' }}
           DATABASE_SERVICE_NAME: ${{ secrets.database_service_name }}
           DATABASE_USER: ${{ secrets.database_user }}
           DATABASE_PASSWORD: ${{ secrets.database_password }}
@@ -90,22 +92,16 @@ jobs:
               exit 1
             fi
           done
-          oracle_enabled=${TAPS_ORACLE_ENABLED:-false}
-          if [[ "$oracle_enabled" != true && "$oracle_enabled" != false ]]; then
-            echo '::error title=Invalid Oracle setting::TAPS_ORACLE_ENABLED must be true or false.'
+          for setting in DATABASE_HOST DATABASE_SERVICE_NAME DATABASE_USER DATABASE_PASSWORD KEYSTORE_SECRET; do
+            if [ -z "${!setting}" ]; then
+              echo "::error title=Missing database secret::${setting} is required in the ${DEPLOY_ENV} environment."
+              exit 1
+            fi
+          done
+          if ! [[ "$DATABASE_PORT" =~ ^[1-9][0-9]{0,4}$ ]] || (( DATABASE_PORT > 65535 )); then
+            echo '::error title=Invalid database port::port must be an integer from 1 to 65535.'
             exit 1
           fi
-          spring_profiles_active=
-          if [[ "$oracle_enabled" == true ]]; then
-            for setting in DATABASE_HOST DATABASE_SERVICE_NAME DATABASE_USER DATABASE_PASSWORD KEYSTORE_SECRET; do
-              if [ -z "${!setting}" ]; then
-                echo "::error title=Missing database secret::${setting,,} is required in the ${DEPLOY_ENV} environment when Oracle is enabled."
-                exit 1
-              fi
-            done
-            spring_profiles_active=oracle
-          fi
-          echo "spring_profiles_active=$spring_profiles_active" >> "$GITHUB_OUTPUT"
           # Missing environment secrets fall back to the caller's DEV secrets.
           if [[ "$OC_NAMESPACE" != *-"$DEPLOY_ENV" ]]; then
             echo "::error title=Wrong OpenShift namespace::oc_namespace must be the ${DEPLOY_ENV} namespace, ending in -${DEPLOY_ENV}."
@@ -136,8 +132,8 @@ jobs:
 
       - uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
         env:
-          SPRING_PROFILES_ACTIVE: ${{ needs.validate.outputs.spring_profiles_active }}
           DATABASE_HOST: ${{ secrets.database_host }}
+          DATABASE_PORT: ${{ secrets.port || '1543' }}
           DATABASE_SERVICE_NAME: ${{ secrets.database_service_name }}
           DATABASE_USER: ${{ secrets.database_user }}
           DATABASE_PASSWORD: ${{ secrets.database_password }}
@@ -154,11 +150,12 @@ jobs:
             -p ZONE="${{ inputs.target }}"
             -p IMAGE_TAG="${{ inputs.tag }}"
             -p ROLLOUT_TRIGGER="${{ github.run_id }}-${{ github.run_attempt }}"
-            -p SPRING_PROFILES_ACTIVE="$SPRING_PROFILES_ACTIVE"
+            -p SPRING_PROFILES_ACTIVE=oracle
             -p TAPS_FAILURE_DIAGNOSTICS_LOG_LEVEL="${{ (inputs.environment == 'dev' || inputs.environment == 'test') && 'DEBUG' || 'INFO' }}"
             -p TAPS_OIDC_ISSUER_URI="${{ vars.TAPS_OIDC_ISSUER_URI }}"
             -p TAPS_OIDC_CLIENT_ID="${{ vars.TAPS_OIDC_CLIENT_ID }}"
             -p DATABASE_HOST="$DATABASE_HOST"
+            -p DATABASE_PORT="$DATABASE_PORT"
             -p DATABASE_SERVICE_NAME="$DATABASE_SERVICE_NAME"
             -p DATABASE_USER="$DATABASE_USER"
             -p DATABASE_PASSWORD="$DATABASE_PASSWORD"
