@@ -56,8 +56,10 @@
   --taps-table-chrome: #262626;
 }
 
+// Match the dark root's specificity so body-mounted calendars inherit the mapped blues too.
 // Carbon's Theme wrapper and portals re-emit Carbon's tokens, so map the blues there as well.
 :root,
+:root[data-carbon-theme='g100'],
 .cds--white,
 .cds--g100 {
   --cds-button-primary: var(--taps-fill-blue);
