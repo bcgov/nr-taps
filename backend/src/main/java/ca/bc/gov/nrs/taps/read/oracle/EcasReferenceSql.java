@@ -6,6 +6,8 @@ final class EcasReferenceSql {
 
   // Authorize on ADS ownership before joining FTAS. Conflicting FTAS rows are rejected instead of
   // taking an arbitrary first row like the legacy FETCH.
+  // INTENTIONAL_LEGACY_DIVERGENCE(COAST_SPECIES_ORDER): sort species codes for stable display;
+  // the legacy species cursor did not specify an order.
   static String select(EcasReadPredicate scope) {
     return """
         WITH record_scope AS (
@@ -89,6 +91,8 @@ final class EcasReferenceSql {
                    (SELECT NVL(SUM(V.SPECIES_VOLUME), 0) FROM ADS_SPECIES_VOLUME V
                      WHERE V.ECAS_ID = P.ECAS_ID) END AS NET_CRUISE_VOLUME,
                  P.NET_MERCHANTABLE_AREA, P.INITIAL_MERCHANTABLE_AREA,
+                 P.SINGLE_TREE_SELECTION_VOLUME, P.SECOND_GROWTH_CONIFER_VOLUME,
+                 P.STANDARD_ERROR_PCT,
                  P.POINT_OF_APPRAISAL_DISTANCE, P.ADS_LOCATION_DISTANCE_AVERAGE,
                  CASE WHEN P.APPRAISAL_METHOD_CODE = 'C' THEN
                    (SELECT DISTINCT D.ADS_LOCATION_CODE FROM ADS_CUTTING_AUTHORITY_DETAIL D
@@ -127,13 +131,25 @@ final class EcasReferenceSql {
         SELECT 0 AS ROW_KIND, P.*, CAST(NULL AS VARCHAR2(6)) AS TIMBER_MARK,
                CAST(NULL AS NUMBER) AS MARK_CRUISE_VOLUME,
                CAST(NULL AS VARCHAR2(1)) AS PRIMARY_MARK_IND,
-               CAST(NULL AS NUMBER) AS MARK_REVISION_COUNT
+               CAST(NULL AS NUMBER) AS MARK_REVISION_COUNT,
+               CAST(NULL AS VARCHAR2(2)) AS SPECIES_CODE,
+               CAST(NULL AS VARCHAR2(120)) AS SPECIES_DESCRIPTION,
+               CAST(NULL AS NUMBER) AS SPECIES_VOLUME,
+               CAST(NULL AS NUMBER) AS SPECIES_REVISION_COUNT
           FROM enriched_parent P
         UNION ALL
-        SELECT 1, P.*, M.TIMBER_MARK, M.MARK_CRUISE_VOLUME, M.PRIMARY_MARK_IND, M.REVISION_COUNT
+        SELECT 1, P.*, M.TIMBER_MARK, M.MARK_CRUISE_VOLUME, M.PRIMARY_MARK_IND, M.REVISION_COUNT,
+               NULL, NULL, NULL, NULL
           FROM enriched_parent P
           JOIN ADS_SUBMITTED_TIMBER_MARK M ON M.ECAS_ID = P.ECAS_ID
-         ORDER BY ROW_KIND, TIMBER_MARK
+        UNION ALL
+        SELECT 2, P.*, NULL, NULL, NULL, NULL,
+               V.HDBS_TREE_SPECIES, S.DESCRIPTION, V.SPECIES_VOLUME, V.REVISION_COUNT
+          FROM enriched_parent P
+          JOIN ADS_SPECIES_VOLUME V ON V.ECAS_ID = P.ECAS_ID
+          JOIN HDBS_TREE_SPECIES S ON S.HDBS_TREE_SPECIES = V.HDBS_TREE_SPECIES
+         WHERE P.APPRAISAL_METHOD_CODE = 'C'
+         ORDER BY ROW_KIND, TIMBER_MARK, SPECIES_CODE
         """.formatted(scope.sql());
   }
 }

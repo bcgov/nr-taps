@@ -79,7 +79,14 @@
     "initialMerchantableArea": null,
     "pointOfAppraisalDistance": null,
     "majorCentreCode": null,
-    "majorCentreDistance": null
+    "majorCentreDistance": null,
+    "speciesVolumes": [
+      {"species": {"code": "FI", "description": "Synthetic fir"}, "volume": 100, "revisionCount": 5},
+      {"species": {"code": "HE", "description": "Synthetic hemlock"}, "volume": 23.45, "revisionCount": 6}
+    ],
+    "singleTreeSelectionVolume": 0,
+    "secondGrowthConiferousVolume": 100,
+    "samplingErrorPercent": 9.5
   },
   "ecasInteriorReference": {
     "header": {
@@ -349,7 +356,14 @@
     "initialMerchantableArea": null,
     "pointOfAppraisalDistance": null,
     "majorCentreCode": null,
-    "majorCentreDistance": null
+    "majorCentreDistance": null,
+    "speciesVolumes": [
+      {"species": {"code": "FI", "description": "Synthetic fir"}, "volume": 123.45, "revisionCount": 5},
+      {"species": {"code": "HE", "description": "Synthetic hemlock"}, "volume": 67.89, "revisionCount": 6}
+    ],
+    "singleTreeSelectionVolume": 0,
+    "secondGrowthConiferousVolume": 150,
+    "samplingErrorPercent": 9.5
   },
   "gasMultiMarkAppraisedSummary": {
     "key": {

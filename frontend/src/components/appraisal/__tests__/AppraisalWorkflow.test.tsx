@@ -164,6 +164,15 @@ test('connects the Coast reference to both related GAS mark rows and exact store
   const reference = screen.getByRole('complementary', { name: 'Coast reference 999900000002' })
   expect(within(reference).getByRole('heading', { name: 'Coast reference' })).toBeInTheDocument()
   expect(within(reference).getByText(/ZZ9997 — volume/)).toBeInTheDocument()
+  const species = within(within(reference).getByRole('table', { name: 'Volume by species' }))
+  expect(species.getAllByRole('row')).toHaveLength(
+    fixture.ecasCoastMultiMarkReference.speciesVolumes.length + 1,
+  )
+  for (const row of fixture.ecasCoastMultiMarkReference.speciesVolumes) {
+    expect(
+      species.getByRole('cell', { name: `${row.species.code} - ${row.species.description}` }),
+    ).toBeInTheDocument()
+  }
   await user.click(within(reference).getByRole('button', { name: 'View related GAS worksheets' }))
   expect(screen.getByText('Related to ECAS 999900000002')).toBeInTheDocument()
   const table = screen.getByRole('table', { name: 'GAS worksheets' })
@@ -188,6 +197,9 @@ test('keeps Interior reference fields separate and links its own worksheet', asy
   const reference = screen.getByRole('complementary', { name: 'Interior reference 999900000001' })
   expect(within(reference).getByText('Comparative cruise')).toBeInTheDocument()
   expect(within(reference).queryByText('Net cruise volume')).not.toBeInTheDocument()
+  expect(
+    within(reference).queryByRole('table', { name: 'Volume by species' }),
+  ).not.toBeInTheDocument()
   await user.click(within(reference).getByRole('button', { name: 'View related GAS worksheets' }))
   expect(
     screen.getByRole('button', { name: /APPRAISED worksheet 999900000010/ }),

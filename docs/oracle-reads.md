@@ -179,7 +179,8 @@ acceptance against the shared database.
 ## ECAS references
 
 `Header` requires only ECAS ID and method. `Coast` adds the primary mark, all submitted marks (each
-with its own revision count), cruise volume, areas and major centre. `Interior` adds its single
+with its own revision count), cruise volume, areas, major centre, species volumes, single-tree
+selection volume, second-growth coniferous volume and sampling-error percentage. `Interior` adds its single
 mark, mark revision count, point of appraisal, selling price zone, comparative cruise and salvage.
 These are read views, not the full editing forms.
 
@@ -196,6 +197,19 @@ draft/scenario visibility to each FAM grant.
   the Coast species-volume sum and the Interior selling-zone default for dates before 2018-11-01.
 - Authorization stays ADS-based even when FTAS shows a different district.
 - Conflicting FTAS contexts or Coast major centres fail instead of choosing an unordered first row.
+
+Coast `speciesVolumes` contains species code/description, stored volume and the species row's own
+revision count. It follows the legacy species lookup join without an effective-date filter: a row
+without a matching species lookup is omitted, while a matching lookup with no description keeps
+the code. Rows are ordered by species code; the legacy cursor did not specify an order. The
+existing net cruise volume still sums all stored species volumes, including rows without a matching
+lookup, so it can differ from the visible rows' sum. An empty stored set totals zero.
+
+Species rows and timber marks are separate tagged rows in the same scoped SELECT, preserving one
+Oracle snapshot without multiplying their counts. The three additional scalar quantities retain
+stored nulls and zeros. Volumes use cubic metres; sampling error is a percentage at two standard
+deviations. The API keeps the existing numeric quantity format and the UI performs no rounding or
+recalculation. These fields do not add editing or pricing calculations.
 
 ## Audit history
 

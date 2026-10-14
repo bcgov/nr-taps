@@ -66,6 +66,9 @@ export function CoastReferenceDetails({ reference }: { reference: CoastReference
           ['Primary timber mark', reference.primaryTimberMark],
           ['Reference mark', reference.referenceMark],
           ['Net cruise volume', reference.netCruiseVolume],
+          ['Single tree selection volume (m³)', reference.singleTreeSelectionVolume],
+          ['Net second-growth coniferous volume (m³)', reference.secondGrowthConiferousVolume],
+          ['Sampling error at 2 standard deviations (%)', reference.samplingErrorPercent],
           ['Net merchantable area', reference.netMerchantableArea],
           ['Initial merchantable area', reference.initialMerchantableArea],
           ['Point of appraisal distance', reference.pointOfAppraisalDistance],
@@ -73,6 +76,38 @@ export function CoastReferenceDetails({ reference }: { reference: CoastReference
           ['Major centre distance', reference.majorCentreDistance],
         ]}
       />
+      <h3>Volume by species</h3>
+      {reference.speciesVolumes.length === 0 ? (
+        <p>No species volumes are available for this submission.</p>
+      ) : (
+        <TableFrame ariaLabel="Volume by species">
+          <Table
+            useZebraStyles
+            size="md"
+            aria-label="Volume by species"
+            className="taps-species-volume-table"
+          >
+            <TableHead>
+              <TableRow>
+                <TableHeader>Species</TableHeader>
+                <TableHeader style={{ textAlign: 'right' }}>Volume (m³)</TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {reference.speciesVolumes.map((row) => (
+                <TableRow key={`${reference.header.ecasId}:${row.species.code}`}>
+                  <TableCell>
+                    {row.species.code !== null && row.species.description !== null
+                      ? `${row.species.code} - ${row.species.description}`
+                      : displayCode(row.species)}
+                  </TableCell>
+                  <TableCell style={{ textAlign: 'right' }}>{row.volume ?? '—'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableFrame>
+      )}
       <h3>Submitted timber marks</h3>
       <ul className="taps-appraisal-mark-list">
         {reference.timberMarks.map((mark) => (

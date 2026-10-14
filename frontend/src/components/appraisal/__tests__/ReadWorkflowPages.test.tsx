@@ -10,7 +10,7 @@ import { workflowFixture as fixture } from '@/local-synthetic/WorkflowPreview'
 import { nonAppraisedSample } from '@/local-synthetic/non-appraised-sample'
 import { syntheticGasAuditApi } from '@/local-synthetic/synthetic-gas-audit-api'
 import { ReadApiError } from '@/service/read-service'
-import type { EcasInboxPage } from '@/contracts/appraisal'
+import type { CoastReference, EcasInboxPage } from '@/contracts/appraisal'
 import { EcasInboxReadPage, GasSearchReadPage } from '../ReadWorkflowPages'
 
 function mount(
@@ -216,6 +216,40 @@ test('never offers the related GAS action without its capability', async () => {
   expect(
     screen.queryByRole('button', { name: 'View related GAS worksheet' }),
   ).not.toBeInTheDocument()
+})
+
+test('switching reference aborts the old Coast species response and preserves detail focus', async () => {
+  const user = userEvent.setup()
+  let releaseCoast!: (reference: CoastReference) => void
+  const api = {
+    ...syntheticReadApi,
+    reference: vi
+      .fn(syntheticReadApi.reference)
+      .mockImplementationOnce(
+        () =>
+          new Promise<CoastReference>((resolve) => {
+            releaseCoast = resolve
+          }),
+      )
+      .mockResolvedValueOnce(fixture.ecasInteriorReference),
+  }
+  mount(<EcasInboxReadPage api={api} />)
+  await user.click(screen.getByRole('button', { name: 'Search' }))
+  await user.click(await screen.findByRole('button', { name: /Open ECAS .*mark ZZ9997/ }))
+  await waitFor(() => expect(api.reference).toHaveBeenCalledOnce())
+  expect(screen.getByText('Loading details…')).toBeInTheDocument()
+  const coastSignal = api.reference.mock.calls[0][2]
+  const interiorLauncher = screen.getByRole('button', { name: /Open ECAS 999900000001/ })
+  await user.click(interiorLauncher)
+  await screen.findByRole('heading', { name: 'Interior reference' })
+  expect(coastSignal.aborted).toBe(true)
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Read details' })).toHaveFocus())
+  await act(async () => releaseCoast(fixture.ecasCoastMultiMarkReference))
+  expect(screen.queryByRole('table', { name: 'Volume by species' })).not.toBeInTheDocument()
+  expect(screen.queryByText('Single tree selection volume (m³)')).not.toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'Interior reference' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Close' }))
+  await waitFor(() => expect(interiorLauncher).toHaveFocus())
 })
 
 test('preserves the licence chooser and FTA context when worksheets are empty', async () => {

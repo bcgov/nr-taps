@@ -39,9 +39,9 @@ Keep credentials out of Git, images, frontend config and the JDBC URL.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `SPRING_PROFILES_ACTIVE` | Empty | Include `oracle` to turn on the datasource, readers and routes. |
+| `SPRING_PROFILES_ACTIVE` | Empty locally; `oracle` in deployments | Include `oracle` locally to turn on the datasource, readers and routes. |
 | `DATABASE_HOST` | None | Required for TCPS. |
-| `DATABASE_PORT` | `1543` | TCPS port. |
+| `DATABASE_PORT` | `1543` | TCPS port; deployments read it from the environment's `PORT` secret. |
 | `DATABASE_SERVICE_NAME` | None | Required for TCPS. |
 | `DATABASE_USER` | None | Required with `oracle`. Proxy account. |
 | `DATABASE_PASSWORD` | None | Required with `oracle`. |
@@ -83,7 +83,7 @@ From the SQL in [`read/oracle`](src/main/java/ca/bc/gov/nrs/taps/read/oracle). N
 unqualified, so the database team needs to confirm the owner and synonym of each object for the
 proxy account. Don't assume one owner because the test fixture has one.
 
-`SELECT` on these 59 objects:
+`SELECT` on these 60 objects:
 
 | Objects | Used for |
 | --- | --- |
@@ -103,7 +103,7 @@ proxy account. Don't assume one owner because the test fixture has one.
 | `FOREST_FILE_CLIENT`, `FOREST_CLIENT`, `V_CLIENT_PUBLIC` | Client links and names (`V_CLIENT_PUBLIC` is a view in the real schema, a table in the fixture) |
 | `PROV_FOREST_USE`, `FILE_TYPE_CODE` | Licence data and filters |
 | `TENURE_FILE_STATUS_CODE`, `HARVEST_AUTH_STATUS_CODE`, `PRIVATE_MARK_STATUS_CODE` | FTA status labels |
-| `ADS_SPECIES_VOLUME`, `ADS_CUTTING_AUTHORITY_DETAIL` | Coast volume and major centre |
+| `ADS_SPECIES_VOLUME`, `HDBS_TREE_SPECIES`, `ADS_CUTTING_AUTHORITY_DETAIL` | Coast species volumes, species labels and major centre |
 | `INT_POINT_OF_APPRAISAL_CODE`, `POINT_OF_APPRAISAL` | Interior appraisal point and selling zone |
 | `TSA_NUMBER_CODE`, `TSB_NUMBER_CODE` | Management-unit labels |
 | `APPRAISAL_METHOD_CODE`, `RATE_ADJUSTMENT_TYPE_CODE` | GAS lookups |

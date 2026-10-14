@@ -59,6 +59,9 @@ Reloading resets it.
   a detail drawer.
 - **Synthetic ECAS and GAS workflow:** uses the backend contract fixture. ECAS rows include several
   marks and permits for one submission. **View related GAS worksheets** follows the fixture link.
+  Coast references include Volume by Species and stored single-tree selection, second-growth
+  coniferous and sampling-error quantities. Species labels show their code and description;
+  missing quantities remain distinct from zero.
   In GAS search, licence `X99998` shows the mark chooser and mark `ZZ9996` shows FTA information
   with no worksheets.
 - **Synthetic asynchronous read pages:** GAS licence `X99995` and mark `ZZ9995` open a fictional
