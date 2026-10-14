@@ -7,9 +7,16 @@ on:
         required: true
         type: string
       tag:
-        description: Image tag both deployments must report
-        required: true
+        description: DEV image tag both deployments must report
+        required: false
         type: string
+        default: ""
+      backend_image:
+        type: string
+        default: ""
+      frontend_image:
+        type: string
+        default: ""
 
 permissions: {}
 
@@ -23,10 +30,12 @@ jobs:
         env:
           BASE_URL: https://${{ github.event.repository.name }}-${{ inputs.target }}.${{ vars.OC_APPS_DOMAIN }}
           IMAGE_TAG: ${{ inputs.tag }}
+          EXPECTED_BACKEND_IMAGE: ${{ inputs.backend_image }}
+          EXPECTED_FRONTEND_IMAGE: ${{ inputs.frontend_image }}
         run: |
           set -euo pipefail
-          EXPECTED_FRONTEND_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}/frontend:${IMAGE_TAG}"
-          EXPECTED_BACKEND_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}/backend:${IMAGE_TAG}"
+          EXPECTED_FRONTEND_IMAGE=${EXPECTED_FRONTEND_IMAGE:-"ghcr.io/${GITHUB_REPOSITORY,,}/frontend:${IMAGE_TAG}"}
+          EXPECTED_BACKEND_IMAGE=${EXPECTED_BACKEND_IMAGE:-"ghcr.io/${GITHUB_REPOSITORY,,}/backend:${IMAGE_TAG}"}
           responses=$(mktemp -d)
           trap 'rm -rf "$responses"' EXIT
           header_value() {

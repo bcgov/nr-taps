@@ -4,17 +4,30 @@ on:
   workflow_call:
     inputs:
       environment:
-        description: GitHub/OpenShift environment, dev or test
+        description: "GitHub/OpenShift environment: dev, test or prod"
         required: true
         type: string
       target:
-        description: Deployment target, a PR number for dev or test for test
+        description: PR number for dev; test or prod for shared environments
         required: true
         type: string
       tag:
-        description: Container tag
-        required: true
+        description: DEV commit SHA image tag
+        required: false
         type: string
+        default: ""
+      backend_image:
+        description: TEST/PROD backend image pinned by digest
+        type: string
+        default: ""
+      frontend_image:
+        description: TEST/PROD frontend image pinned by digest
+        type: string
+        default: ""
+      source_ref:
+        description: Commit whose deployment templates accompany the images
+        type: string
+        default: ""
     secrets:
       oc_namespace:
         description: OpenShift namespace
@@ -22,7 +35,7 @@ on:
       oc_token:
         description: OpenShift token
         required: true
-      # Read from the dev/test environment only, so TEST can't fall back to a DEV value.
+      # Read from the selected environment only; callers do not pass database credentials.
       database_host:
         description: Oracle host
         required: false
@@ -48,6 +61,8 @@ permissions: {}
 jobs:
   validate:
     name: Check deployment settings
+    permissions:
+      contents: read
     environment:
       name: ${{ inputs.environment }}
       deployment: false
@@ -56,13 +71,33 @@ jobs:
     outputs:
       route_slot: ${{ steps.settings.outputs.route_slot }}
       spring_profiles_active: ${{ steps.settings.outputs.spring_profiles_active }}
+      backend_image: ${{ steps.settings.outputs.backend_image }}
+      frontend_image: ${{ steps.settings.outputs.frontend_image }}
+      source_ref: ${{ steps.settings.outputs.source_ref }}
+      backend_min_replicas: ${{ steps.settings.outputs.backend_min_replicas }}
+      backend_max_replicas: ${{ steps.settings.outputs.backend_max_replicas }}
+      database_max_pool_size: ${{ steps.settings.outputs.database_max_pool_size }}
+      database_min_idle: ${{ steps.settings.outputs.database_min_idle }}
+      database_connection_timeout_ms: ${{ steps.settings.outputs.database_connection_timeout_ms }}
+      database_query_timeout_seconds: ${{ steps.settings.outputs.database_query_timeout_seconds }}
+      database_connect_timeout_ms: ${{ steps.settings.outputs.database_connect_timeout_ms }}
+      database_read_timeout_ms: ${{ steps.settings.outputs.database_read_timeout_ms }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
       - name: Require OpenShift and FAM configuration
         id: settings
         env:
           DEPLOY_ENV: ${{ inputs.environment }}
           DEPLOY_TARGET: ${{ inputs.target }}
           IMAGE_TAG: ${{ inputs.tag }}
+          BACKEND_IMAGE: ${{ inputs.backend_image }}
+          FRONTEND_IMAGE: ${{ inputs.frontend_image }}
+          SOURCE_REF: ${{ inputs.source_ref }}
           OC_SERVER: ${{ vars.OC_SERVER }}
           OC_APPS_DOMAIN: ${{ vars.OC_APPS_DOMAIN }}
           OC_NAMESPACE: ${{ secrets.oc_namespace }}
@@ -70,54 +105,20 @@ jobs:
           TAPS_OIDC_ISSUER_URI: ${{ vars.TAPS_OIDC_ISSUER_URI }}
           TAPS_OIDC_CLIENT_ID: ${{ vars.TAPS_OIDC_CLIENT_ID }}
           TAPS_ORACLE_ENABLED: ${{ vars.TAPS_ORACLE_ENABLED }}
+          TAPS_BACKEND_MIN_REPLICAS: ${{ vars.TAPS_BACKEND_MIN_REPLICAS }}
+          TAPS_BACKEND_MAX_REPLICAS: ${{ vars.TAPS_BACKEND_MAX_REPLICAS }}
+          DATABASE_MAX_POOL_SIZE: ${{ vars.DATABASE_MAX_POOL_SIZE }}
+          DATABASE_MIN_IDLE: ${{ vars.DATABASE_MIN_IDLE }}
+          DATABASE_CONNECTION_TIMEOUT_MS: ${{ vars.DATABASE_CONNECTION_TIMEOUT_MS }}
+          DATABASE_QUERY_TIMEOUT_SECONDS: ${{ vars.DATABASE_QUERY_TIMEOUT_SECONDS }}
+          DATABASE_CONNECT_TIMEOUT_MS: ${{ vars.DATABASE_CONNECT_TIMEOUT_MS }}
+          DATABASE_READ_TIMEOUT_MS: ${{ vars.DATABASE_READ_TIMEOUT_MS }}
           DATABASE_HOST: ${{ secrets.database_host }}
           DATABASE_SERVICE_NAME: ${{ secrets.database_service_name }}
           DATABASE_USER: ${{ secrets.database_user }}
           DATABASE_PASSWORD: ${{ secrets.database_password }}
           KEYSTORE_SECRET: ${{ secrets.keystore_secret }}
-        run: |
-          if ! [[ "$IMAGE_TAG" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$ ]]; then
-            echo '::error title=Invalid image tag::The image tag must be a PR number or commit SHA.'
-            exit 1
-          fi
-          if ! { [[ "$DEPLOY_ENV" == dev && "$DEPLOY_TARGET" =~ ^[0-9]+$ ]] || [[ "$DEPLOY_ENV" == test && "$DEPLOY_TARGET" == test ]]; }; then
-            echo '::error title=Unsupported deployment target::Only DEV PR previews and TEST are enabled.'
-            exit 1
-          fi
-          for setting in OC_SERVER OC_APPS_DOMAIN OC_NAMESPACE OC_TOKEN TAPS_OIDC_ISSUER_URI TAPS_OIDC_CLIENT_ID; do
-            if [ -z "${!setting}" ]; then
-              echo "::error title=Missing deployment setting::${setting} is required for the ${DEPLOY_ENV} environment."
-              exit 1
-            fi
-          done
-          oracle_enabled=${TAPS_ORACLE_ENABLED:-false}
-          if [[ "$oracle_enabled" != true && "$oracle_enabled" != false ]]; then
-            echo '::error title=Invalid Oracle setting::TAPS_ORACLE_ENABLED must be true or false.'
-            exit 1
-          fi
-          spring_profiles_active=
-          if [[ "$oracle_enabled" == true ]]; then
-            for setting in DATABASE_HOST DATABASE_SERVICE_NAME DATABASE_USER DATABASE_PASSWORD KEYSTORE_SECRET; do
-              if [ -z "${!setting}" ]; then
-                echo "::error title=Missing database secret::${setting,,} is required in the ${DEPLOY_ENV} environment when Oracle is enabled."
-                exit 1
-              fi
-            done
-            spring_profiles_active=oracle
-          fi
-          echo "spring_profiles_active=$spring_profiles_active" >> "$GITHUB_OUTPUT"
-          # Missing environment secrets fall back to the caller's DEV secrets.
-          if [[ "$OC_NAMESPACE" != *-"$DEPLOY_ENV" ]]; then
-            echo "::error title=Wrong OpenShift namespace::oc_namespace must be the ${DEPLOY_ENV} namespace, ending in -${DEPLOY_ENV}."
-            exit 1
-          fi
-          # CSS callbacks cover DEV slots 0-49.
-          if [[ "$DEPLOY_ENV" == dev ]]; then
-            route_slot=$((10#$DEPLOY_TARGET % 50))
-          else
-            route_slot=test
-          fi
-          echo "route_slot=$route_slot" >> "$GITHUB_OUTPUT"
+        run: node .github/scripts/deployment-settings.mjs
 
   backend:
     name: Deploy backend
@@ -133,6 +134,12 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          ref: ${{ needs.validate.outputs.source_ref }}
+
+      - name: Stage selected backend template
+        run: |
+          mkdir -p "$RUNNER_TEMP/taps-deploy"
+          cp backend/openshift.deploy.yml "$RUNNER_TEMP/taps-deploy/backend.yml"
 
       - uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
         env:
@@ -143,7 +150,7 @@ jobs:
           DATABASE_PASSWORD: ${{ secrets.database_password }}
           KEYSTORE_SECRET: ${{ secrets.keystore_secret }}
         with:
-          file: backend/openshift.deploy.yml
+          file: ${{ runner.temp }}/taps-deploy/backend.yml
           lite_mode: false
           overwrite: true
           oc_namespace: ${{ secrets.oc_namespace }}
@@ -152,9 +159,17 @@ jobs:
           parameters: >-
             -p NAME="${{ github.event.repository.name }}"
             -p ZONE="${{ inputs.target }}"
-            -p IMAGE_TAG="${{ inputs.tag }}"
+            -p IMAGE_REF="${{ needs.validate.outputs.backend_image }}"
             -p ROLLOUT_TRIGGER="${{ github.run_id }}-${{ github.run_attempt }}"
             -p SPRING_PROFILES_ACTIVE="$SPRING_PROFILES_ACTIVE"
+            -p MIN_REPLICAS="${{ needs.validate.outputs.backend_min_replicas }}"
+            -p MAX_REPLICAS="${{ needs.validate.outputs.backend_max_replicas }}"
+            -p DATABASE_MAX_POOL_SIZE="${{ needs.validate.outputs.database_max_pool_size }}"
+            -p DATABASE_MIN_IDLE="${{ needs.validate.outputs.database_min_idle }}"
+            -p DATABASE_CONNECTION_TIMEOUT_MS="${{ needs.validate.outputs.database_connection_timeout_ms }}"
+            -p DATABASE_QUERY_TIMEOUT_SECONDS="${{ needs.validate.outputs.database_query_timeout_seconds }}"
+            -p DATABASE_CONNECT_TIMEOUT_MS="${{ needs.validate.outputs.database_connect_timeout_ms }}"
+            -p DATABASE_READ_TIMEOUT_MS="${{ needs.validate.outputs.database_read_timeout_ms }}"
             -p TAPS_FAILURE_DIAGNOSTICS_LOG_LEVEL="${{ (inputs.environment == 'dev' || inputs.environment == 'test') && 'DEBUG' || 'INFO' }}"
             -p TAPS_OIDC_ISSUER_URI="${{ vars.TAPS_OIDC_ISSUER_URI }}"
             -p TAPS_OIDC_CLIENT_ID="${{ vars.TAPS_OIDC_CLIENT_ID }}"
@@ -178,10 +193,17 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+          ref: ${{ needs.validate.outputs.source_ref }}
+
+      - name: Stage selected frontend templates
+        run: |
+          mkdir -p "$RUNNER_TEMP/taps-deploy"
+          cp frontend/openshift.deploy.yml "$RUNNER_TEMP/taps-deploy/frontend.yml"
+          cp frontend/openshift.route.yml "$RUNNER_TEMP/taps-deploy/route.yml"
 
       - uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
         with:
-          file: frontend/openshift.deploy.yml
+          file: ${{ runner.temp }}/taps-deploy/frontend.yml
           lite_mode: false
           overwrite: true
           oc_namespace: ${{ secrets.oc_namespace }}
@@ -190,18 +212,18 @@ jobs:
           parameters: >-
             -p NAME="${{ github.event.repository.name }}"
             -p ZONE="${{ inputs.target }}"
-            -p IMAGE_TAG="${{ inputs.tag }}"
+            -p IMAGE_REF="${{ needs.validate.outputs.frontend_image }}"
             -p ROLLOUT_TRIGGER="${{ github.run_id }}-${{ github.run_attempt }}"
             -p VITE_OIDC_ISSUER_URI="${{ vars.TAPS_OIDC_ISSUER_URI }}"
             -p VITE_OIDC_CLIENT_ID="${{ vars.TAPS_OIDC_CLIENT_ID }}"
             -p VITE_OIDC_IDIR_HINT="${{ vars.TAPS_OIDC_IDIR_HINT || 'azureidir' }}"
             -p VITE_OIDC_BCEID_HINT="${{ vars.TAPS_OIDC_BCEID_HINT || 'bceidbusiness' }}"
-            -p VITE_OIDC_SITEMINDER_LOGOUT_URL="${{ vars.TAPS_OIDC_SITEMINDER_LOGOUT_URL || 'https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi' }}"
+            -p VITE_OIDC_SITEMINDER_LOGOUT_URL="${{ vars.TAPS_OIDC_SITEMINDER_LOGOUT_URL || (inputs.environment == 'prod' && 'https://logon7.gov.bc.ca/clp-cgi/logoff.cgi' || 'https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi') }}"
 
       - name: Route
         uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
         with:
-          file: frontend/openshift.route.yml
+          file: ${{ runner.temp }}/taps-deploy/route.yml
           overwrite: true
           oc_namespace: ${{ secrets.oc_namespace }}
           oc_server: ${{ vars.OC_SERVER }}

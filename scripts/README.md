@@ -27,7 +27,7 @@ The script prints its output directory (logs, HTTP responses, result). Each run 
 - Synthetic OIDC settings reach `config.js`. The issuer is on the reserved `.invalid` domain, so no real provider is called.
 - Health endpoints respond, SPA deep links load, and anonymous `/api/me` and `/api/gas/worksheets` return `401`.
 - The shell, runtime config, API responses and errors aren't cached. Fingerprinted assets are cached as immutable. Security headers are present.
-- Responses carry `X-TAPS-Image` (frontend) and `X-TAPS-Backend-Image` (backend). The deploy smoke test compares these with the expected tag: head SHA in DEV, PR number in TEST.
+- Responses carry `X-TAPS-Image` (frontend) and `X-TAPS-Backend-Image` (backend). The deploy smoke test compares these with the expected reference: head-SHA tag in DEV, immutable digests in TEST/PROD.
 - On SIGTERM the backend shuts down in time, and Caddy returns an uncached `502` and exits cleanly.
 
 A small root helper makes the test volume group-writable, like Kubernetes `fsGroup`. It doesn't run either app.
@@ -111,3 +111,13 @@ The app should recover without a restart.
 ```sh
 node --test scripts/local-read-issuer.test.mjs
 ```
+
+## Release and deployment guard tests
+
+Run `node --test .github/scripts/*.test.mjs` from the repository root. These tests use synthetic
+workflow contexts, temporary Git repositories and mocked GitHub/registry commands. They do not
+publish tags, images or deployments. Both the PR and Analysis workflows run them.
+
+The tests reject automatic PROD calls, wrong namespaces, mutable release references, untested
+or unmerged tags, stale PR source trees, mismatched manifests and unsafe connection/replica limits.
+See [manual releases](../docs/production-release.md) and [legacy coexistence](../docs/legacy-coexistence.md).

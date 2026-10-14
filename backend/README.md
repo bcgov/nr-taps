@@ -43,13 +43,16 @@ Keep credentials out of Git, images, frontend config and the JDBC URL.
 | `DATABASE_HOST` | None | Required for TCPS. |
 | `DATABASE_PORT` | `1543` | TCPS port. |
 | `DATABASE_SERVICE_NAME` | None | Required for TCPS. |
-| `DATABASE_USER` | None | Required with `oracle`. Proxy account. |
+| `DATABASE_USER` | None | Dedicated read principal (or proxy into that principal), never the shared schema owner. |
 | `DATABASE_PASSWORD` | None | Required with `oracle`. |
 | `KEYSTORE_SECRET` | None | Required with `oracle`, even over TCP. Truststore password; OpenShift uses `keystore_secret`. |
 | `TRUSTSTORE_PATH` | `/cert/jssecacerts` | JKS truststore written by the init container. |
-| `DATABASE_CONNECT_TIMEOUT_MS` | `10000` | Network connect. |
-| `DATABASE_READ_TIMEOUT_MS` | `30000` | Socket read. |
-| `DATABASE_QUERY_TIMEOUT_SECONDS` | `20` | Statement timeout. |
+| `DATABASE_MAX_POOL_SIZE` | `2` | Per-pod connection limit, 1–10. |
+| `DATABASE_MIN_IDLE` | `0` | Idle connections, 0 through the maximum pool size. |
+| `DATABASE_CONNECTION_TIMEOUT_MS` | `3000` | Pool wait, 250–30000 ms. |
+| `DATABASE_CONNECT_TIMEOUT_MS` | `10000` | Network connect, 1000–10000 ms. |
+| `DATABASE_READ_TIMEOUT_MS` | `30000` | Socket read, 1000–30000 ms. |
+| `DATABASE_QUERY_TIMEOUT_SECONDS` | `20` | Statement timeout, 1–20 seconds; zero/unlimited is rejected. |
 | `SPRING_DATASOURCE_URL` | TCPS descriptor | Local only. Replaces the descriptor for a plain-TCP database. |
 | `TAPS_HTTP_WORKER_THREADS` | `64` | Undertow workers. Reads hold one while Oracle answers. |
 | `APP_LOG_LEVEL` | `INFO` | TAPS log level. |
@@ -64,9 +67,11 @@ hook re-enables RSA key-exchange suites (`TLS_RSA_*`) without changing other Jav
 Review this compatibility exception with the database administrators before deployment, and remove
 it when no longer required. Keep environment-specific service and TLS details in private operational records.
 
-The Hikari pool holds at most 10 connections with 1 idle, and a request waits up to 30 seconds for
-one. Idle connections close after 10 minutes and connections live at most 30 minutes. Size the pool
-for the replica count (the backend scales to 3) and the proxy account's connection limit.
+The default Hikari pool permits two connections, keeps no minimum idle connections and waits up to
+three seconds for a connection. Startup rejects pool/socket values outside the documented bounds.
+Idle connections close after 10 minutes and connections live at most 30 minutes. The default
+backend replica limit is one. Account for every preview, replica, rollout surge and terminating pod
+when setting the database-wide budget; see [legacy coexistence](../docs/legacy-coexistence.md).
 
 `/actuator/health` includes datasource health. Liveness and readiness use app state,
 so a database outage doesn't restart every pod. Read failures return 503. Turning Oracle on doesn't
@@ -81,9 +86,12 @@ connection details.
 
 From the SQL in [`read/oracle`](src/main/java/ca/bc/gov/nrs/taps/read/oracle). Names are
 unqualified, so the database team needs to confirm the owner and synonym of each object for the
-proxy account. Don't assume one owner because the test fixture has one.
+read principal. Don't assume one owner because the test fixture has one. Use object-level `READ`
+privileges, which allow SELECT queries without permitting locking reads or table locks. Do not
+grant `SELECT`, DML, DDL or `ANY` privileges, and do not proxy as a shared schema owner. The
+[coexistence guide](../docs/legacy-coexistence.md) explains the activation checks.
 
-`SELECT` on these 59 objects:
+`READ` on the following objects:
 
 | Objects | Used for |
 | --- | --- |
@@ -113,7 +121,8 @@ proxy account. Don't assume one owner because the test fixture has one.
 | `HISTORIC_SPECIES`, `HISTORIC_COAST_SPECIES_GRADE` | Historic species and Coast grades |
 
 Also `EXECUTE` on `SIL_GET_CLIENT_NAME` (inbox client names), the only function called. The
-database team should check its body, rights and dependencies; the fixture version returns
+database team must verify its deployed body, definer rights and dependencies are free of writes
+(including autonomous transactions), external side effects and assignment/rate regeneration; the fixture version returns
 synthetic names. `DUAL`, built-in functions and `DBMS_LOB.GETLENGTH` use normal public access.
 
 No `GAS2_*` or `PKG_ECAS*` package is called. The account needs no `INSERT`, `UPDATE`, `DELETE`,
