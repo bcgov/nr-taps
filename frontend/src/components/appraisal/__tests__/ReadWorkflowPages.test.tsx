@@ -167,6 +167,10 @@ test('searches, opens the selected ECAS reference and follows its immutable ID t
   expect(history.getByText('2026-10-12T10:00:00')).toBeInTheDocument()
   expect(history.getByText('Discount Percent')).toBeInTheDocument()
   expect(history.getByRole('cell', { name: '10.0' })).toBeInTheDocument()
+  const noticeRow = history.getByRole('row', { name: /Adjustment Notice Message/ })
+  expect(within(noticeRow).getAllByRole('cell')[3].textContent).toBe(
+    `SYNTHETIC_NOTICE_${'LONGTOKEN'.repeat(24)}\nSecond synthetic notice line retains its stored line break.`,
+  )
   await user.click(history.getByRole('button', { name: 'Next page' }))
   await history.findByText('2026-10-02T10:00:00')
   expect(audit.history).toHaveBeenLastCalledWith(

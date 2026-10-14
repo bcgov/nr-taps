@@ -53,7 +53,8 @@
   min-inline-size: 20rem;
 }
 .taps-table-frame .taps-attachment-table th:nth-child(3),
-.taps-table-frame .taps-audit-changes-table th:nth-last-child(-n + 2) {
+.taps-table-frame .taps-audit-changes-table th:nth-last-child(-n + 2),
+.taps-table-frame .taps-gas-history-table th:nth-last-child(-n + 2) {
   min-inline-size: 16rem;
 }
 
