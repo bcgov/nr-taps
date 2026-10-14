@@ -10,6 +10,8 @@ const shared = {
   GITHUB_EVENT_NAME: 'push', OC_SERVER: 'https://api.example.invalid:6443',
   OC_APPS_DOMAIN: 'apps.example.invalid', OC_TOKEN: 'synthetic',
   TAPS_OIDC_ISSUER_URI: 'https://sso.example.invalid/realms/synthetic', TAPS_OIDC_CLIENT_ID: 'synthetic',
+  DATABASE_HOST: 'oracle.example.invalid', DATABASE_SERVICE_NAME: 'synthetic', DATABASE_USER: 'synthetic',
+  DATABASE_PASSWORD: 'sensitive-test-value', KEYSTORE_SECRET: 'sensitive-test-value',
   BACKEND_IMAGE: `ghcr.io/${repository}/backend@sha256:${'b'.repeat(64)}`,
   FRONTEND_IMAGE: `ghcr.io/${repository}/frontend@sha256:${'c'.repeat(64)}`,
 }
@@ -48,15 +50,21 @@ test('TEST requires main and the pinned image pair; DEV retains SHA tags and num
   }
 })
 
-test('Oracle defaults off; activation requires complete credentials without emitting them', () => {
-  assert.equal(deploymentSettings(production).spring_profiles_active, '')
-  assert.throws(() => deploymentSettings({ ...production, TAPS_ORACLE_ENABLED: 'yes' }))
-  assert.throws(() => deploymentSettings({ ...production, TAPS_ORACLE_ENABLED: 'true' }))
-  const result = deploymentSettings({ ...production, TAPS_ORACLE_ENABLED: 'true', DATABASE_HOST: 'synthetic',
-    DATABASE_SERVICE_NAME: 'synthetic', DATABASE_USER: 'synthetic', DATABASE_PASSWORD: 'sensitive-test-value',
-    KEYSTORE_SECRET: 'sensitive-test-value' })
-  assert.equal(result.spring_profiles_active, 'oracle')
+test('every deployment requires Oracle credentials and accepts only valid TCPS ports', () => {
+  for (const setting of ['DATABASE_HOST', 'DATABASE_SERVICE_NAME', 'DATABASE_USER', 'DATABASE_PASSWORD', 'KEYSTORE_SECRET']) {
+    assert.throws(() => deploymentSettings({ ...production, [setting]: '' }))
+    // The removed opt-out must not bypass the required deployed-read configuration.
+    assert.throws(() => deploymentSettings({ ...production, [setting]: '', TAPS_ORACLE_ENABLED: 'false' }))
+  }
+  for (const port of ['', '1', '1543', '2484', '65535']) {
+    assert.ok(deploymentSettings({ ...production, DATABASE_PORT: port }))
+  }
+  for (const port of ['0', '65536', '-1', '1.5', '01543', ' 1543', '1543\n', '1543\nmalformed']) {
+    assert.throws(() => deploymentSettings({ ...production, DATABASE_PORT: port }))
+  }
+  const result = deploymentSettings(production)
   assert.ok(!JSON.stringify(result).includes('sensitive-test-value'))
+  assert.ok(!Object.hasOwn(result, 'spring_profiles_active'))
 })
 
 test('connection, timeout and replica budgets are conservative and reject unbounded values', () => {
@@ -89,4 +97,17 @@ test('no automatic workflow calls PROD, and releases stage the selected template
     assert.match(deploy, new RegExp(`file: \\$\\{\\{ runner.temp \\}\\}/taps-deploy/${file}\\.yml`))
   }
   assert.equal((deploy.match(/ref: \$\{\{ needs.validate.outputs.source_ref \}\}/g) ?? []).length, 2)
+})
+
+
+test('deployed Oracle remains enabled and the same port reaches certificate init and JDBC', () => {
+  const deploy = readFileSync(new URL('../workflows/reusable-deploy.yml', import.meta.url), 'utf8')
+  const backend = readFileSync(new URL('../../backend/openshift.deploy.yml', import.meta.url), 'utf8')
+  assert.doesNotMatch(deploy, /TAPS_ORACLE_ENABLED|spring_profiles_active/)
+  assert.match(deploy, /-p SPRING_PROFILES_ACTIVE=oracle/)
+  assert.match(deploy, /-p DATABASE_PORT="\$DATABASE_PORT"/)
+  assert.equal((deploy.match(/DATABASE_PORT: \$\{\{ secrets.port \|\| '1543' \}\}/g) ?? []).length, 2)
+  assert.match(backend, /name: SPRING_PROFILES_ACTIVE\n\s+description:.*\n\s+value: oracle/)
+  assert.match(backend, /name: ORACLEDB_PORT\n\s+value: \$\{DATABASE_PORT\}/)
+  assert.match(backend, /name: DATABASE_PORT\n\s+value: \$\{DATABASE_PORT\}/)
 })

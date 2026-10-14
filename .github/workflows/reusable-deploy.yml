@@ -39,6 +39,9 @@ on:
       database_host:
         description: Oracle host
         required: false
+      port:
+        description: Oracle TCPS listener port (defaults to 1543)
+        required: false
       database_service_name:
         description: Oracle service name
         required: false
@@ -70,7 +73,6 @@ jobs:
     timeout-minutes: 5
     outputs:
       route_slot: ${{ steps.settings.outputs.route_slot }}
-      spring_profiles_active: ${{ steps.settings.outputs.spring_profiles_active }}
       backend_image: ${{ steps.settings.outputs.backend_image }}
       frontend_image: ${{ steps.settings.outputs.frontend_image }}
       source_ref: ${{ steps.settings.outputs.source_ref }}
@@ -104,7 +106,6 @@ jobs:
           OC_TOKEN: ${{ secrets.oc_token }}
           TAPS_OIDC_ISSUER_URI: ${{ vars.TAPS_OIDC_ISSUER_URI }}
           TAPS_OIDC_CLIENT_ID: ${{ vars.TAPS_OIDC_CLIENT_ID }}
-          TAPS_ORACLE_ENABLED: ${{ vars.TAPS_ORACLE_ENABLED }}
           TAPS_BACKEND_MIN_REPLICAS: ${{ vars.TAPS_BACKEND_MIN_REPLICAS }}
           TAPS_BACKEND_MAX_REPLICAS: ${{ vars.TAPS_BACKEND_MAX_REPLICAS }}
           DATABASE_MAX_POOL_SIZE: ${{ vars.DATABASE_MAX_POOL_SIZE }}
@@ -114,6 +115,7 @@ jobs:
           DATABASE_CONNECT_TIMEOUT_MS: ${{ vars.DATABASE_CONNECT_TIMEOUT_MS }}
           DATABASE_READ_TIMEOUT_MS: ${{ vars.DATABASE_READ_TIMEOUT_MS }}
           DATABASE_HOST: ${{ secrets.database_host }}
+          DATABASE_PORT: ${{ secrets.port || '1543' }}
           DATABASE_SERVICE_NAME: ${{ secrets.database_service_name }}
           DATABASE_USER: ${{ secrets.database_user }}
           DATABASE_PASSWORD: ${{ secrets.database_password }}
@@ -143,8 +145,8 @@ jobs:
 
       - uses: bcgov/action-deployer-openshift@bb9d143f4f03187239580c17c4b77da04cdb6e66 # v4.2.2
         env:
-          SPRING_PROFILES_ACTIVE: ${{ needs.validate.outputs.spring_profiles_active }}
           DATABASE_HOST: ${{ secrets.database_host }}
+          DATABASE_PORT: ${{ secrets.port || '1543' }}
           DATABASE_SERVICE_NAME: ${{ secrets.database_service_name }}
           DATABASE_USER: ${{ secrets.database_user }}
           DATABASE_PASSWORD: ${{ secrets.database_password }}
@@ -161,7 +163,7 @@ jobs:
             -p ZONE="${{ inputs.target }}"
             -p IMAGE_REF="${{ needs.validate.outputs.backend_image }}"
             -p ROLLOUT_TRIGGER="${{ github.run_id }}-${{ github.run_attempt }}"
-            -p SPRING_PROFILES_ACTIVE="$SPRING_PROFILES_ACTIVE"
+            -p SPRING_PROFILES_ACTIVE=oracle
             -p MIN_REPLICAS="${{ needs.validate.outputs.backend_min_replicas }}"
             -p MAX_REPLICAS="${{ needs.validate.outputs.backend_max_replicas }}"
             -p DATABASE_MAX_POOL_SIZE="${{ needs.validate.outputs.database_max_pool_size }}"
@@ -174,6 +176,7 @@ jobs:
             -p TAPS_OIDC_ISSUER_URI="${{ vars.TAPS_OIDC_ISSUER_URI }}"
             -p TAPS_OIDC_CLIENT_ID="${{ vars.TAPS_OIDC_CLIENT_ID }}"
             -p DATABASE_HOST="$DATABASE_HOST"
+            -p DATABASE_PORT="$DATABASE_PORT"
             -p DATABASE_SERVICE_NAME="$DATABASE_SERVICE_NAME"
             -p DATABASE_USER="$DATABASE_USER"
             -p DATABASE_PASSWORD="$DATABASE_PASSWORD"

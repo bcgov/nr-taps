@@ -22,7 +22,7 @@ flowchart LR
 - The browser is a public OIDC client, so there is no secret in the SPA.
 - FAM writes role assignments into Keycloak. The API authorizes from the validated token and doesn't call FAM per request.
 - The frontend writes `/config.js` from environment values at startup, so one image runs in DEV and TEST.
-- Oracle reads run only with the backend's `oracle` Spring profile, which is off by default. With it on, the backend won't start unless it can connect.
+- Oracle reads require the backend's `oracle` Spring profile. Local runs can omit it; deployed backends always enable it and won't start unless they can connect.
 
 The frontend uses Carbon and TanStack Router; see [UI development](../frontend/README.md). After a redeploy, a tab requesting a missing code chunk reloads to pick up the new build, at most once a minute.
 

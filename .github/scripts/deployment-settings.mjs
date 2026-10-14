@@ -47,18 +47,17 @@ export function deploymentSettings(env) {
       images[`${component}_image`] = supplied
     }
   }
-  const oracle = env.TAPS_ORACLE_ENABLED || 'false'
-  if (!['true', 'false'].includes(oracle)) throw new Error('TAPS_ORACLE_ENABLED must be true or false')
-  if (oracle === 'true') {
-    for (const setting of ['DATABASE_HOST', 'DATABASE_SERVICE_NAME', 'DATABASE_USER', 'DATABASE_PASSWORD', 'KEYSTORE_SECRET']) {
-      if (!env[setting]) throw new Error(`${setting} is required when Oracle is enabled`)
-    }
+  for (const setting of ['DATABASE_HOST', 'DATABASE_SERVICE_NAME', 'DATABASE_USER', 'DATABASE_PASSWORD', 'KEYSTORE_SECRET']) {
+    if (!env[setting]) throw new Error(`${setting} is required for deployed Oracle reads`)
+  }
+  const port = env.DATABASE_PORT || '1543'
+  if (!/^[1-9][0-9]{0,4}$/.test(port) || String(Number(port)) !== port || Number(port) > 65535) {
+    throw new Error('DATABASE_PORT must be an integer from 1 to 65535')
   }
   const settings = {
     ...images,
     source_ref: source,
     route_slot: environment === 'dev' ? String(Number(target) % 50) : target,
-    spring_profiles_active: oracle === 'true' ? 'oracle' : '',
     backend_min_replicas: boundedInteger(env, 'TAPS_BACKEND_MIN_REPLICAS', 1, 1, 3),
     backend_max_replicas: boundedInteger(env, 'TAPS_BACKEND_MAX_REPLICAS', 1, 1, 3),
     database_max_pool_size: boundedInteger(env, 'DATABASE_MAX_POOL_SIZE', 2, 1, 10),

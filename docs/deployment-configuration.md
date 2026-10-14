@@ -60,10 +60,10 @@ DEV/TEST tokens must have no PROD access.
 | Environment variable | `TAPS_OIDC_CLIENT_ID`                         | TAPS `resource` value for that environment                                             |
 | Environment variable | `TAPS_OIDC_SITEMINDER_LOGOUT_URL`             | Optional; PROD defaults to `logon7`, DEV/TEST to `logontest7`                |
 | Environment variable | `TAPS_OIDC_IDIR_HINT`, `TAPS_OIDC_BCEID_HINT` | Optional; default to `azureidir` and `bceidbusiness`                                   |
-| Environment variable | `TAPS_ORACLE_ENABLED`                         | `true` or `false`; unset means `false`. `true` turns on the backend's `oracle` profile |
 | Repository secret (DEV)       | `oc_namespace`, `oc_token`                    | DEV namespace (ends in `-dev`) and deploy token                                        |
 | TEST environment secret       | `oc_namespace`, `oc_token`                    | TEST namespace (ends in `-test`) and a separate deploy token                           |
 | PROD environment secret | `oc_namespace`, `oc_token` | PROD namespace (ends in `-prod`) and a PROD-only deploy token |
+| Environment secret | `PORT` | Optional Oracle TCPS listener port; defaults to `1543` |
 | Environment secret   | `database_host`                               | Oracle TCPS host                                                                       |
 | Environment secret   | `database_service_name`                       | Oracle service name                                                                    |
 | Environment secret   | `database_user`                               | Dedicated read principal or proxy into that principal |
@@ -71,7 +71,7 @@ DEV/TEST tokens must have no PROD access.
 | Environment secret   | `keystore_secret`                             | Passphrase for the generated truststore                                                |
 | Repository secret             | `sonar_token_backend`, `sonar_token_frontend` | Optional; SonarCloud runs on pushes to `main` once set                                 |
 
-- Database secrets are required when `TAPS_ORACLE_ENABLED=true` and belong only in the selected environment; callers do not pass them. Complete the [coexistence checks](legacy-coexistence.md) before setting this flag.
+- Oracle is enabled for every deployment. All five database secrets are required; `PORT` is optional. Values belong only in the selected environment; callers do not pass them. Complete the [coexistence checks](legacy-coexistence.md) before deploying to a shared database.
 - TEST/PROD jobs use their own environment secrets. Namespace suffix checks reject fallback to the DEV repository namespace. Set all database/OIDC values in the intended environment; do not create repository-level database defaults.
 - Keep OIDC values in their environment, with no repository-level fallback.
 - Limit each deploy token to this app in its own namespace. Each namespace must be able to pull the GHCR images.
@@ -134,7 +134,7 @@ The PR workflow runs the backend tests and frontend checks before the DEV deploy
 
 ## Oracle connection
 
-`TAPS_ORACLE_ENABLED` accepts `true` or `false`; unset means `false`. When it's `true`, the workflow requires all five database secrets and deploys the backend with `SPRING_PROFILES_ACTIVE=oracle`. With that profile, the backend won't start if credentials are missing or the database is unreachable.
+Every deployed backend uses `SPRING_PROFILES_ACTIVE=oracle`. The workflow requires all five database secrets and validates the configured port before deploying. The backend won't start if credentials are missing or the database is unreachable. Local runs can still omit the `oracle` profile.
 
 Environment variables `DATABASE_MAX_POOL_SIZE` (default 2), `DATABASE_MIN_IDLE` (0),
 `DATABASE_CONNECTION_TIMEOUT_MS` (3000), `DATABASE_QUERY_TIMEOUT_SECONDS` (20),
@@ -146,8 +146,9 @@ as well. See [configuration limits](../backend/README.md#configuration).
 How it's wired:
 
 - The backend template creates Secret `nr-taps-backend-secret-<zone>` with keys `DATABASE_USER`, `DATABASE_PASSWORD` and `KEYSTORE_SECRET`. PR cleanup deletes it.
-- The `oracle` profile builds a TCPS descriptor from `DATABASE_HOST`, port 1543 and `DATABASE_SERVICE_NAME`.
-- An init container (`ghcr.io/bcgov/nr-forest-client/common:prod`) reads the database certificate and writes a JKS truststore to `/cert/jssecacerts`, protected by `keystore_secret`. It only runs when the `oracle` profile is on. The truststore is rebuilt on every pod start, so a rotated certificate is picked up. The backend mounts it read-only.
+- The workflow maps the environment's `PORT` secret to `DATABASE_PORT`, defaulting to `1543`. Both the certificate initializer and the JDBC datasource use that same port. The `oracle` profile builds a TCPS descriptor from `DATABASE_HOST`, `DATABASE_PORT` and `DATABASE_SERVICE_NAME`.
+- The host and port must identify a TCPS listener. Changing the port does not switch the connection to plain TCP.
+- An init container (`ghcr.io/bcgov/nr-forest-client/common:prod`) reads the database certificate and writes a JKS truststore to `/cert/jssecacerts`, protected by `keystore_secret`. The truststore is rebuilt on every pod start, so a rotated certificate is picked up. The backend mounts it read-only.
 
 See the [backend configuration](../backend/README.md#configuration) for runtime settings, TLS compatibility, pooling, health and read diagnostics, and [database privileges](../backend/README.md#database-privileges) for the object inventory.
 
@@ -164,9 +165,9 @@ For each check, record the commit, image tag, environment, result and any follow
 - [ ] DEV and TEST deploy identities cannot change PROD. A timeout doesn't count as a denial.
 - [ ] Frontend and backend use the same issuer and client. Callbacks, logout and providers are registered for the exact host.
 - [ ] The database team approves the dedicated read principal/proxy, service, TLS trust, owners/synonyms and READ/reviewed-EXECUTE grants. The read screens need no DML or DDL privileges.
-- [ ] Set `database_host`, `database_service_name`, `database_user`, `database_password` and `keystore_secret` (see [GitHub variables and secrets](#github-variables-and-secrets)). Don't print them.
+- [ ] Set `database_host`, `database_service_name`, `database_user`, `database_password` and `keystore_secret`, plus `PORT` if the approved TCPS listener uses a port other than `1543` (see [GitHub variables and secrets](#github-variables-and-secrets)). Don't print them.
 
-First deploy with `TAPS_ORACLE_ENABLED=false`, so the backend runs without the `oracle` profile. Check that anonymous `/api/me` returns 401, a signed-in user gets `readApiEnabled: false`, and the UI says reads are unavailable.
+After the infrastructure and schema checks pass, deploy DEV with Oracle enabled. Check that anonymous `/api/me` returns 401 and a signed-in user gets `readApiEnabled: true`.
 
 ### 2. Check the schema
 
@@ -178,9 +179,9 @@ First deploy with `TAPS_ORACLE_ENABLED=false`, so the backend runs without the `
 
 Never load the local fixture DDL into a shared database.
 
-### 3. Turn on DEV reads and compare with legacy
+### 3. Deploy DEV reads and compare with legacy
 
-Set `TAPS_ORACLE_ENABLED=true` and deploy. The workflow starts the backend with the `oracle` Spring profile, and the backend must connect before it starts. Compare TAPS with the legacy apps on real data, using [intentional legacy divergences](intentional-legacy-divergences.md) to distinguish recorded technical choices from regressions and unimplemented features:
+Deploy DEV. The workflow starts the backend with the `oracle` Spring profile, and the backend must connect before it starts. Compare TAPS with the legacy apps on real data, using [intentional legacy divergences](intentional-legacy-divergences.md) to distinguish recorded technical choices from regressions and unimplemented features:
 
 | Area | Check |
 | --- | --- |
