@@ -1,4 +1,5 @@
 import { Button, InlineLoading, Pagination } from '@carbon/react'
+import { ArrowLeft } from '@carbon/icons-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   AppraisalMethod,
@@ -111,6 +112,16 @@ function ReadDetailPanel({
       fallbackFocusSelector="#read-results-heading"
       onClose={() => setSelection(null)}
     >
+      {selection?.kind === 'related' && (
+        <button
+          type="button"
+          className="taps-link-button taps-detail-return"
+          onClick={() => setSelection(selection.reference)}
+        >
+          <ArrowLeft size={16} aria-hidden="true" />
+          Back to ECAS reference
+        </button>
+      )}
       <h2 id="read-detail-heading" tabIndex={-1}>
         {selection?.kind === 'reference' ? 'Submission details' : 'Worksheet details'}
       </h2>
@@ -149,11 +160,6 @@ function ReadDetailPanel({
           onClick={() => setSelection({ kind: 'related', id: selection.id, reference: selection })}
         >
           View related GAS worksheet
-        </Button>
-      )}
-      {selection?.kind === 'related' && (
-        <Button kind="tertiary" size="md" onClick={() => setSelection(selection.reference)}>
-          Back to ECAS reference
         </Button>
       )}
     </DetailSidePanel>

@@ -554,6 +554,7 @@ b {
 }
 .taps-notification.cds--inline-notification {
   inline-size: 100%;
+  min-inline-size: 0;
   max-inline-size: 100%;
 }
 
@@ -702,6 +703,13 @@ legend.cds--label {
   gap: 1rem;
 }
 .taps-filter-grid .cds--form-item {
+  min-inline-size: 0;
+}
+.taps-filter-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
   min-inline-size: 0;
 }
 .taps-filter-date-types {

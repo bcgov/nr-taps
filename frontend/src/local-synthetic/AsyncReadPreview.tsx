@@ -48,7 +48,7 @@ const attachments: EcasAttachment[] = Array.from({ length: 51 }, (_, index) => (
   updatedAt: '2026-10-02T10:30:00',
 }))
 
-const syntheticRelatedApis: EcasRelatedApis = {
+export const syntheticRelatedApis: EcasRelatedApis = {
   audit: {
     history: async (ecasId, page, signal) => {
       signal.throwIfAborted()

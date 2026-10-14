@@ -133,6 +133,7 @@ export default function EcasSearchFilters({
           id="read-ecas-id"
           labelText="ECAS ID"
           maxLength={12}
+          inputMode="numeric"
           value={draft.ecasId}
           onChange={(event) => set('ecasId', event.target.value)}
           invalid={Boolean(errors.ecasId)}

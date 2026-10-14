@@ -1,5 +1,6 @@
-import { Button, Select, SelectItem, TextInput } from '@carbon/react'
+import { Button, InlineLoading, Select, SelectItem, TextInput } from '@carbon/react'
 import type { LicenceMarks } from '@/contracts/appraisal'
+import AppNotification from '../AppNotification'
 import SearchFilters from '../SearchFilters'
 
 export type GasFilters = { licence: string; timberMark: string }
@@ -26,7 +27,8 @@ export default function GasSearchFilters({
   onRetryLookup?: () => void
 }) {
   const licence = draft.licence.trim().toUpperCase()
-  const marks = licenceMarks?.licence === licence ? licenceMarks.timberMarks : []
+  const hasLicenceMarks = licenceMarks?.licence === licence
+  const marks = hasLicenceMarks ? licenceMarks.timberMarks : []
   return (
     <SearchFilters
       title="Appraisal search filters"
@@ -51,43 +53,42 @@ export default function GasSearchFilters({
         value={draft.licence}
         onChange={(event) => onChange({ licence: event.target.value, timberMark: '' })}
       />
-      {licence ? (
-        <Select
-          id="gas-timber-mark"
-          labelText="Timber mark"
-          value={marks.includes(draft.timberMark) ? draft.timberMark : ''}
-          disabled={lookupLoading || Boolean(lookupError)}
-          helperText={
-            lookupLoading
-              ? 'Loading timber marks…'
-              : marks.length === 0
-                ? 'No timber marks returned for this licence.'
-                : undefined
-          }
-          onChange={(event) => onChange({ ...draft, timberMark: event.target.value })}
-        >
-          <SelectItem value="" text="All marks for this licence" />
-          {marks.map((mark) => (
-            <SelectItem key={mark} value={mark} text={mark} />
-          ))}
-        </Select>
-      ) : (
-        <TextInput
-          id="gas-timber-mark"
-          labelText="Timber mark"
-          maxLength={6}
-          value={draft.timberMark}
-          onChange={(event) => onChange({ ...draft, timberMark: event.target.value })}
-        />
-      )}
-      {lookupError && (
-        <div role="alert">
-          <p>{lookupError}</p>
-          <Button type="button" kind="tertiary" size="md" onClick={onRetryLookup}>
-            Retry timber marks
-          </Button>
-        </div>
-      )}
+      <div className="taps-filter-field">
+        {licence ? (
+          <Select
+            id="gas-timber-mark"
+            labelText="Timber mark"
+            value={marks.includes(draft.timberMark) ? draft.timberMark : ''}
+            disabled={lookupLoading || Boolean(lookupError)}
+            onChange={(event) => onChange({ ...draft, timberMark: event.target.value })}
+          >
+            <SelectItem value="" text="All marks for this licence" />
+            {marks.map((mark) => (
+              <SelectItem key={mark} value={mark} text={mark} />
+            ))}
+          </Select>
+        ) : (
+          <TextInput
+            id="gas-timber-mark"
+            labelText="Timber mark"
+            maxLength={6}
+            value={draft.timberMark}
+            onChange={(event) => onChange({ ...draft, timberMark: event.target.value })}
+          />
+        )}
+        {lookupLoading && <InlineLoading description="Loading timber marks…" />}
+        {hasLicenceMarks && !lookupLoading && !lookupError && marks.length === 0 && (
+          <p role="status">No timber marks returned for this licence.</p>
+        )}
+        {lookupError && (
+          <>
+            <AppNotification kind="error" title="Timber marks unavailable" subtitle={lookupError} />
+            <Button type="button" kind="tertiary" size="md" onClick={onRetryLookup}>
+              Retry timber marks
+            </Button>
+          </>
+        )}
+      </div>
     </SearchFilters>
   )
 }

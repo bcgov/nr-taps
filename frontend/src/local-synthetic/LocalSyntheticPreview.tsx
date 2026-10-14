@@ -25,6 +25,7 @@ import ThemeProvider from '@/context/theme/ThemeProvider'
 import type { Session } from '@/service/session-service'
 import ControlsSample from './ControlsSample'
 import WorkflowPreview from './WorkflowPreview'
+import ReadFeedbackPreview from './ReadFeedbackPreview'
 import AsyncReadPreview, {
   SyntheticEcasInboxPage,
   SyntheticGasSearchPage,
@@ -56,6 +57,7 @@ const previewPaths = [
   { path: '/ui-controls', label: 'Synthetic reusable controls' },
   { path: '/workflow', label: 'Synthetic ECAS and GAS workflow' },
   { path: '/async-reads', label: 'Synthetic asynchronous read pages' },
+  { path: '/read-feedback', label: 'Synthetic read feedback' },
   { path: '/not-a-page', label: 'Page not found' },
   { path: '/route-error', label: 'Synthetic route failure' },
 ]
@@ -250,6 +252,11 @@ export function createPreviewRouter() {
       throw new Error('Synthetic preview route failure')
     },
   })
+  const feedbackRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/read-feedback',
+    component: ReadFeedbackPreview,
+  })
 
   return createRouter({
     history: previewHistory,
@@ -262,6 +269,7 @@ export function createPreviewRouter() {
       controlsRoute,
       workflowRoute,
       readsRoute,
+      feedbackRoute,
       failureRoute,
     ]),
   })

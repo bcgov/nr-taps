@@ -109,6 +109,53 @@ test('selected organizations are submitted as filters without changing available
   expect(search).toHaveBeenCalledWith(expect.objectContaining({ orgUnitNumbers: ['10'] }))
 })
 
+test('correcting the last additional-filter error keeps the edited field expanded and focused', async () => {
+  const user = userEvent.setup()
+  render(<Form initial={{ ...empty, clientNumber: 'ABC' }} onSearch={vi.fn()} />)
+  const toggle = screen.getByRole('button', { name: 'Additional filters' })
+  const client = screen.getByLabelText('Client number')
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await user.clear(client)
+  expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled()
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  expect(client).toHaveFocus()
+  await user.click(toggle)
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+})
+
+test('reveals a dependent additional-filter error when the licence is cleared', async () => {
+  const user = userEvent.setup()
+  render(
+    <Form initial={{ ...empty, licence: 'A00001', cuttingPermit: '001' }} onSearch={vi.fn()} />,
+  )
+  const toggle = screen.getByRole('button', { name: 'Additional filters' })
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await user.clear(screen.getByLabelText('Licence'))
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByLabelText('Cutting permit')).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
+})
+
+test('reveals new errors after Escape closes the heading without closing on field Escape', async () => {
+  const user = userEvent.setup()
+  render(
+    <Form initial={{ ...empty, licence: 'A00001', cuttingPermit: '001' }} onSearch={vi.fn()} />,
+  )
+  const toggle = screen.getByRole('button', { name: 'Additional filters' })
+  await user.click(toggle)
+  await user.click(screen.getByLabelText('Cutting permit'))
+  await user.keyboard('{Escape}')
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+
+  toggle.focus()
+  await user.keyboard('{Escape}')
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await user.clear(screen.getByLabelText('Licence'))
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByLabelText('Cutting permit')).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
+})
+
 test.each([
   [{ cuttingPermit: '001' }, 'cuttingPermit'],
   [{ managementUnitId: '12' }, 'managementUnitId'],

@@ -5,7 +5,9 @@ import {
   Select,
   SelectItem,
   TextInput,
+  type AccordionItemProps,
 } from '@carbon/react'
+import { useCallback, useState } from 'react'
 import type { CodeOption, EcasLookups, EcasSearchFilters } from '@/contracts/appraisal'
 import { additionalFilterErrors } from './ecas-filter-validation'
 
@@ -21,6 +23,28 @@ export default function EcasAdditionalFilters({
   lookupUnavailable: boolean
 }) {
   const errors = additionalFilterErrors(draft)
+  const hasErrors = Object.keys(errors).length > 0
+  const [expanded, setExpanded] = useState(hasErrors)
+  const [previousHasErrors, setPreviousHasErrors] = useState(hasErrors)
+  // Reveal new errors without collapsing the edited field when the final error is corrected.
+  if (hasErrors !== previousHasErrors) {
+    setPreviousHasErrors(hasErrors)
+    if (hasErrors) setExpanded(true)
+  }
+  const renderToggle = useCallback<NonNullable<AccordionItemProps['renderToggle']>>(
+    ({ onKeyDown, ...props }) => (
+      <button
+        {...props}
+        type="button"
+        onKeyDown={(event) => {
+          onKeyDown?.(event)
+          // Carbon closes the heading on Escape without calling onHeadingClick.
+          if (event.key === 'Escape') setExpanded(false)
+        }}
+      />
+    ),
+    [],
+  )
   const set = <K extends keyof EcasSearchFilters>(key: K, value: EcasSearchFilters[K]) =>
     onChange({ ...draft, [key]: value })
   const organizations = (lookups?.organizations ?? [])
@@ -46,7 +70,12 @@ export default function EcasAdditionalFilters({
   ] as const
   return (
     <Accordion className="taps-additional-filters">
-      <AccordionItem title="Additional filters" open={Object.keys(errors).length > 0 || undefined}>
+      <AccordionItem
+        title="Additional filters"
+        open={expanded}
+        onHeadingClick={({ isOpen }) => setExpanded(isOpen)}
+        renderToggle={renderToggle}
+      >
         <div className="taps-filter-grid">
           <TextInput
             id="ecas-cutting-permit"

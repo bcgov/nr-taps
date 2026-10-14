@@ -2,6 +2,20 @@
   min-inline-size: 62rem;
 }
 
+.taps-detail-return {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  inline-size: fit-content;
+  padding-block: 0.25rem;
+  margin-block-end: 1.5rem;
+  text-decoration: none;
+}
+
+.taps-detail-return:hover {
+  text-decoration: underline;
+}
+
 .taps-table-frame .cds--data-table.taps-species-volume-table {
   min-inline-size: 0;
   inline-size: 100%;

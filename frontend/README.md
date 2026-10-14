@@ -74,6 +74,9 @@ Reloading resets it.
   a comment containing literal markup that must display as text.
   Appraised worksheets under licence `X99998` also expose their own synthetic History pages;
   historic worksheets do not offer History.
+- **Synthetic read feedback:** choose ECAS or GAS, then a one-time search-choice, results, record
+  or FTA failure. Use the real page's retry action to recover. The ECAS reappraisal draft scenario
+  adds required-date validation to a synthetic copy; the backend contract fixture stays unchanged.
 
 The preview source lives in `src/local-synthetic/`, with `LocalSyntheticPreview.tsx` as its UI.
 `local-synthetic.html` is guarded by Vite's built-in `import.meta.env.DEV` flag, which enables local
@@ -122,6 +125,10 @@ also applies to shared behavior, including keeping the page available beside an 
 - **Typography:** field labels use `label-02`, field and read-only values `body-02`/`body-compact-02`,
   and DataTable keeps Carbon's sizes. Headings: page title `heading-05`, sections and card titles
   `heading-03`, sub-sections `heading-compact-02`. Inside a side panel, each level moves down one step.
+- **Forms:** helper text gives format hints. Loading, unavailable choices and confirmed empty
+  responses have separate feedback. Required fields have a leading red `*`, a required-fields
+  legend and `aria-required="true"`. Validation errors stay on their fields until corrected;
+  notifications cover failures that do not belong to an individual field.
 - **Buttons:** use `size="md"`. The two login actions use expressive `lg` (48px), matching the login
   design; a test guards this exception. A button with an icon keeps it at the right edge.
 - **Search pages:** add `taps-fullbleed-page` to the page. Filters sit four to a row, with

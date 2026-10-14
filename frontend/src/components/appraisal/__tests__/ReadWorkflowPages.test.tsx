@@ -220,6 +220,32 @@ test('never offers the related GAS action without its capability', async () => {
   ).not.toBeInTheDocument()
 })
 
+test('returns from a related worksheet above its content without clearing the search', async () => {
+  const user = userEvent.setup()
+  const api = { ...syntheticReadApi, inbox: vi.fn(syntheticReadApi.inbox) }
+  mount(<EcasInboxReadPage api={api} />)
+  await user.type(screen.getByRole('textbox', { name: 'Timber mark' }), 'ZZ9997')
+  await user.click(screen.getByRole('button', { name: 'Search' }))
+  const launcher = await screen.findByRole('button', { name: /Open ECAS .*mark ZZ9997/ })
+  await user.click(launcher)
+  await screen.findByRole('heading', { name: 'Coast reference' })
+  await user.click(screen.getByRole('button', { name: 'View related GAS worksheet' }))
+  const heading = screen.getByRole('heading', { name: 'Worksheet details' })
+  const back = screen.getByRole('button', { name: 'Back to ECAS reference' })
+  expect(back.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(back.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  await user.click(back)
+  await screen.findByRole('heading', { name: 'Coast reference' })
+  expect(screen.getByRole('textbox', { name: 'Timber mark' })).toHaveValue('ZZ9997')
+  expect(
+    within(screen.getByRole('table', { name: 'ECAS submissions' })).getAllByRole('row'),
+  ).toHaveLength(2)
+  expect(api.inbox).toHaveBeenCalledOnce()
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: 'Submission details' })).toHaveFocus(),
+  )
+})
+
 test.each([1440, 1280])(
   'keeps page focus when a pending reference finishes loading at %ipx',
   async (width) => {

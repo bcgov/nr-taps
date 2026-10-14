@@ -189,6 +189,67 @@ test('submits the displayed selection when a licence lookup no longer contains t
   expect(onSearch).toHaveBeenCalledWith({ licence: 'X99998', timberMark: '' })
 })
 
+test('announces no marks only after the current licence lookup finishes successfully', () => {
+  const props = {
+    draft: { licence: 'X99998', timberMark: '' },
+    onChange: vi.fn(),
+    onSearch: vi.fn(),
+    onReset: vi.fn(),
+  }
+  const emptyMessage = 'No timber marks returned for this licence.'
+  const { rerender } = render(<GasSearchFilters {...props} licenceMarks={null} />)
+  expect(screen.queryByText(emptyMessage)).not.toBeInTheDocument()
+
+  rerender(<GasSearchFilters {...props} licenceMarks={{ licence: 'X99999', timberMarks: [] }} />)
+  expect(screen.queryByText(emptyMessage)).not.toBeInTheDocument()
+
+  rerender(
+    <GasSearchFilters
+      {...props}
+      licenceMarks={{ licence: 'X99998', timberMarks: [] }}
+      lookupLoading
+    />,
+  )
+  expect(screen.getByText('Loading timber marks…')).toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: 'Timber mark' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
+  expect(screen.queryByText(emptyMessage)).not.toBeInTheDocument()
+
+  rerender(<GasSearchFilters {...props} licenceMarks={{ licence: 'X99998', timberMarks: [] }} />)
+  expect(screen.queryByText('Loading timber marks…')).not.toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveTextContent(emptyMessage)
+  expect(screen.getByRole('combobox', { name: 'Timber mark' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled()
+
+  rerender(<GasSearchFilters {...props} licenceMarks={fixture.gasLicenceMarks} />)
+  expect(screen.queryByText(emptyMessage)).not.toBeInTheDocument()
+})
+
+test('shows a retryable notification for failed mark choices without claiming no marks exist', async () => {
+  const retry = vi.fn()
+  const onSearch = vi.fn()
+  render(
+    <GasSearchFilters
+      draft={{ licence: 'X99998', timberMark: 'ZZ9998' }}
+      licenceMarks={{ licence: 'X99998', timberMarks: [] }}
+      onChange={vi.fn()}
+      onSearch={onSearch}
+      onReset={vi.fn()}
+      lookupError="The read service is unavailable. Please try again."
+      onRetryLookup={retry}
+    />,
+  )
+  const alert = screen.getByText('Timber marks unavailable').closest('[role="alert"]')
+  expect(alert).toHaveTextContent('Timber marks unavailable')
+  expect(alert).toHaveTextContent('The read service is unavailable. Please try again.')
+  expect(screen.queryByText('No timber marks returned for this licence.')).not.toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: 'Timber mark' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Retry timber marks' }))
+  expect(retry).toHaveBeenCalledOnce()
+  expect(onSearch).not.toHaveBeenCalled()
+})
+
 function renderWorkflow() {
   setViewportWidth(1440)
   return render(

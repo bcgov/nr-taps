@@ -6,7 +6,6 @@ import {
   validateCoastAppraisalDates,
   type CoastAppraisalDates,
 } from '@/contracts/coast-reference-draft'
-import AppNotification from '../AppNotification'
 import './coast-reference-draft.scss'
 
 export default function CoastAppraisalDatesDraft({ reference }: { reference: CoastReference }) {
@@ -26,6 +25,7 @@ function DateFields({ reference }: { reference: CoastReference }) {
   const original = coastDatesFromReference(reference)
   const [draft, setDraft] = useState(original)
   const [checked, setChecked] = useState(false)
+  const effectiveRequired = reference.header.appraisalCategoryCode === 'R'
   const effectiveRef = useRef<HTMLInputElement>(null)
   const expiryRef = useRef<HTMLInputElement>(null)
   const errors = checked ? validateCoastAppraisalDates(draft, reference.header) : {}
@@ -34,7 +34,6 @@ function DateFields({ reference }: { reference: CoastReference }) {
     draft.effectiveDate !== original.effectiveDate || draft.expiryDate !== original.expiryDate
   const update = (field: keyof CoastAppraisalDates, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }))
-    setChecked(false)
   }
   return (
     <section className="taps-reference-draft" aria-labelledby={`${id}-heading`}>
@@ -62,16 +61,36 @@ function DateFields({ reference }: { reference: CoastReference }) {
           else if (nextErrors.expiryDate) expiryRef.current?.focus()
         }}
       >
+        {effectiveRequired && (
+          <p className="taps-required-fields-legend">
+            <span className="taps-required-marker" aria-hidden="true">
+              *
+            </span>{' '}
+            Required fields
+          </p>
+        )}
         {/* Date inputs retain the ISO form used by the date rules. */}
         <div className="taps-reference-draft__fields">
           <TextInput
             ref={effectiveRef}
             id={`${id}-effective-date`}
-            labelText="Appraisal effective date"
+            labelText={
+              <>
+                {effectiveRequired && (
+                  <>
+                    <span className="taps-required-marker" aria-hidden="true">
+                      *
+                    </span>{' '}
+                  </>
+                )}
+                Appraisal effective date
+              </>
+            }
             helperText="YYYY-MM-DD; on or after 2002-04-01. Required for reappraisals."
             placeholder="YYYY-MM-DD"
             maxLength={10}
             autoComplete="off"
+            aria-required={effectiveRequired || undefined}
             value={draft.effectiveDate}
             invalid={Boolean(errors.effectiveDate)}
             invalidText={errors.effectiveDate}
@@ -91,13 +110,6 @@ function DateFields({ reference }: { reference: CoastReference }) {
             onChange={(event) => update('expiryDate', event.target.value)}
           />
         </div>
-        {checked && invalid && (
-          <AppNotification
-            kind="error"
-            title="Check the appraisal dates"
-            subtitle="Correct the highlighted fields. No changes have been saved."
-          />
-        )}
         <p role="status" aria-live="polite">
           {checked && !invalid
             ? 'Date fields pass the local checks. Changes are not saved.'
