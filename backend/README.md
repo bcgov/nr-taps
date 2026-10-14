@@ -83,7 +83,7 @@ From the SQL in [`read/oracle`](src/main/java/ca/bc/gov/nrs/taps/read/oracle). N
 unqualified, so the database team needs to confirm the owner and synonym of each object for the
 proxy account. Don't assume one owner because the test fixture has one.
 
-`SELECT` on these 59 objects:
+`SELECT` on these 60 objects:
 
 | Objects | Used for |
 | --- | --- |
