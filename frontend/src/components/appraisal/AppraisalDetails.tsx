@@ -6,7 +6,7 @@ import type {
   GasAppraisedSummary,
 } from '@/contracts/appraisal'
 import TableFrame from '../TableFrame'
-import { displayCode } from './AppraisalResults'
+import { displayCode, worksheetTypeLabels } from './AppraisalResults'
 import type { ReadApi } from '@/service/read-service'
 import GasFtaContext from './GasFtaContext'
 import GasAuditDetails from './GasAuditDetails'
@@ -30,30 +30,60 @@ function Fields({ rows }: { rows: (readonly [string, string | number | null])[] 
 
 function HeaderDetails({ header }: { header: ReferenceHeader }) {
   return (
-    <Fields
-      rows={[
-        ['ECAS ID', header.ecasId],
-        ['Submission revision', header.revisionCount],
-        ['Licence', header.licence],
-        ['Cutting permit', header.cuttingPermit],
-        ['Client number', header.clientNumber],
-        ['Client location', header.clientLocationCode],
-        ['Licensee', header.licenseeName],
-        ['Status', displayCode(header.status)],
-        ['Appraisal category', header.appraisalCategoryCode],
-        ['Reappraisal reason', header.reappraisalReasonCode],
-        ['Rate calculation method', header.rateCalculationMethodCode],
-        ['Coniferous stand rate eligibility', displayCode(header.coniferousStandRateEligibility)],
-        ['Deciduous stand rate eligibility', displayCode(header.deciduousStandRateEligibility)],
-        ['Effective date', formatDisplayDate(header.effectiveDate)],
-        ['Expiry date', formatDisplayDate(header.expiryDate)],
-        ['Administrative district', displayCode(header.administrativeDistrict)],
-        ['Geographic district', displayCode(header.geographicDistrict)],
-        ['File type', displayCode(header.fileType)],
-        ['Timber supply area', displayCode(header.timberSupplyArea)],
-        ['Timber supply block', displayCode(header.timberSupplyBlock)],
-      ]}
-    />
+    <>
+      <h3>Submission information</h3>
+      <Fields
+        rows={[
+          ['ECAS ID', header.ecasId],
+          ['Submission revision', header.revisionCount],
+          ['Status', displayCode(header.status)],
+        ]}
+      />
+      <h3>Client and tenure</h3>
+      <Fields
+        rows={[
+          ['Licence', header.licence],
+          ['Cutting permit', header.cuttingPermit],
+          ['File type', displayCode(header.fileType)],
+        ]}
+      />
+      <Fields
+        rows={[
+          ['Client number', header.clientNumber],
+          ['Client location', header.clientLocationCode],
+        ]}
+      />
+      <Fields rows={[['Licensee', header.licenseeName]]} />
+      <h3>Appraisal information</h3>
+      <Fields
+        rows={[
+          ['Appraisal category', header.appraisalCategoryCode],
+          ['Reappraisal reason', header.reappraisalReasonCode],
+        ]}
+      />
+      <Fields rows={[['Rate calculation method', header.rateCalculationMethodCode]]} />
+      <Fields
+        rows={[
+          ['Coniferous stand rate eligibility', displayCode(header.coniferousStandRateEligibility)],
+          ['Deciduous stand rate eligibility', displayCode(header.deciduousStandRateEligibility)],
+        ]}
+      />
+      <Fields
+        rows={[
+          ['Effective date', formatDisplayDate(header.effectiveDate)],
+          ['Expiry date', formatDisplayDate(header.expiryDate)],
+        ]}
+      />
+      <h3>Geographic context</h3>
+      <Fields
+        rows={[
+          ['Administrative district', displayCode(header.administrativeDistrict)],
+          ['Geographic district', displayCode(header.geographicDistrict)],
+          ['Timber supply area', displayCode(header.timberSupplyArea)],
+          ['Timber supply block', displayCode(header.timberSupplyBlock)],
+        ]}
+      />
+    </>
   )
 }
 
@@ -66,13 +96,17 @@ export function CoastReferenceDetails({ reference }: { reference: CoastReference
         rows={[
           ['Primary timber mark', reference.primaryTimberMark],
           ['Reference mark', reference.referenceMark],
-          ['Net cruise volume', reference.netCruiseVolume],
+          ['Net cruise volume (m³)', reference.netCruiseVolume],
           ['Single tree selection volume (m³)', reference.singleTreeSelectionVolume],
           ['Net second-growth coniferous volume (m³)', reference.secondGrowthConiferousVolume],
           ['Sampling error at 2 standard deviations (%)', reference.samplingErrorPercent],
           ['Net merchantable area', reference.netMerchantableArea],
           ['Initial merchantable area', reference.initialMerchantableArea],
-          ['Point of appraisal distance', reference.pointOfAppraisalDistance],
+        ]}
+      />
+      <Fields rows={[['Point of appraisal distance', reference.pointOfAppraisalDistance]]} />
+      <Fields
+        rows={[
           ['Major centre', reference.majorCentreCode],
           ['Major centre distance', reference.majorCentreDistance],
         ]}
@@ -113,14 +147,33 @@ export function CoastReferenceDetails({ reference }: { reference: CoastReference
       {reference.timberMarks.length === 0 ? (
         <p>No submitted timber marks are available for this submission.</p>
       ) : (
-        <ul className="taps-appraisal-mark-list">
-          {reference.timberMarks.map((mark) => (
-            <li key={mark.timberMark}>
-              {mark.timberMark ?? '—'} — volume {mark.cruiseVolume ?? '—'}; primary{' '}
-              {yesNo(mark.primary)}; mark revision {mark.revisionCount ?? '—'}
-            </li>
-          ))}
-        </ul>
+        <TableFrame ariaLabel="Submitted timber marks">
+          <Table
+            useZebraStyles
+            size="md"
+            aria-label="Submitted timber marks"
+            className="taps-submitted-marks-table"
+          >
+            <TableHead>
+              <TableRow>
+                <TableHeader>Timber mark</TableHeader>
+                <TableHeader className="taps-numeric-cell">Volume (m³)</TableHeader>
+                <TableHeader>Primary</TableHeader>
+                <TableHeader className="taps-numeric-cell">Mark revision</TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {reference.timberMarks.map((mark) => (
+                <TableRow key={mark.timberMark}>
+                  <TableCell>{mark.timberMark ?? '—'}</TableCell>
+                  <TableCell className="taps-numeric-cell">{mark.cruiseVolume ?? '—'}</TableCell>
+                  <TableCell>{yesNo(mark.primary)}</TableCell>
+                  <TableCell className="taps-numeric-cell">{mark.revisionCount ?? '—'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableFrame>
       )}
     </>
   )
@@ -136,8 +189,16 @@ export function InteriorReferenceDetails({ reference }: { reference: InteriorRef
           ['Timber mark', reference.timberMark],
           ['Timber mark revision', reference.timberMarkRevisionCount],
           ['Reference mark', reference.referenceMark],
+        ]}
+      />
+      <Fields
+        rows={[
           ['Point of appraisal', displayCode(reference.pointOfAppraisal)],
           ['Selling price zone', reference.sellingPriceZoneCode],
+        ]}
+      />
+      <Fields
+        rows={[
           ['Comparative cruise', yesNo(reference.comparativeCruise)],
           ['Salvage', yesNo(reference.salvage)],
         ]}
@@ -161,20 +222,31 @@ export function GasStoredSummary({
       <Fields
         rows={[
           ['Worksheet', summary.key.worksheetId],
-          ['Worksheet type', summary.key.type],
+          ['Worksheet type', worksheetTypeLabels[summary.key.type]],
           ['ECAS ID', summary.ecasId],
           ['Method', summary.appraisalMethod === 'C' ? 'Coast' : 'Interior'],
-          ['Summary variant', summary.variant],
-          ['Rate calculation method', summary.rateCalculationMethodCode],
-          ['TOA eligible', yesNo(summary.toaEligible)],
-          ['Status', displayCode(summary.status)],
-          ['Effective date', formatDisplayDate(summary.effectiveDate)],
-          ['Expiry date', formatDisplayDate(summary.expiryDate)],
-          ['Reference type', summary.referenceTypeCode],
-          ['Cease adjustment date', formatDisplayDate(summary.ceaseAdjustmentDate)],
-          ['Timber marks', summary.timberMarks.join(', ')],
         ]}
       />
+      <Fields
+        rows={[
+          ['Rate calculation method', summary.rateCalculationMethodCode],
+          ['TOA eligible', yesNo(summary.toaEligible)],
+        ]}
+      />
+      <Fields rows={[['Status', displayCode(summary.status)]]} />
+      <Fields
+        rows={[
+          ['Effective date', formatDisplayDate(summary.effectiveDate)],
+          ['Expiry date', formatDisplayDate(summary.expiryDate)],
+        ]}
+      />
+      <Fields
+        rows={[
+          ['Reference type', summary.referenceTypeCode],
+          ['Cease adjustment date', formatDisplayDate(summary.ceaseAdjustmentDate)],
+        ]}
+      />
+      <Fields rows={[['Timber marks', summary.timberMarks.join(', ')]]} />
       <GasFtaContext
         key={`APPRAISED:${summary.key.worksheetId}`}
         timberMark={summary.primaryTimberMark}

@@ -22,8 +22,8 @@ const sizeAttribute = (attributes: ts.JsxAttributes): string => {
     : (size.initializer?.getText() ?? 'missing')
 }
 
-test('sets size="md" on every Carbon Button', () => {
-  // Carbon defaults to lg (48px); TAPS buttons are md (40px) everywhere.
+test('uses 40px application buttons with only the expressive 48px login exception', () => {
+  // Only the two login actions use the verified expressive 48px layout; other actions are 40px.
   const findings = sourceFiles(SOURCE_ROOT).flatMap((file) => {
     const sourceFile = ts.createSourceFile(
       file,
@@ -38,7 +38,22 @@ test('sets size="md" on every Carbon Button', () => {
         node.tagName.getText() === 'Button'
       ) {
         const size = sizeAttribute(node.attributes)
-        if (size !== 'md') {
+        const label = ts.isJsxOpeningElement(node)
+          ? node.parent.children
+              .filter(ts.isJsxText)
+              .map((child) => child.text.trim())
+              .join('')
+          : ''
+        const loginAction =
+          relative(SOURCE_ROOT, file) === join('components', 'Landing.tsx') &&
+          ['Log in with IDIR', 'Log in with Business BCeID'].includes(label)
+        const expressive = node.attributes.properties.some(
+          (attribute) =>
+            ts.isJsxAttribute(attribute) &&
+            attribute.name.getText() === 'isExpressive' &&
+            !attribute.initializer,
+        )
+        if (loginAction ? size !== 'lg' || !expressive : size !== 'md') {
           const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart())
           fileFindings.push(`${relative(SOURCE_ROOT, file)}:${line + 1} size=${size}`)
         }

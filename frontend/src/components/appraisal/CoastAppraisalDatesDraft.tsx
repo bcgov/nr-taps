@@ -62,7 +62,7 @@ function DateFields({ reference }: { reference: CoastReference }) {
           else if (nextErrors.expiryDate) expiryRef.current?.focus()
         }}
       >
-        {/* Contained ISO inputs keep every control inside the drawer's mobile focus boundary. */}
+        {/* Date inputs retain the ISO form used by the date rules. */}
         <div className="taps-reference-draft__fields">
           <TextInput
             ref={effectiveRef}

@@ -25,7 +25,12 @@ export function ApplicationPage({ application }: { application: ApplicationId })
           <CardTitle icon={Catalog}>Pages</CardTitle>
           {screens.length ? (
             <TableFrame ariaLabel={`${app.title} pages table`}>
-              <Table size="md" useZebraStyles aria-label={`${app.title} pages`}>
+              <Table
+                size="md"
+                useZebraStyles
+                aria-label={`${app.title} pages`}
+                className="taps-overview-table"
+              >
                 <TableHead>
                   <TableRow>
                     <TableHeader>Page</TableHeader>
@@ -48,6 +53,7 @@ export function ApplicationPage({ application }: { application: ApplicationId })
             </TableFrame>
           ) : (
             <EmptyState
+              headingLevel={3}
               title="No pages available"
               description={`Your ${app.title} pages will appear here as they become available.`}
               role="status"

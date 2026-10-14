@@ -29,7 +29,7 @@ function readCollapsed() {
   }
 }
 
-function Layout({ children }: { children: ReactNode }) {
+function Layout({ children, loginConfigured }: { children: ReactNode; loginConfigured?: boolean }) {
   const { state, can } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const pathname = useLocation().pathname
@@ -99,7 +99,14 @@ function Layout({ children }: { children: ReactNode }) {
     if (returnFocus) requestAnimationFrame(() => profileLauncherRef.current?.focus())
   }, [])
 
-  if (state.kind === 'signed-out') return <Landing expired={state.expired} />
+  if (state.kind === 'signed-out')
+    return (
+      <Landing
+        key={state.expired ? 'expired' : 'signed-out'}
+        expired={state.expired}
+        configured={loginConfigured}
+      />
+    )
 
   const currentPageTitle = (app: ApplicationId) => {
     if (activeApplication !== app) return undefined

@@ -1,7 +1,6 @@
 import type { FC } from 'react'
 import { Button } from '@carbon/react'
 import { useNavigate } from '@tanstack/react-router'
-import PageHeader from './PageHeader'
 import EmptyState from './EmptyState'
 
 const NotFound: FC = () => {
@@ -12,13 +11,13 @@ const NotFound: FC = () => {
     })
   }
   return (
-    <section className="taps-page">
-      <PageHeader title="404" />
+    <section className="taps-not-found">
       <EmptyState
-        title="Page not found"
+        headingLevel={1}
+        title="404"
         description="The page you’re looking for does not exist."
         action={
-          <Button size="md" onClick={() => buttonClicked()}>
+          <Button kind="tertiary" size="md" onClick={() => buttonClicked()}>
             Back home
           </Button>
         }

@@ -93,10 +93,10 @@ test('keeps GAS marks and worksheet families distinct and preserves rows across 
     />,
   )
   expect(
-    screen.getByRole('button', { name: /APPRAISED worksheet .*mark ZZ9997/ }),
+    screen.getByRole('button', { name: /Appraised worksheet .*mark ZZ9997/ }),
   ).toBeInTheDocument()
   expect(
-    screen.getByRole('button', { name: /APPRAISED worksheet .*mark ZZ9998/ }),
+    screen.getByRole('button', { name: /Appraised worksheet .*mark ZZ9998/ }),
   ).toBeInTheDocument()
   expect(screen.getAllByRole('cell', { name: 'ZZ9998' })).toHaveLength(2)
 })
@@ -204,7 +204,14 @@ test('connects the Coast reference to both related GAS mark rows and exact store
   await user.click(screen.getByRole('button', { name: /Open ECAS .*mark ZZ9997/ }))
   const reference = screen.getByRole('complementary', { name: 'Coast reference 999900000002' })
   expect(within(reference).getByRole('heading', { name: 'Coast reference' })).toBeInTheDocument()
-  expect(within(reference).getByText(/ZZ9997 — volume/)).toBeInTheDocument()
+  expect(
+    within(within(reference).getByRole('table', { name: 'Submitted timber marks' })).getByRole(
+      'row',
+      {
+        name: 'ZZ9997 67.89 No 4',
+      },
+    ),
+  ).toBeInTheDocument()
   const species = within(within(reference).getByRole('table', { name: 'Volume by species' }))
   expect(species.getAllByRole('row')).toHaveLength(
     fixture.ecasCoastMultiMarkReference.speciesVolumes.length + 1,
@@ -221,7 +228,17 @@ test('connects the Coast reference to both related GAS mark rows and exact store
   const launcher = within(table).getByRole('button', { name: /mark ZZ9997/ })
   await user.click(launcher)
   const summary = screen.getByRole('complementary', { name: 'Appraised worksheet 999900000011' })
-  expect(within(summary).getByText('COAST_MPS_TOA_N')).toBeInTheDocument()
+  expect(within(summary).queryByText('Summary variant')).not.toBeInTheDocument()
+  expect(within(summary).queryByText('COAST_MPS_TOA_N')).not.toBeInTheDocument()
+  expect(
+    within(within(summary).getByText('Worksheet type').parentElement!).getByText('Appraised'),
+  ).toBeInTheDocument()
+  expect(
+    within(within(summary).getByText('Rate calculation method').parentElement!).getByText('MPS'),
+  ).toBeInTheDocument()
+  expect(
+    within(within(summary).getByText('TOA eligible').parentElement!).getByText('No'),
+  ).toBeInTheDocument()
   expect(within(summary).getByRole('cell', { name: '12.30' })).toBeInTheDocument()
   await user.click(within(summary).getByRole('button', { name: 'History' }))
   expect(
@@ -237,16 +254,16 @@ test('keeps Interior reference fields separate and links its own worksheet', asy
   await user.click(screen.getByRole('button', { name: /Open ECAS 999900000001/ }))
   const reference = screen.getByRole('complementary', { name: 'Interior reference 999900000001' })
   expect(within(reference).getByText('Comparative cruise')).toBeInTheDocument()
-  expect(within(reference).queryByText('Net cruise volume')).not.toBeInTheDocument()
+  expect(within(reference).queryByText('Net cruise volume (m³)')).not.toBeInTheDocument()
   expect(
     within(reference).queryByRole('table', { name: 'Volume by species' }),
   ).not.toBeInTheDocument()
   await user.click(within(reference).getByRole('button', { name: 'View related GAS worksheets' }))
   expect(
-    screen.getByRole('button', { name: /APPRAISED worksheet 999900000010/ }),
+    screen.getByRole('button', { name: /Appraised worksheet 999900000010/ }),
   ).toBeInTheDocument()
   expect(
-    screen.queryByRole('button', { name: /APPRAISED worksheet 999900000011/ }),
+    screen.queryByRole('button', { name: /Appraised worksheet 999900000011/ }),
   ).not.toBeInTheDocument()
 })
 

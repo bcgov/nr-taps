@@ -2,7 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { GasWorksheetSummary, StoredNonAppraisedRate } from '@/contracts/appraisal'
 import TableFrame from '../TableFrame'
 import { GasStoredSummary } from './AppraisalDetails'
-import { displayCode } from './AppraisalResults'
+import { displayCode, worksheetTypeLabels } from './AppraisalResults'
 import type { GasAuditApi } from '@/service/gas-audit-service'
 import GasAuditDetails from './GasAuditDetails'
 import type { ReadApi } from '@/service/read-service'
@@ -146,7 +146,7 @@ export default function OtherWorksheetDetails({
         {(
           [
             ['Worksheet', summary.key.worksheetId],
-            ['Type', historic ? 'Historic' : 'Non-appraised'],
+            ['Type', worksheetTypeLabels[summary.key.type]],
             ['Licence', summary.licence],
             ['Timber mark', summary.timberMark],
             ['Method', summary.appraisalMethod === 'C' ? 'Coast' : 'Interior'],
@@ -168,11 +168,8 @@ export default function OtherWorksheetDetails({
       />
       {historic ? (
         <>
+          <h3>Calculation settings</h3>
           <dl className="taps-field-grid">
-            <div>
-              <dt>Variant</dt>
-              <dd>{summary.variant}</dd>
-            </div>
             <div>
               <dt>Policy version</dt>
               <dd>{summary.policyVersion ?? '—'}</dd>
@@ -272,6 +269,7 @@ export default function OtherWorksheetDetails({
         </>
       ) : (
         <>
+          <h3>Rate classifications</h3>
           <dl className="taps-field-grid">
             {(
               [

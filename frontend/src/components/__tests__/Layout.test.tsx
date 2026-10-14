@@ -342,8 +342,10 @@ test('shows the login page without the shell and keeps the saved theme', async (
   expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1)
   expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('TAPS')
   expect(screen.getByText('Timber Appraisal and Pricing System')).toBeInTheDocument()
-  expect(screen.getByRole('img', { name: 'Government of British Columbia' })).toHaveAttribute(
-    'src',
+  const logo = screen.getByRole('img', { name: 'Government of British Columbia' })
+  expect(logo).toHaveAttribute('viewBox', '70 70 710 188')
+  expect(logo.querySelector('image')).toHaveAttribute(
+    'href',
     expect.stringContaining('gov-bc-logo-horiz'),
   )
   expect(screen.getByRole('button', { name: 'Log in with Business BCeID' })).toBeEnabled()

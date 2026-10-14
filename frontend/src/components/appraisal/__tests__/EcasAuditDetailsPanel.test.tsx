@@ -58,7 +58,7 @@ function AuditPanel({ api }: { api: EcasAuditApi }) {
   )
 }
 
-test.each([1440, 768])(
+test.each([1440, 1280, 1024, 768])(
   'audit focus survives a child loading animation inside the real panel at %ipx',
   async (width) => {
     setViewportWidth(width)
@@ -75,7 +75,7 @@ test.each([1440, 768])(
     }
     render(<AuditPanel api={api} />)
     await user.click(screen.getByRole('button', { name: 'Open reference' }))
-    const panel = screen.getByRole(width >= 1312 ? 'complementary' : 'dialog', {
+    const panel = screen.getByRole('complementary', {
       name: 'Reference details',
     })
     await waitFor(() =>

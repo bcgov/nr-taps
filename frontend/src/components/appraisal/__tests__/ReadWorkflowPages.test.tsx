@@ -145,7 +145,9 @@ test('searches, opens the selected ECAS reference and follows its immutable ID t
   await user.click(screen.getByRole('button', { name: 'View related GAS worksheet' }))
   expect(await screen.findByRole('cell', { name: '12.30' })).toBeInTheDocument()
   expect(api.relatedSummary).toHaveBeenCalledWith('999900000002', expect.any(AbortSignal))
-  expect(screen.getByText('COAST_MPS_TOA_N')).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Worksheet type').parentElement!).getByText('Appraised'),
+  ).toBeInTheDocument()
   await waitFor(() =>
     expect(api.licenceInformation).toHaveBeenCalledWith(
       '',
@@ -198,7 +200,7 @@ test('summary FTA uses its primary mark instead of the selected or first listed 
   await user.type(screen.getByRole('textbox', { name: 'Timber mark' }), 'ZZ9998')
   await user.click(screen.getByRole('button', { name: 'Search' }))
   await user.click(
-    await screen.findByRole('button', { name: /Open APPRAISED worksheet .*mark ZZ9998/ }),
+    await screen.findByRole('button', { name: /Open Appraised worksheet .*mark ZZ9998/ }),
   )
   const context = within(await screen.findByRole('region', { name: 'Worksheet FTA information' }))
   expect(await context.findByText('Mark ZZ9997')).toBeInTheDocument()
@@ -217,6 +219,41 @@ test('never offers the related GAS action without its capability', async () => {
     screen.queryByRole('button', { name: 'View related GAS worksheet' }),
   ).not.toBeInTheDocument()
 })
+
+test.each([1440, 1280])(
+  'keeps page focus when a pending reference finishes loading at %ipx',
+  async (width) => {
+    const user = userEvent.setup()
+    let releaseCoast!: (reference: CoastReference) => void
+    const api = {
+      ...syntheticReadApi,
+      reference: vi.fn(
+        () =>
+          new Promise<CoastReference>((resolve) => {
+            releaseCoast = resolve
+          }),
+      ),
+    }
+    mount(<EcasInboxReadPage api={api} />)
+    act(() => setViewportWidth(width))
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    await user.click(await screen.findByRole('button', { name: /Open ECAS .*mark ZZ9997/ }))
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Submission details' })).toHaveFocus(),
+    )
+    expect(screen.getByText('Loading details…')).toBeInTheDocument()
+    const filter = screen.getByRole('textbox', { name: 'ECAS ID' })
+    await user.click(filter)
+    expect(filter).toHaveFocus()
+
+    await act(async () => releaseCoast(fixture.ecasCoastMultiMarkReference))
+    await screen.findByRole('heading', { name: 'Coast reference' })
+    // Let any animation-frame focus scheduled by the completed request run.
+    await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+
+    expect(filter).toHaveFocus()
+  },
+)
 
 test('switching reference aborts the old Coast species response and preserves detail focus', async () => {
   const user = userEvent.setup()
@@ -281,7 +318,7 @@ test('opens the fictional non-appraised preview worksheet with labelled server r
   await user.click(screen.getByRole('button', { name: 'Search' }))
   await user.click(
     await screen.findByRole('button', {
-      name: `Open NON_APPRAISED worksheet ${nonAppraisedSample.key.worksheetId}, mark ${nonAppraisedSample.timberMark}`,
+      name: `Open Non-appraised worksheet ${nonAppraisedSample.key.worksheetId}, mark ${nonAppraisedSample.timberMark}`,
     }),
   )
   const rates = within(await screen.findByRole('table', { name: 'Non-appraised rates' }))

@@ -88,11 +88,12 @@ function ReadDetailPanel({
   useSessionFailure(detail.error)
   useEffect(() => {
     if (!selection) return
+    // Focus a newly selected record, without reclaiming focus when its request completes.
     const frame = requestAnimationFrame(() =>
       document.getElementById('read-detail-heading')?.focus(),
     )
     return () => cancelAnimationFrame(frame)
-  }, [selection, detail.value])
+  }, [selection])
   const title =
     selection?.kind === 'reference'
       ? `ECAS reference ${selection.id}`

@@ -77,6 +77,14 @@ test('historic summary retains flags, exact stored rates and separate rate compo
   }
   render(<OtherWorksheetDetails summary={summary} api={syntheticFtaApi} />)
   expect(screen.getByText('Historic')).toBeInTheDocument()
+  expect(screen.queryByText('Variant')).not.toBeInTheDocument()
+  expect(screen.queryByText('INTERIOR_MPS')).not.toBeInTheDocument()
+  expect(
+    within(screen.getByText('Policy version').parentElement!).getByText('2026.1'),
+  ).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Calculation method').parentElement!).getByText('MPS'),
+  ).toBeInTheDocument()
   expect(screen.getByText('Yes')).toBeInTheDocument()
   expect(screen.getByText('No')).toBeInTheDocument()
   expect(

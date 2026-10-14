@@ -203,7 +203,7 @@ test('replaces results with an accessible error and lets the caller retry', asyn
     </SearchResultsTableFrame>,
   )
 
-  expect(screen.getByRole('alert')).toHaveTextContent('Unable to load results')
+  expect(screen.getByRole('alert')).toHaveAccessibleName('Search unavailable')
   expect(screen.getByRole('alert')).toHaveTextContent('The service is unavailable.')
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
   expect(screen.queryByRole('region', { name: 'Search results table' })).not.toBeInTheDocument()

@@ -69,7 +69,7 @@ beforeEach(() => {
   localStorage.clear()
 })
 
-test('isolates every Layout region and keeps the mobile drawer usable through Tab, Escape and reopen', async () => {
+test('keeps Layout available and the narrow drawer usable through Tab, close and reopen', async () => {
   setViewportWidth(375)
   const user = userEvent.setup()
   await renderLayout()
@@ -83,9 +83,9 @@ test('isolates every Layout region and keeps the mobile drawer usable through Ta
 
   for (let cycle = 0; cycle < 2; cycle++) {
     await user.click(launcher)
-    const panel = screen.getByRole('dialog', { name: 'Reference details' })
-    background.forEach((region) => expect(region.closest('[inert]')).not.toBeNull())
-    expect(menu.closest('[inert]')).not.toBeNull()
+    const panel = screen.getByRole('complementary', { name: 'Reference details' })
+    background.forEach((region) => expect(region.closest('[inert]')).toBeNull())
+    expect(menu.closest('[inert]')).toBeNull()
     expect(panel.closest('[inert]')).toBeNull()
     expect(panel.closest('#main-content')).toBeNull()
     await waitFor(() =>
@@ -95,22 +95,29 @@ test('isolates every Layout region and keeps the mobile drawer usable through Ta
     await user.tab()
     expect(within(panel).getByRole('button', { name: 'Last action' })).toHaveFocus()
     await user.tab()
-    expect(within(panel).getByRole('button', { name: 'Close' })).toHaveFocus()
-    await user.tab({ shift: true })
-    expect(within(panel).getByRole('button', { name: 'Last action' })).toHaveFocus()
-    await user.keyboard('{Escape}')
+    expect(panel).not.toContainElement(document.activeElement as HTMLElement)
+    await user.click(within(panel).getByRole('button', { name: 'Close' }))
 
-    expect(screen.queryByRole('dialog', { name: 'Reference details' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('complementary', { name: 'Reference details' }),
+    ).not.toBeInTheDocument()
     background.forEach((region) => expect(region.closest('[inert]')).toBeNull())
     await waitFor(() => expect(launcher).toHaveFocus())
   }
 
+  await user.click(launcher)
+  const panel = screen.getByRole('complementary', { name: 'Reference details' })
   await user.click(menu)
   expect(menu).toHaveAttribute('aria-expanded', 'true')
   expect(screen.getByRole('main')).toHaveAttribute('inert')
+  expect(panel.closest('[inert]')).toBeNull()
+  await user.click(menu)
+  expect(screen.getByRole('main')).not.toHaveAttribute('inert')
+  await user.click(within(panel).getByRole('button', { name: 'Close' }))
+  await waitFor(() => expect(launcher).toHaveFocus())
 })
 
-test('keeps drawer content and dark theme while switching between modal and desktop modes', async () => {
+test('keeps content, theme and page focus when switching between beside-page and over-page layouts', async () => {
   localStorage.setItem('taps.ui.theme', 'g100')
   setViewportWidth(1440)
   const user = userEvent.setup()
@@ -124,10 +131,16 @@ test('keeps drawer content and dark theme while switching between modal and desk
   expect(main.closest('[inert]')).toBeNull()
   expect(panel.closest('.taps-detail-panel-host')).toHaveClass('cds--g100')
 
-  act(() => setViewportWidth(1311))
-  expect(screen.getByRole('dialog', { name: 'Reference details' })).toBe(panel)
-  expect(main.closest('[inert]')).not.toBeNull()
+  act(() => setViewportWidth(1280))
+  expect(screen.getByRole('complementary', { name: 'Reference details' })).toBe(panel)
+  expect(main.closest('[inert]')).toBeNull()
   expect(panel.closest('[inert]')).toBeNull()
+  expect(note).toHaveValue('Keep this reference')
+  expect(note).toHaveFocus()
+
+  act(() => setViewportWidth(1024))
+  expect(screen.getByRole('complementary', { name: 'Reference details' })).toBe(panel)
+  expect(main.closest('[inert]')).toBeNull()
   expect(note).toHaveValue('Keep this reference')
   expect(note).toHaveFocus()
 
@@ -140,8 +153,10 @@ test('keeps drawer content and dark theme while switching between modal and desk
   act(() => launcher.focus())
   expect(launcher).toHaveFocus()
   act(() => setViewportWidth(375))
-  await waitFor(() => expect(note).toHaveFocus())
-  expect(main.closest('[inert]')).not.toBeNull()
+  expect(launcher).toHaveFocus()
+  expect(main.closest('[inert]')).toBeNull()
+  expect(note).toHaveValue('Keep this reference')
+  await user.click(note)
   await user.keyboard('{Escape}')
   await waitFor(() => expect(launcher).toHaveFocus())
 })

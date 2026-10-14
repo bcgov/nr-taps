@@ -52,13 +52,14 @@ and page selectors. The preview renders the real `Layout`, pages, `RequireAccess
 `ThemeProvider` with an in-memory router and a fake `AuthContext`. It makes no API or OIDC calls.
 Reloading resets it.
 
-- **Sessions:** signed out (the login page, with the preview controls above it), loading, error,
-  no role, ECAS and GAS staff, ECAS only, and GAS client-report only (can open the GAS overview but
-  not appraisal screens).
+- **Sessions:** signed out and expired (preview login actions switch synthetic sessions), loading,
+  error, no role, ECAS and GAS staff, ECAS only, long identity, and GAS client-report only (can open
+  the GAS overview but not appraisal screens). The page selector also exposes 404 and route-error states.
 - **Synthetic reusable controls:** sample table with draft filters, loading/empty/error states and
   a detail drawer.
 - **Inbox Search and Appraisal Search:** normal preview navigation opens the real frontend search
-  and detail components with synthetic APIs, including audit, attachments and worksheet history.
+  and detail components with synthetic APIs, including paged audit events, field changes,
+  attachments with long stored text, and worksheet history.
   Capability checks still apply; these pages make no HTTP requests.
 - **Synthetic ECAS and GAS workflow:** uses the backend contract fixture. ECAS rows include several
   marks and permits for one submission. **View related GAS worksheets** follows the fixture link.
@@ -68,8 +69,8 @@ Reloading resets it.
   In GAS search, licence `X99998` shows the mark chooser and mark `ZZ9996` shows FTA information
   with no worksheets.
 - **Synthetic asynchronous read pages:** GAS licence `X99995` and mark `ZZ9995` open a fictional
-  non-appraised summary with descriptive labels, nullable rate components and exact Upset Rate /
-  Total Rate values. Expand **History** for twelve fictional changes across two pages, including
+  non-appraised and historic summaries with descriptive labels, nullable rate components and exact
+  Upset Rate / Total Rate values. Expand **History** on a non-appraised summary for twelve fictional changes across two pages, including
   a comment containing literal markup that must display as text.
   Appraised worksheets under licence `X99998` also expose their own synthetic History pages;
   historic worksheets do not offer History.
@@ -92,7 +93,7 @@ local synthetic preview. See the
 4. Open a row drawer at wide and narrow widths. Check initial focus, Escape, Tab and that focus
    returns to the row button.
 5. At narrow width, check the menu, wrapped page actions, table keyboard scrolling, and light and
-   dark themes. With the drawer open, the header and page behind it must be inert.
+   dark themes. The detail panel is nonmodal: the header and page stay available, and Tab can leave it.
 6. In the workflow preview, check every ECAS mark/permit row, both reference methods, both GAS mark
    rows opening the same worksheet, and the FTA-only mark.
 
@@ -104,13 +105,16 @@ takes precedence over illustrative screenshots. Use the
 [LEXIS search patterns](https://www.figma.com/design/YK5SeF2OD7dxFN2yG3rW7S/LEXIS?node-id=4498-79848)
 and existing LEXIS components for the shared presentation. TAPS applies them as follows:
 
+The [post-implementation UX review](https://www.figma.com/design/jnxAnMyBpvlzfHvkrrlCsg/LEXIS-%E2%80%94-Post-implementation-UX-Review?node-id=0-1)
+also applies to shared behavior, including keeping the page available beside an open side panel.
+
 - **Colour:** two blues replace Carbon's blue. Fill blue `#0073E6` sits behind white content (the
   header, primary buttons) in both themes. Text blue (`#005CB8` light, `#5CADFF` dark) is used for
   links, icons, focus, selection and tertiary buttons. Don't add other colours.
 - **Header and navigation:** "TAPS **Timber Appraisal and Pricing System**", 12px after the menu
   toggle. The toggle names its next action ("Open menu"/"Close menu") on hover and focus. The side
-  navigation opens expanded, collapses to an icon rail, remembers that choice and opens only from
-  the toggle. Collapsed items have tooltips; a collapsed group holding the current page shows
+  navigation opens expanded, collapses to an icon rail, and remembers that choice. The toggle or
+  activating a collapsed group expands it. Collapsed items have tooltips; a group holding the current page shows
   "Group: Page" and is marked current. Icons are text blue whether or not they're selected.
   All rows are 48px high, including grouped links, whose labels start 16px beyond the group label.
   **Support** sits below a divider at the foot of the panel, outside page navigation; **Report an
@@ -118,13 +122,15 @@ and existing LEXIS components for the shared presentation. TAPS applies them as 
 - **Typography:** field labels use `label-02`, field and read-only values `body-02`/`body-compact-02`,
   and DataTable keeps Carbon's sizes. Headings: page title `heading-05`, sections and card titles
   `heading-03`, sub-sections `heading-compact-02`. Inside a side panel, each level moves down one step.
-- **Buttons:** always `size="md"` (a test checks this). A button with an icon keeps it at the right edge.
+- **Buttons:** use `size="md"`. The two login actions use expressive `lg` (48px), matching the login
+  design; a test guards this exception. A button with an icon keeps it at the right edge.
 - **Search pages:** add `taps-fullbleed-page` to the page. Filters sit four to a row, with
   **Clear all** (tertiary) and **Search** (primary) at the right. Results fill the content width,
   with the count, table and pagination on one grey panel. Rows that open a panel use
   `taps-link-button`. Date ranges stay together on a row and stack at narrow widths. Headers can
   wrap rather than forcing avoidable horizontal scrolling. Read-only calendar dates use month
   names (for example, Sep 28, 2026); date inputs retain YYYY-MM-DD and timestamps retain their values.
+  Search failures use a centered error state with a retry action.
 - **Detail tables:** rate, volume and percentage columns align right, including their headers.
   Small stored-rate tables fit the drawer; wide tables retain keyboard-accessible scrolling.
   Empty collections show a message. Stored numeric strings retain their precision.
@@ -149,15 +155,16 @@ Components are in `frontend/src/components` (appraisal screens under `appraisal/
 | `CardTitle` | `children`; optional `icon`, `id`. A card's `h2` in `heading-03` with a 24px icon. Put it in a `Tile` with `className="taps-card"`. |
 | `SearchFilters` | `children`, `onSearch`; optional `title` (the form's accessible name), `onReset` (shows **Clear all**), `loading`, `disabled`. A form, so Enter submits. The caller owns draft and applied state. |
 | `TableFrame` | `ariaLabel`, `children`; optional `busy`. Labelled scroll region, focusable only when it overflows. |
-| `SearchResultsTableFrame` | `children`; optional `ariaLabel`, `loading`, `loadingDescription`, `totalItems`, `columnCount`, `error`, `onRetry`, `pagination`. Count, skeleton, empty or error state, with the pagination on the same panel. `columnCount` must match the table. |
+| `SearchResultsTableFrame` | `children`; optional `ariaLabel`, `loading`, `loadingDescription`, `totalItems`, `columnCount`, `error`, `errorTitle`, `onRetry`, `pagination`. Count, skeleton, empty or error state, with the pagination on the same panel. `columnCount` must match the table. |
 | `AppNotification` | Carbon `kind`, `title`, `subtitle`, optional `role` (default `alert` for errors, else `status`). |
-| `EmptyState` | `title`, `description`; optional `action`, `role="status"`. |
+| `EmptyState` | `title`, `description`; optional `action`, `role="status"`, `headingLevel` (default 2). |
+| `RouteError` | Root route fallback with a generic error and reload action; preserves the selected theme and keeps exception details out of the page. |
 | `DetailSidePanel` | `open`, `title`, `children`, `onClose`, `launcherRef`, `initialFocusSelector`; optional `contentSelector`, `fallbackFocusSelector` (default `#main-content`). |
 
-`DetailSidePanel` slides in at 1312px and wider and is an overlay below that. It focuses the
-initial target on open and returns focus to the launcher (or the fallback) on close. It renders in
-a body portal. In overlay mode it makes the rest of the page inert and restores it on close, resize
-or unmount.
+`DetailSidePanel` makes room beside the page at 1312px and wider and slides over it below that.
+It remains a nonmodal complementary landmark at every width: the page stays enabled and focus is
+not trapped. It focuses the initial target on open and returns focus to the launcher (or fallback)
+on close. It renders in a themed body portal; resizing restores any temporary page styles.
 
 Store the clicked button before opening:
 
@@ -166,6 +173,7 @@ const launcherRef = useRef<HTMLElement | null>(null)
 const [open, setOpen] = useState(false)
 
 <Button
+  size="md"
   onClick={(event) => {
     launcherRef.current = event.currentTarget
     setOpen(true)
@@ -198,8 +206,8 @@ Users with `ECAS_SUBMISSION_EDIT` see an appraisal-dates section on the Coast re
 **Check dates** runs the rules below and **Reset draft** restores the stored values. Nothing is
 saved, and leaving or reloading the record discards the draft.
 
-Category and revision are read-only. Invalid input is
-kept, the first invalid field gets focus, and the inputs stay inside the mobile drawer's focus trap.
+Category and revision are read-only. Invalid input is kept and the first invalid field gets focus.
+The panel remains nonmodal while checking the draft.
 
 ### Field rules
 
