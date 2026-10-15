@@ -71,7 +71,7 @@ The default Hikari pool permits two connections, keeps no minimum idle connectio
 three seconds for a connection. Startup rejects pool/socket values outside the documented bounds.
 Idle connections close after 10 minutes and connections live at most 30 minutes. The default
 backend replica limit is one. Account for every preview, replica, rollout surge and terminating pod
-when setting the database-wide budget; see [legacy coexistence](../docs/legacy-coexistence.md).
+when setting the database-wide budget.
 
 `/actuator/health` includes datasource health. Liveness and readiness use app state,
 so a database outage doesn't restart every pod. Read failures return 503. Turning Oracle on doesn't
@@ -88,8 +88,7 @@ From the SQL in [`read/oracle`](src/main/java/ca/bc/gov/nrs/taps/read/oracle). N
 unqualified, so the database team needs to confirm the owner and synonym of each object for the
 read principal. Don't assume one owner because the test fixture has one. Use object-level `READ`
 privileges, which allow SELECT queries without permitting locking reads or table locks. Do not
-grant `SELECT`, DML, DDL or `ANY` privileges, and do not proxy as a shared schema owner. The
-[coexistence guide](../docs/legacy-coexistence.md) explains the activation checks.
+grant `SELECT`, DML, DDL or `ANY` privileges, and do not proxy as a shared schema owner.
 
 `READ` on the following objects:
 

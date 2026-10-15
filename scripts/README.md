@@ -120,4 +120,3 @@ publish tags, images or deployments. Both the PR and Analysis workflows run them
 
 The tests reject automatic PROD calls, wrong namespaces, mutable release references, untested
 or unmerged tags, stale PR source trees, mismatched manifests and unsafe connection/replica limits.
-See [manual releases](../docs/production-release.md) and [legacy coexistence](../docs/legacy-coexistence.md).

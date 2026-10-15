@@ -65,6 +65,3 @@ For local checks with a test issuer and disposable Oracle, use the [local synthe
 | [Read API and Oracle behavior](docs/oracle-reads.md) | Implemented request/response contracts, query mappings and document visibility |
 
 The [Oracle SQL fixture README](backend/src/test/resources/oracle/README.md) stays beside the seven synthetic SQL files and explains their isolation from live databases.
-
-Manual promotion and coexistence requirements are documented in [PROD releases](docs/production-release.md)
-and [ECAS/GAS2 database coexistence](docs/legacy-coexistence.md).

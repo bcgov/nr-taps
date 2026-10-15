@@ -71,7 +71,7 @@ DEV/TEST tokens must have no PROD access.
 | Environment secret   | `keystore_secret`                             | Passphrase for the generated truststore                                                |
 | Repository secret             | `sonar_token_backend`, `sonar_token_frontend` | Optional; SonarCloud runs on pushes to `main` once set                                 |
 
-- Oracle is enabled for every deployment. All five database secrets are required; `PORT` is optional. Values belong only in the selected environment; callers do not pass them. Complete the [coexistence checks](legacy-coexistence.md) before deploying to a shared database.
+- Oracle is enabled for every deployment. All five database secrets are required; `PORT` is optional. Values belong only in the selected environment; callers do not pass them.
 - TEST/PROD jobs use their own environment secrets. Namespace suffix checks reject fallback to the DEV repository namespace. Set all database/OIDC values in the intended environment; do not create repository-level database defaults.
 - Keep OIDC values in their environment, with no repository-level fallback.
 - Limit each deploy token to this app in its own namespace. Each namespace must be able to pull the GHCR images.
@@ -121,14 +121,14 @@ Spring's 60-second graceful shutdown plus a 10-second preStop fits in the 90-sec
 | Weekly (Saturday)    | DEV previews older than a week removed; ZAP scan of TEST    |                                                   |
 
 - PR builds tag images with the PR number and head SHA. DEV runs the SHA images. Merge verifies the PR source tree matches the merged commit, resolves the head-SHA images to immutable digests and deploys that pair to TEST. Update a PR from `main` and let it rebuild before merging.
-- After TEST smoke succeeds, Merge records a release manifest. PROD requires explicitly running [Release PROD](production-release.md) with an existing tested tag. A merge, schedule or new tag cannot deploy PROD.
+- After TEST smoke succeeds, Merge records a release manifest. PROD requires explicitly running the manual Release PROD workflow with an existing tested tag. A merge, schedule or new tag cannot deploy PROD.
 - The smoke test checks that the shell loads, anonymous `/api/me` gets 401, and both pods report the expected image reference. The tag check catches two PRs sharing a route slot. There are 50 slots to match the SSO redirect list.
 - PR Validate posts the preview links on the PR. The Scheduled workflow also marks PRs and issues stale after 14 days and closes them 7 days later.
 - Keep the OpenShift deployer action at v4.2.2 or later so rendered templates, which contain secrets, stay out of logs.
 
 Configure branch protection in the repository settings.
 
-**PROD has no automatic delivery path.** Only the manual [Release PROD workflow](production-release.md) can deploy it, using a TEST-verified tag and digest pair. Creating a tag does not deploy. Environment/SSO/grant setup and acceptance must precede the first manual release.
+**PROD has no automatic delivery path.** Only the manual Release PROD workflow can deploy it, using a TEST-verified tag and digest pair. Creating a tag does not deploy. Environment/SSO/grant setup and acceptance must precede the first manual release.
 
 The PR workflow runs the backend tests and frontend checks before the DEV deploy. The Analysis workflow runs on non-draft PRs, pushes to `main`, weekly and on demand: backend tests with JaCoCo, frontend checks with dependency and supply-chain scans, the rehearsal issuer tests, and an advisory Trivy scan that reports to GitHub Security. SonarCloud runs on pushes to `main` once the `sonar_token_backend` and `sonar_token_frontend` secrets exist. CI doesn't run the Oracle integration tests or `test:security-config`.
 
@@ -154,7 +154,7 @@ See the [backend configuration](../backend/README.md#configuration) for runtime 
 
 ## Activation acceptance
 
-Complete these checks before activating reads in a shared environment. Having a proxy account does not establish connectivity, grants or application acceptance. See the [current status](../README.md#current-status) and [manual release guide](production-release.md).
+Complete these checks before activating reads in a shared environment. Having a proxy account does not establish connectivity, grants or application acceptance. See the [current status](../README.md#current-status).
 
 For each check, record the commit, image tag, environment, result and any follow-up. Keep credentials, tokens, account details and query results out of Git, screenshots and logs.
 
