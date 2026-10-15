@@ -60,7 +60,7 @@ DEV/TEST tokens must have no PROD access.
 | Environment variable | `TAPS_OIDC_CLIENT_ID`                         | TAPS `resource` value for that environment                                             |
 | Environment variable | `TAPS_OIDC_SITEMINDER_LOGOUT_URL`             | Optional; PROD defaults to `logon7`, DEV/TEST to `logontest7`                |
 | Environment variable | `TAPS_OIDC_IDIR_HINT`, `TAPS_OIDC_BCEID_HINT` | Optional; default to `azureidir` and `bceidbusiness`                                   |
-| Repository secret (DEV)       | `oc_namespace`, `oc_token`                    | DEV namespace (ends in `-dev`) and deploy token                                        |
+| DEV environment secret        | `oc_namespace`, `oc_token`                    | DEV namespace (ends in `-dev`) and deploy token                                        |
 | TEST environment secret       | `oc_namespace`, `oc_token`                    | TEST namespace (ends in `-test`) and a separate deploy token                           |
 | PROD environment secret | `oc_namespace`, `oc_token` | PROD namespace (ends in `-prod`) and a PROD-only deploy token |
 | Environment secret | `PORT` | Optional Oracle TCPS listener port; defaults to `1543` |
@@ -72,8 +72,8 @@ DEV/TEST tokens must have no PROD access.
 | Repository secret             | `sonar_token_backend`, `sonar_token_frontend` | Optional; SonarCloud runs on pushes to `main` once set                                 |
 
 - Oracle is enabled for every deployment. All five database secrets are required; `PORT` is optional. Values belong only in the selected environment; callers do not pass them.
-- TEST/PROD jobs use their own environment secrets. Namespace suffix checks reject fallback to the DEV repository namespace. Set all database/OIDC values in the intended environment; do not create repository-level database defaults.
-- Keep OIDC values in their environment, with no repository-level fallback.
+- Keep namespace, token, database and OIDC values in their environment, never at repository or organization level. GitHub fills a value missing from an environment with a repository or organization value of the same name, and nothing in the run shows which level it came from.
+- TEST and PROD callers pass no secrets, so a secret missing from that environment fails the deploy. Every deploy also requires the namespace to end in `-<environment>`, the issuer to use that environment's `loginproxy.gov.bc.ca` host, and any SiteMinder logout URL to use `logontest7` (DEV/TEST) or `logon7` (PROD).
 - Limit each deploy token to this app in its own namespace. Each namespace must be able to pull the GHCR images.
 - There is no `TAPS_OIDC_CLIENT_SECRET`.
 

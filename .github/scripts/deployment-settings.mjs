@@ -1,6 +1,25 @@
 import { appendFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
+const SSO_ORIGINS = {
+  dev: 'https://dev.loginproxy.gov.bc.ca',
+  test: 'https://test.loginproxy.gov.bc.ca',
+  prod: 'https://loginproxy.gov.bc.ca',
+}
+const SITEMINDER_ORIGINS = {
+  dev: 'https://logontest7.gov.bc.ca',
+  test: 'https://logontest7.gov.bc.ca',
+  prod: 'https://logon7.gov.bc.ca',
+}
+
+function origin(value) {
+  try {
+    return new URL(value).origin
+  } catch {
+    return undefined
+  }
+}
+
 function boundedInteger(env, name, fallback, min, max) {
   const value = env[name] || String(fallback)
   if (!/^\d+$/.test(value) || Number(value) < min || Number(value) > max) {
@@ -31,6 +50,15 @@ export function deploymentSettings(env) {
     if (!env[setting]) throw new Error(`${setting} is required for ${environment}`)
   }
   if (!env.OC_NAMESPACE.endsWith(`-${environment}`)) throw new Error('OpenShift namespace does not match the environment')
+  // A variable missing from the environment silently takes the repository or organization value,
+  // so values that select an SSO environment must match the one being deployed.
+  if (origin(env.TAPS_OIDC_ISSUER_URI) !== SSO_ORIGINS[environment]) {
+    throw new Error(`TAPS_OIDC_ISSUER_URI must use ${SSO_ORIGINS[environment]} for ${environment}`)
+  }
+  if (env.TAPS_OIDC_SITEMINDER_LOGOUT_URL &&
+      origin(env.TAPS_OIDC_SITEMINDER_LOGOUT_URL) !== SITEMINDER_ORIGINS[environment]) {
+    throw new Error(`TAPS_OIDC_SITEMINDER_LOGOUT_URL must use ${SITEMINDER_ORIGINS[environment]} for ${environment}`)
+  }
   const source = env.SOURCE_REF || env.GITHUB_SHA
   if (!/^[a-f0-9]{40}$/.test(source ?? '')) throw new Error('Deployment source must be a commit SHA')
   const images = {}
@@ -78,7 +106,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${value}\n`)
     }
   } catch (error) {
-    console.error(error.message)
+    // An annotation keeps the reason on the run summary, readable without the job log.
+    const message = String(error.message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
+    console.log(`::error title=Invalid deployment settings::${message}`)
     process.exitCode = 1
   }
 }
