@@ -29,15 +29,13 @@ on:
         type: string
         default: ""
     secrets:
-      # Read from the selected environment. TEST and PROD callers pass no secrets, so a value missing
-      # from that environment stays empty and fails validation instead of falling back to a
-      # repository or organization secret of the same name.
       oc_namespace:
         description: OpenShift namespace
-        required: false
+        required: true
       oc_token:
         description: OpenShift token
-        required: false
+        required: true
+      # Read from the selected environment only; callers do not pass database credentials.
       database_host:
         description: Oracle host
         required: false
@@ -113,7 +111,6 @@ jobs:
           OC_TOKEN: ${{ secrets.oc_token }}
           TAPS_OIDC_ISSUER_URI: ${{ vars.TAPS_OIDC_ISSUER_URI }}
           TAPS_OIDC_CLIENT_ID: ${{ vars.TAPS_OIDC_CLIENT_ID }}
-          TAPS_OIDC_SITEMINDER_LOGOUT_URL: ${{ vars.TAPS_OIDC_SITEMINDER_LOGOUT_URL }}
           TAPS_BACKEND_MIN_REPLICAS: ${{ vars.TAPS_BACKEND_MIN_REPLICAS }}
           TAPS_BACKEND_MAX_REPLICAS: ${{ vars.TAPS_BACKEND_MAX_REPLICAS }}
           DATABASE_MAX_POOL_SIZE: ${{ vars.DATABASE_MAX_POOL_SIZE }}

@@ -72,8 +72,8 @@ DEV/TEST tokens must have no PROD access.
 | Repository secret             | `sonar_token_backend`, `sonar_token_frontend` | Optional; SonarCloud runs on pushes to `main` once set                                 |
 
 - Oracle is enabled for every deployment. All five database secrets are required; `PORT` is optional. Values belong only in the selected environment; callers do not pass them.
-- Keep namespace, token, database and OIDC values in their environment, never at repository or organization level. GitHub fills a value missing from an environment with a repository or organization value of the same name, and nothing in the run shows which level it came from.
-- TEST and PROD callers pass no secrets, so a secret missing from that environment fails the deploy. Every deploy also requires the namespace to end in `-<environment>`, the issuer to use that environment's `loginproxy.gov.bc.ca` host, and any SiteMinder logout URL to use `logontest7` (DEV/TEST) or `logon7` (PROD).
+- Keep namespace, token, database and OIDC values out of the repository level. An environment value replaces a same-named repository value only when it exists, so a missing TEST or PROD value would otherwise inherit the repository one.
+- Each deployment fails before deploying if a required value is empty or the namespace doesn't end in `-<environment>`.
 - Limit each deploy token to this app in its own namespace. Each namespace must be able to pull the GHCR images.
 - There is no `TAPS_OIDC_CLIENT_SECRET`.
 

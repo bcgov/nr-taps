@@ -7,12 +7,11 @@ import { deploymentSettings } from './deployment-settings.mjs'
 
 const sha = 'a'.repeat(40)
 const repository = 'bcgov/nr-taps'
-const issuer = environment =>
-  `https://${environment === 'prod' ? '' : `${environment}.`}loginproxy.gov.bc.ca/auth/realms/standard`
 const shared = {
   GITHUB_REPOSITORY: repository, GITHUB_SHA: sha, GITHUB_REF: 'refs/heads/main',
   GITHUB_EVENT_NAME: 'push', OC_SERVER: 'https://api.example.invalid:6443',
-  OC_APPS_DOMAIN: 'apps.example.invalid', OC_TOKEN: 'synthetic', TAPS_OIDC_CLIENT_ID: 'synthetic',
+  OC_APPS_DOMAIN: 'apps.example.invalid', OC_TOKEN: 'synthetic',
+  TAPS_OIDC_ISSUER_URI: 'https://sso.example.invalid/realms/synthetic', TAPS_OIDC_CLIENT_ID: 'synthetic',
   DATABASE_HOST: 'oracle.example.invalid', DATABASE_SERVICE_NAME: 'synthetic', DATABASE_USER: 'synthetic',
   DATABASE_PASSWORD: 'sensitive-test-value', KEYSTORE_SECRET: 'sensitive-test-value',
   BACKEND_IMAGE: `ghcr.io/${repository}/backend@sha256:${'b'.repeat(64)}`,
@@ -20,17 +19,9 @@ const shared = {
 }
 const production = {
   ...shared, DEPLOY_ENV: 'prod', DEPLOY_TARGET: 'prod', OC_NAMESPACE: 'synthetic-prod',
-  TAPS_OIDC_ISSUER_URI: issuer('prod'), GITHUB_EVENT_NAME: 'workflow_dispatch',
+  GITHUB_EVENT_NAME: 'workflow_dispatch',
   GITHUB_WORKFLOW_REF: `${repository}/.github/workflows/release-prod.yml@refs/heads/main`,
   SOURCE_REF: 'd'.repeat(40),
-}
-const testing = {
-  ...shared, DEPLOY_ENV: 'test', DEPLOY_TARGET: 'test', OC_NAMESPACE: 'synthetic-test',
-  TAPS_OIDC_ISSUER_URI: issuer('test'),
-}
-const preview = {
-  ...shared, DEPLOY_ENV: 'dev', DEPLOY_TARGET: '57', OC_NAMESPACE: 'synthetic-dev', IMAGE_TAG: sha,
-  TAPS_OIDC_ISSUER_URI: issuer('dev'), GITHUB_EVENT_NAME: 'pull_request', GITHUB_REF: 'refs/pull/57/merge',
 }
 
 test('PROD requires a manual dispatch of the release workflow on main', () => {
@@ -47,43 +38,25 @@ test('PROD requires a manual dispatch of the release workflow on main', () => {
 })
 
 test('TEST requires main and the pinned image pair; DEV retains SHA tags and numbered slots', () => {
-  assert.equal(deploymentSettings(testing).backend_image, shared.BACKEND_IMAGE)
-  assert.throws(() => deploymentSettings({ ...testing, GITHUB_REF: 'refs/pull/7/merge' }))
-  assert.throws(() => deploymentSettings({ ...testing, FRONTEND_IMAGE: '' }))
-  const result = deploymentSettings(preview)
+  const testEnv = { ...shared, DEPLOY_ENV: 'test', DEPLOY_TARGET: 'test', OC_NAMESPACE: 'synthetic-test' }
+  assert.equal(deploymentSettings(testEnv).backend_image, shared.BACKEND_IMAGE)
+  assert.throws(() => deploymentSettings({ ...testEnv, GITHUB_REF: 'refs/pull/7/merge' }))
+  assert.throws(() => deploymentSettings({ ...testEnv, FRONTEND_IMAGE: '' }))
+  const dev = { ...shared, DEPLOY_ENV: 'dev', DEPLOY_TARGET: '57', OC_NAMESPACE: 'synthetic-dev', IMAGE_TAG: sha,
+    GITHUB_EVENT_NAME: 'pull_request', GITHUB_REF: 'refs/pull/57/merge' }
+  const result = deploymentSettings(dev)
   assert.equal(result.route_slot, '7')
   assert.equal(result.backend_image, `ghcr.io/${repository}/backend:${sha}`)
   for (const overrides of [{ DEPLOY_TARGET: 'test' }, { IMAGE_TAG: 'prod' }, { DEPLOY_TARGET: '9007199254740992' }]) {
-    assert.throws(() => deploymentSettings({ ...preview, ...overrides }))
+    assert.throws(() => deploymentSettings({ ...dev, ...overrides }))
   }
-})
-
-test('the SSO issuer and SiteMinder logout must belong to the deployed environment', () => {
-  const siteminder = { test: 'https://logontest7.gov.bc.ca/clp-cgi/logoff.cgi', prod: 'https://logon7.gov.bc.ca/clp-cgi/logoff.cgi' }
-  for (const [env, logout] of [[preview, siteminder.test], [testing, siteminder.test], [production, siteminder.prod]]) {
-    assert.ok(deploymentSettings(env))
-    assert.ok(deploymentSettings({ ...env, TAPS_OIDC_SITEMINDER_LOGOUT_URL: logout }))
-  }
-  // A variable missing from an environment takes the repository or organization value instead.
-  for (const [env, overrides] of [
-    [production, { TAPS_OIDC_ISSUER_URI: issuer('dev') }], [production, { TAPS_OIDC_ISSUER_URI: issuer('test') }],
-    [production, { TAPS_OIDC_SITEMINDER_LOGOUT_URL: siteminder.test }],
-    [testing, { TAPS_OIDC_ISSUER_URI: issuer('dev') }], [testing, { TAPS_OIDC_ISSUER_URI: issuer('prod') }],
-    [testing, { TAPS_OIDC_SITEMINDER_LOGOUT_URL: siteminder.prod }],
-    [preview, { TAPS_OIDC_ISSUER_URI: issuer('test') }], [preview, { TAPS_OIDC_SITEMINDER_LOGOUT_URL: siteminder.prod }],
-    [production, { TAPS_OIDC_ISSUER_URI: 'http://loginproxy.gov.bc.ca/auth/realms/standard' }],
-    [production, { TAPS_OIDC_ISSUER_URI: 'https://loginproxy.gov.bc.ca.example.invalid/auth/realms/standard' }],
-    [production, { TAPS_OIDC_ISSUER_URI: 'loginproxy.gov.bc.ca/auth/realms/standard' }],
-    [production, { TAPS_OIDC_SITEMINDER_LOGOUT_URL: 'logon7.gov.bc.ca' }],
-  ]) assert.throws(() => deploymentSettings({ ...env, ...overrides }), /^Error: TAPS_OIDC_/)
 })
 
 test('invalid settings fail with a workflow error annotation', () => {
   const script = fileURLToPath(new URL('./deployment-settings.mjs', import.meta.url))
-  const run = spawnSync(process.execPath, [script], { env: { ...preview, TAPS_OIDC_ISSUER_URI: issuer('test') }, encoding: 'utf8' })
+  const run = spawnSync(process.execPath, [script], { env: { ...production, OC_NAMESPACE: 'synthetic-dev' }, encoding: 'utf8' })
   assert.equal(run.status, 1)
-  assert.equal(run.stdout,
-    '::error title=Invalid deployment settings::TAPS_OIDC_ISSUER_URI must use https://dev.loginproxy.gov.bc.ca for dev\n')
+  assert.equal(run.stdout, '::error title=Invalid deployment settings::OpenShift namespace does not match the environment\n')
   assert.ok(!run.stdout.includes('sensitive-test-value'))
 })
 
@@ -129,12 +102,7 @@ test('no automatic workflow calls PROD, and releases stage the selected template
     assert.doesNotMatch(workflow(name), /(?:environment|target): prod\b/)
   }
   assert.match(workflow('merge'), /needs: \[init, smoke\]/)
-  // TEST and PROD read OpenShift and database secrets only from their environment, never from a
-  // repository or organization secret passed by the caller.
-  for (const name of ['merge', 'release-prod']) assert.doesNotMatch(workflow(name), /\bsecrets[.:]/)
   const deploy = workflow('reusable-deploy')
-  assert.doesNotMatch(deploy.slice(deploy.indexOf('\n    secrets:'), deploy.indexOf('\n    outputs:')), /required: true/)
-  assert.match(deploy, /TAPS_OIDC_SITEMINDER_LOGOUT_URL: \$\{\{ vars.TAPS_OIDC_SITEMINDER_LOGOUT_URL \}\}/)
   for (const file of ['backend', 'frontend', 'route']) {
     assert.match(deploy, new RegExp(`file: \\$\\{\\{ runner.temp \\}\\}/taps-deploy/${file}\\.yml`))
   }

@@ -53,6 +53,9 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/reusable-deploy.yml
+    secrets:
+      oc_namespace: ${{ secrets.oc_namespace }}
+      oc_token: ${{ secrets.oc_token }}
     with:
       environment: test
       target: test
