@@ -183,7 +183,7 @@ test('replaces stale table contents with a busy skeleton and then an empty state
 
   rerender(<SearchResultsTableFrame totalItems={0}>{resultTable}</SearchResultsTableFrame>)
   expect(screen.getByRole('status')).toHaveTextContent('0 results found')
-  expect(screen.getByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'No results found' })).toBeInTheDocument()
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
   expect(screen.getByRole('region', { name: 'Search results table' })).toHaveAttribute(
     'aria-busy',
@@ -203,7 +203,7 @@ test('replaces results with an accessible error and lets the caller retry', asyn
     </SearchResultsTableFrame>,
   )
 
-  expect(screen.getByRole('alert')).toHaveTextContent('Unable to load results')
+  expect(screen.getByRole('alert')).toHaveAccessibleName('Search unavailable')
   expect(screen.getByRole('alert')).toHaveTextContent('The service is unavailable.')
   expect(screen.queryByRole('table')).not.toBeInTheDocument()
   expect(screen.queryByRole('region', { name: 'Search results table' })).not.toBeInTheDocument()

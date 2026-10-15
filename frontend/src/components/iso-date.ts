@@ -15,3 +15,26 @@ export function parseIsoDate(value: string): Date | false {
   if (year < 100) result.setFullYear(year)
   return result
 }
+
+const shortMonths = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+]
+
+// Read-only calendar dates use words; inputs and timestamp values keep their original format.
+export function formatDisplayDate(value: string | null | undefined): string {
+  if (!value) return '—'
+  if (!isValidIsoDate(value)) return value
+  const [year, month, day] = value.split('-')
+  return `${shortMonths[Number(month) - 1]} ${Number(day)}, ${year}`
+}

@@ -18,13 +18,20 @@ import {
   type EcasInboxItem,
   type GasAppraisalItem,
   type GasSearchResult,
+  type WorksheetKey,
 } from '@/contracts/appraisal'
 import SearchResultsTableFrame from '../SearchResultsTableFrame'
 import AppNotification from '../AppNotification'
 import CardTitle from '../CardTitle'
+import { formatDisplayDate } from '../iso-date'
 import './appraisal.scss'
 
 export const displayCode = (value: CodeOption | null) => value?.description ?? value?.code ?? '—'
+export const worksheetTypeLabels: Record<WorksheetKey['type'], string> = {
+  APPRAISED: 'Appraised',
+  NON_APPRAISED: 'Non-appraised',
+  HISTORIC: 'Historic',
+}
 
 export function EcasInboxResults({
   items,
@@ -46,6 +53,7 @@ export function EcasInboxResults({
   return (
     <SearchResultsTableFrame
       ariaLabel="ECAS submissions"
+      errorTitle="Submission search unavailable"
       totalItems={totalItems}
       columnCount={8}
       loading={loading}
@@ -100,7 +108,7 @@ export function EcasInboxResults({
               <TableCell>{item.cuttingPermit ?? '—'}</TableCell>
               <TableCell>{item.clientName ?? item.clientNumber ?? '—'}</TableCell>
               <TableCell>{displayCode(item.status)}</TableCell>
-              <TableCell>{item.effectiveDate ?? '—'}</TableCell>
+              <TableCell>{formatDisplayDate(item.effectiveDate)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -164,8 +172,8 @@ export function GasSearchResults({
                 ['Timber mark', info.timberMark],
                 ['Forest region', info.forestRegion],
                 ['Forest district', info.forestDistrict],
-                ['Mark expiry date', info.markExpiryDate],
-                ['Mark extension date', info.markExtendDate],
+                ['Mark expiry date', formatDisplayDate(info.markExpiryDate)],
+                ['Mark extension date', formatDisplayDate(info.markExtendDate)],
                 ['Licence status', info.ftaStatus],
               ] as const
             ).map(([label, value]) => (
@@ -181,6 +189,7 @@ export function GasSearchResults({
       </section>
       <SearchResultsTableFrame
         ariaLabel="GAS worksheets"
+        errorTitle="Worksheet search unavailable"
         totalItems={result.appraisals.total}
         columnCount={7}
         loading={loading}
@@ -217,7 +226,7 @@ export function GasSearchResults({
                     <button
                       type="button"
                       className="taps-link-button"
-                      aria-label={`Open ${item.key.type} worksheet ${item.key.worksheetId}, mark ${item.timberMark ?? 'unknown'}`}
+                      aria-label={`Open ${worksheetTypeLabels[item.key.type]} worksheet ${item.key.worksheetId}, mark ${item.timberMark ?? 'unknown'}`}
                       onClick={(event) => onOpen(item, event.currentTarget)}
                     >
                       {item.key.worksheetId}
@@ -226,20 +235,12 @@ export function GasSearchResults({
                     item.key.worksheetId
                   )}
                 </TableCell>
-                <TableCell>
-                  {
-                    {
-                      APPRAISED: 'Appraised',
-                      NON_APPRAISED: 'Non-appraised',
-                      HISTORIC: 'Historic',
-                    }[item.key.type]
-                  }
-                </TableCell>
+                <TableCell>{worksheetTypeLabels[item.key.type]}</TableCell>
                 <TableCell>{item.timberMark ?? '—'}</TableCell>
                 <TableCell>{item.licence ?? '—'}</TableCell>
                 <TableCell>{displayCode(item.status)}</TableCell>
-                <TableCell>{item.effectiveDate ?? '—'}</TableCell>
-                <TableCell>{item.expiryDate ?? '—'}</TableCell>
+                <TableCell>{formatDisplayDate(item.effectiveDate)}</TableCell>
+                <TableCell>{formatDisplayDate(item.expiryDate)}</TableCell>
               </TableRow>
             ))}
           </TableBody>

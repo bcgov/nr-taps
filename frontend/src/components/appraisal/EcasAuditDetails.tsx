@@ -94,8 +94,8 @@ function AuditContents({ ecasId, api }: { ecasId: string; api: EcasAuditApi }) {
                       <TableCell>{event.userId ?? '—'}</TableCell>
                       <TableCell>{displayCode(event.action)}</TableCell>
                       <TableCell>{event.sentToUserId ?? '—'}</TableCell>
-                      <TableCell>{event.fileName ?? '—'}</TableCell>
-                      <TableCell>
+                      <TableCell className="taps-wrap-cell">{event.fileName ?? '—'}</TableCell>
+                      <TableCell className="taps-wrap-cell">
                         {event.commentsSuppressed ? (
                           'Not displayed for import events.'
                         ) : (
@@ -181,7 +181,12 @@ function AuditContents({ ecasId, api }: { ecasId: string; api: EcasAuditApi }) {
                 <p>No field changes on this page.</p>
               ) : (
                 <TableFrame ariaLabel="Audit field changes">
-                  <Table useZebraStyles size="md" aria-label="Audit field changes">
+                  <Table
+                    useZebraStyles
+                    size="md"
+                    aria-label="Audit field changes"
+                    className="taps-audit-changes-table"
+                  >
                     <TableHead>
                       <TableRow>
                         {[
@@ -205,11 +210,11 @@ function AuditContents({ ecasId, api }: { ecasId: string; api: EcasAuditApi }) {
                           <TableCell>{change.tableName ?? '—'}</TableCell>
                           <TableCell>{change.businessIdentifier ?? '—'}</TableCell>
                           <TableCell>{change.columnName ?? '—'}</TableCell>
-                          <TableCell>
+                          <TableCell className="taps-wrap-cell">
                             {change.previousValue ?? '—'}
                             {change.previousValueTruncated && ' (truncated)'}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="taps-wrap-cell">
                             {change.changedValue ?? '—'}
                             {change.changedValueTruncated && ' (truncated)'}
                           </TableCell>

@@ -3,6 +3,27 @@ import { expect, test } from 'vitest'
 import { workflowFixture } from '@/local-synthetic/WorkflowPreview'
 import { CoastReferenceDetails, InteriorReferenceDetails } from '../AppraisalDetails'
 
+test('reference details display calendar dates in words and preserve unknown date values', () => {
+  render(
+    <CoastReferenceDetails
+      reference={{
+        ...workflowFixture.ecasCoastMultiMarkReference,
+        header: {
+          ...workflowFixture.ecasCoastMultiMarkReference.header,
+          effectiveDate: '2026-09-28',
+          expiryDate: 'unknown',
+        },
+      }}
+    />,
+  )
+  expect(
+    within(screen.getByText('Effective date').parentElement!).getByText('Sep 28, 2026'),
+  ).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Expiry date').parentElement!).getByText('unknown'),
+  ).toBeInTheDocument()
+})
+
 test('Coast reference displays each species once with exact stored quantities and units', () => {
   const reference = {
     ...workflowFixture.ecasCoastMultiMarkReference,
@@ -45,8 +66,29 @@ test('Coast reference displays each species once with exact stored quantities an
       screen.getByText('Sampling error at 2 standard deviations (%)').parentElement!,
     ).getByText('4.25'),
   ).toBeInTheDocument()
-  expect(screen.getByText(/ZZ9997 — volume/)).toBeInTheDocument()
-  expect(screen.getByText(/ZZ9998 — volume/)).toBeInTheDocument()
+  const marks = within(screen.getByRole('table', { name: 'Submitted timber marks' }))
+  expect(marks.getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual([
+    'Timber mark',
+    'Volume (m³)',
+    'Primary',
+    'Mark revision',
+  ])
+  expect(
+    marks
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) =>
+        within(row)
+          .getAllByRole('cell')
+          .map((cell) => cell.textContent),
+      ),
+  ).toEqual([
+    ['ZZ9998', '123.45', 'Yes', '3'],
+    ['ZZ9997', '67.89', 'No', '4'],
+  ])
+  expect(
+    within(screen.getByText('Net cruise volume (m³)').parentElement!).getByText('191.34'),
+  ).toBeInTheDocument()
   expect(screen.queryByRole('button')).not.toBeInTheDocument()
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
 })
@@ -82,6 +124,18 @@ test('Interior reference does not acquire Coast species or cruise fields', () =>
   expect(screen.queryByText('Single tree selection volume (m³)')).not.toBeInTheDocument()
 })
 
+test('Coast reference states when no submitted timber marks are recorded', () => {
+  render(
+    <CoastReferenceDetails
+      reference={{ ...workflowFixture.ecasCoastMultiMarkReference, timberMarks: [] }}
+    />,
+  )
+  expect(
+    screen.getByText('No submitted timber marks are available for this submission.'),
+  ).toBeInTheDocument()
+  expect(screen.queryByRole('table', { name: 'Submitted timber marks' })).not.toBeInTheDocument()
+})
+
 test.each(['Coast', 'Interior'] as const)(
   '%s reference shows stand rate eligibility labels',
   (method) => {
@@ -114,6 +168,19 @@ test.each(['Coast', 'Interior'] as const)(
         'No Grades',
       ),
     ).toBeInTheDocument()
+    for (const labels of [
+      ['Appraisal category', 'Reappraisal reason'],
+      ['Rate calculation method'],
+      ['Coniferous stand rate eligibility', 'Deciduous stand rate eligibility'],
+      ['Effective date', 'Expiry date'],
+    ]) {
+      const group = screen.getByText(labels[0]).closest('dl')!
+      expect(
+        within(group)
+          .getAllByRole('term')
+          .map((term) => term.textContent),
+      ).toEqual(labels)
+    }
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   },
 )

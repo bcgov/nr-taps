@@ -114,6 +114,31 @@ test.each([null, ' '])('does not request FTA when the stored mark is %j', async 
     screen.getByText('No primary timber mark is recorded for this worksheet.'),
   ).toBeInTheDocument()
   expect(reader.licenceInformation).not.toHaveBeenCalled()
+  expect(screen.queryByText('Cruise based')).not.toBeInTheDocument()
+  expect(screen.queryByText('FTA Status')).not.toBeInTheDocument()
+})
+
+test('pending FTA shows the known mark and loading state until returned fields are available', async () => {
+  const reader = api()
+  let release!: (value: FtaLicenceInformation) => void
+  vi.mocked(reader.licenceInformation).mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        release = resolve
+      }),
+  )
+  render(<GasFtaContext timberMark="ZZ9997" api={reader} />)
+  expect(screen.getByText('ZZ9997')).toBeInTheDocument()
+  expect(screen.getByText('Loading FTA information…')).toBeInTheDocument()
+  expect(screen.queryByText('Cruise based')).not.toBeInTheDocument()
+  expect(screen.queryByText('FTA Status')).not.toBeInTheDocument()
+  expect(
+    screen.queryByText('No FTA information is available for this timber mark.'),
+  ).not.toBeInTheDocument()
+  await waitFor(() => expect(reader.licenceInformation).toHaveBeenCalledOnce())
+  await act(async () => release({ ...info, markStatus: null, cruiseBased: null }))
+  expect(screen.queryByText('Loading FTA information…')).not.toBeInTheDocument()
+  expect(within(screen.getByText('FTA Status').parentElement!).getByText('—')).toBeInTheDocument()
   expect(within(screen.getByText('Cruise based').parentElement!).getByText('—')).toBeInTheDocument()
 })
 
@@ -126,6 +151,8 @@ test('missing or failed FTA retains stored rates and retries only the context re
   const summary = { ...workflowFixture.gasMultiMarkAppraisedSummary, primaryTimberMark: 'ZZ9997' }
   const view = render(<GasStoredSummary summary={summary} api={reader} />)
   await screen.findByText('No FTA information is available for this timber mark.')
+  expect(screen.queryByText('Cruise based')).not.toBeInTheDocument()
+  expect(screen.queryByText('FTA Status')).not.toBeInTheDocument()
   expect(screen.getByRole('cell', { name: '12.30' })).toBeInTheDocument()
   view.rerender(
     <GasStoredSummary
@@ -134,6 +161,11 @@ test('missing or failed FTA retains stored rates and retries only the context re
     />,
   )
   await screen.findByText('FTA information unavailable')
+  expect(screen.queryByText('Cruise based')).not.toBeInTheDocument()
+  expect(screen.queryByText('FTA Status')).not.toBeInTheDocument()
+  expect(
+    screen.queryByText('No FTA information is available for this timber mark.'),
+  ).not.toBeInTheDocument()
   expect(screen.getByRole('cell', { name: '12.30' })).toBeInTheDocument()
   await userEvent.setup().click(screen.getByRole('button', { name: 'Retry FTA information' }))
   await screen.findByText('<script>Issued as text</script>')

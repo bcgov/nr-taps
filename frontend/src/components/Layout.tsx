@@ -1,6 +1,7 @@
 import {
   Dashboard as HomeIcon,
   Document,
+  Email,
   Finance,
   Moon,
   Sun,
@@ -28,7 +29,7 @@ function readCollapsed() {
   }
 }
 
-function Layout({ children }: { children: ReactNode }) {
+function Layout({ children, loginConfigured }: { children: ReactNode; loginConfigured?: boolean }) {
   const { state, can } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const pathname = useLocation().pathname
@@ -98,7 +99,14 @@ function Layout({ children }: { children: ReactNode }) {
     if (returnFocus) requestAnimationFrame(() => profileLauncherRef.current?.focus())
   }, [])
 
-  if (state.kind === 'signed-out') return <Landing expired={state.expired} />
+  if (state.kind === 'signed-out')
+    return (
+      <Landing
+        key={state.expired ? 'expired' : 'signed-out'}
+        expired={state.expired}
+        configured={loginConfigured}
+      />
+    )
 
   const currentPageTitle = (app: ApplicationId) => {
     if (activeApplication !== app) return undefined
@@ -170,80 +178,100 @@ function Layout({ children }: { children: ReactNode }) {
       </header>
       <ProfilePanel open={profileOpen} onClose={closeProfile} launcherRef={profileLauncherRef} />
       {hasNavigation && (
-        <nav
-          ref={navigationRef}
+        <aside
           id="side-navigation"
           className={`cds--side-nav taps-navigation${expanded ? '' : ' is-collapsed'}`}
-          aria-label="Side navigation"
         >
-          <SideNavItems isSideNavExpanded={expanded}>
-            <li>
-              <SideNavigationTooltip enabled={!expanded} label="Home">
-                {(descriptionId) => (
-                  <Link
-                    to="/"
-                    activeOptions={{ exact: true }}
-                    className={`cds--side-nav__link${pathname === '/' ? ' cds--side-nav__link--active' : ''}`}
-                    aria-current={pathname === '/' ? 'page' : undefined}
-                    aria-describedby={descriptionId}
-                    aria-label="Home"
-                  >
-                    <span className="cds--side-nav__icon" aria-hidden="true">
-                      <HomeIcon size={20} />
-                    </span>
-                    <span className="cds--side-nav__link-text">Home</span>
-                  </Link>
-                )}
-              </SideNavigationTooltip>
-            </li>
-            {(Object.keys(applications) as ApplicationId[])
-              .filter((app) => applications[app].capabilities.some(can))
-              .map((app) => (
-                <SideNavigationGroup
-                  key={`${app}:${pathname}`}
-                  label={applications[app].title}
-                  icon={app === 'ecas' ? Document : Finance}
-                  collapsed={!expanded}
-                  active={activeApplication === app}
-                  activePage={currentPageTitle(app)}
-                  onExpandNavigation={() => {
-                    if (narrow) setMobileOpen(true)
-                    else setDesktopCollapsed(false)
-                  }}
-                >
-                  <li>
+          <nav ref={navigationRef} className="taps-navigation__pages" aria-label="Side navigation">
+            <SideNavItems isSideNavExpanded={expanded}>
+              <li>
+                <SideNavigationTooltip enabled={!expanded} label="Home">
+                  {(descriptionId) => (
                     <Link
-                      to={`/${app}`}
+                      to="/"
                       activeOptions={{ exact: true }}
-                      className="cds--side-nav__link"
-                      aria-current={
-                        pathname === `/${app}` || pathname === `/${app}/` ? 'page' : undefined
-                      }
+                      className={`cds--side-nav__link${pathname === '/' ? ' cds--side-nav__link--active' : ''}`}
+                      aria-current={pathname === '/' ? 'page' : undefined}
+                      aria-describedby={descriptionId}
+                      aria-label="Home"
                     >
-                      <span className="cds--side-nav__link-text">
-                        {applications[app].title} overview
+                      <span className="cds--side-nav__icon" aria-hidden="true">
+                        <HomeIcon size={20} />
                       </span>
+                      <span className="cds--side-nav__link-text">Home</span>
                     </Link>
-                  </li>
-                  {applicationScreens
-                    .filter((screen) => screen.application === app && can(screen.capability))
-                    .map((screen) => (
-                      <li key={screen.id}>
-                        <Link
-                          to={`/${app}/$screenId`}
-                          activeOptions={{ exact: true }}
-                          params={{ screenId: screen.id }}
-                          className="cds--side-nav__link"
-                          aria-current={pathname === `/${app}/${screen.id}` ? 'page' : undefined}
-                        >
-                          <span className="cds--side-nav__link-text">{screen.title}</span>
-                        </Link>
-                      </li>
-                    ))}
-                </SideNavigationGroup>
-              ))}
-          </SideNavItems>
-        </nav>
+                  )}
+                </SideNavigationTooltip>
+              </li>
+              {(Object.keys(applications) as ApplicationId[])
+                .filter((app) => applications[app].capabilities.some(can))
+                .map((app) => (
+                  <SideNavigationGroup
+                    key={`${app}:${pathname}`}
+                    label={applications[app].title}
+                    icon={app === 'ecas' ? Document : Finance}
+                    collapsed={!expanded}
+                    active={activeApplication === app}
+                    activePage={currentPageTitle(app)}
+                    onExpandNavigation={() => {
+                      if (narrow) setMobileOpen(true)
+                      else setDesktopCollapsed(false)
+                    }}
+                  >
+                    <li>
+                      <Link
+                        to={`/${app}`}
+                        activeOptions={{ exact: true }}
+                        className="cds--side-nav__link"
+                        aria-current={
+                          pathname === `/${app}` || pathname === `/${app}/` ? 'page' : undefined
+                        }
+                      >
+                        <span className="cds--side-nav__link-text">
+                          {applications[app].title} overview
+                        </span>
+                      </Link>
+                    </li>
+                    {applicationScreens
+                      .filter((screen) => screen.application === app && can(screen.capability))
+                      .map((screen) => (
+                        <li key={screen.id}>
+                          <Link
+                            to={`/${app}/$screenId`}
+                            activeOptions={{ exact: true }}
+                            params={{ screenId: screen.id }}
+                            className="cds--side-nav__link"
+                            aria-current={pathname === `/${app}/${screen.id}` ? 'page' : undefined}
+                          >
+                            <span className="cds--side-nav__link-text">{screen.title}</span>
+                          </Link>
+                        </li>
+                      ))}
+                  </SideNavigationGroup>
+                ))}
+            </SideNavItems>
+          </nav>
+          <div className="taps-navigation-support">
+            <p className="taps-navigation-support__label" hidden={!expanded}>
+              Support
+            </p>
+            <SideNavigationTooltip enabled={!expanded} label="Report an issue">
+              {(descriptionId) => (
+                <a
+                  href="mailto:Heartwood@gov.bc.ca"
+                  className="cds--side-nav__link"
+                  aria-label="Report an issue"
+                  aria-describedby={descriptionId}
+                >
+                  <span className="cds--side-nav__icon" aria-hidden="true">
+                    <Email size={20} />
+                  </span>
+                  <span className="cds--side-nav__link-text">Report an issue</span>
+                </a>
+              )}
+            </SideNavigationTooltip>
+          </div>
+        </aside>
       )}
       {overlayOpen && (
         <button

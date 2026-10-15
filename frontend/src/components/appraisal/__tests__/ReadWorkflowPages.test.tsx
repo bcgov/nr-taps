@@ -47,7 +47,7 @@ test('submits the selected mode only on Search and clears results when the mode 
   expect(screen.queryByRole('table', { name: 'ECAS submissions' })).not.toBeInTheDocument()
   expect(api.inbox).toHaveBeenCalledOnce()
   await user.click(screen.getByRole('button', { name: 'Search' }))
-  expect(await screen.findByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'No results found' })).toBeInTheDocument()
   expect(api.inbox).toHaveBeenLastCalledWith(
     expect.objectContaining({ mode: 'MY_TO_DO' }),
     0,
@@ -117,9 +117,9 @@ test('aborts an old mode request and ignores its late rows after a new mode sear
   await user.selectOptions(screen.getByRole('combobox', { name: 'Search mode' }), 'MY_TO_DO')
   expect(oldSignal?.aborted).toBe(true)
   await user.click(screen.getByRole('button', { name: 'Search' }))
-  await screen.findByRole('heading', { name: 'No results' })
+  await screen.findByRole('heading', { name: 'No results found' })
   await act(async () => releaseOld({ items: [fixture.ecasInboxItem], total: 250, page: 0 }))
-  expect(screen.getByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'No results found' })).toBeInTheDocument()
   expect(screen.queryByRole('table', { name: 'ECAS submissions' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Next page' })).not.toBeInTheDocument()
 })
@@ -145,7 +145,9 @@ test('searches, opens the selected ECAS reference and follows its immutable ID t
   await user.click(screen.getByRole('button', { name: 'View related GAS worksheet' }))
   expect(await screen.findByRole('cell', { name: '12.30' })).toBeInTheDocument()
   expect(api.relatedSummary).toHaveBeenCalledWith('999900000002', expect.any(AbortSignal))
-  expect(screen.getByText('COAST_MPS_TOA_N')).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Worksheet type').parentElement!).getByText('Appraised'),
+  ).toBeInTheDocument()
   await waitFor(() =>
     expect(api.licenceInformation).toHaveBeenCalledWith(
       '',
@@ -165,6 +167,10 @@ test('searches, opens the selected ECAS reference and follows its immutable ID t
   expect(history.getByText('2026-10-12T10:00:00')).toBeInTheDocument()
   expect(history.getByText('Discount Percent')).toBeInTheDocument()
   expect(history.getByRole('cell', { name: '10.0' })).toBeInTheDocument()
+  const noticeRow = history.getByRole('row', { name: /Adjustment Notice Message/ })
+  expect(within(noticeRow).getAllByRole('cell')[3].textContent).toBe(
+    `SYNTHETIC_NOTICE_${'LONGTOKEN'.repeat(24)}\nSecond synthetic notice line retains its stored line break.`,
+  )
   await user.click(history.getByRole('button', { name: 'Next page' }))
   await history.findByText('2026-10-02T10:00:00')
   expect(audit.history).toHaveBeenLastCalledWith(
@@ -198,7 +204,7 @@ test('summary FTA uses its primary mark instead of the selected or first listed 
   await user.type(screen.getByRole('textbox', { name: 'Timber mark' }), 'ZZ9998')
   await user.click(screen.getByRole('button', { name: 'Search' }))
   await user.click(
-    await screen.findByRole('button', { name: /Open APPRAISED worksheet .*mark ZZ9998/ }),
+    await screen.findByRole('button', { name: /Open Appraised worksheet .*mark ZZ9998/ }),
   )
   const context = within(await screen.findByRole('region', { name: 'Worksheet FTA information' }))
   expect(await context.findByText('Mark ZZ9997')).toBeInTheDocument()
@@ -217,6 +223,67 @@ test('never offers the related GAS action without its capability', async () => {
     screen.queryByRole('button', { name: 'View related GAS worksheet' }),
   ).not.toBeInTheDocument()
 })
+
+test('returns from a related worksheet above its content without clearing the search', async () => {
+  const user = userEvent.setup()
+  const api = { ...syntheticReadApi, inbox: vi.fn(syntheticReadApi.inbox) }
+  mount(<EcasInboxReadPage api={api} />)
+  await user.type(screen.getByRole('textbox', { name: 'Timber mark' }), 'ZZ9997')
+  await user.click(screen.getByRole('button', { name: 'Search' }))
+  const launcher = await screen.findByRole('button', { name: /Open ECAS .*mark ZZ9997/ })
+  await user.click(launcher)
+  await screen.findByRole('heading', { name: 'Coast reference' })
+  await user.click(screen.getByRole('button', { name: 'View related GAS worksheet' }))
+  const heading = screen.getByRole('heading', { name: 'Worksheet details' })
+  const back = screen.getByRole('button', { name: 'Back to ECAS reference' })
+  expect(back.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(back.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+  await user.click(back)
+  await screen.findByRole('heading', { name: 'Coast reference' })
+  expect(screen.getByRole('textbox', { name: 'Timber mark' })).toHaveValue('ZZ9997')
+  expect(
+    within(screen.getByRole('table', { name: 'ECAS submissions' })).getAllByRole('row'),
+  ).toHaveLength(2)
+  expect(api.inbox).toHaveBeenCalledOnce()
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: 'Submission details' })).toHaveFocus(),
+  )
+})
+
+test.each([1440, 1280])(
+  'keeps page focus when a pending reference finishes loading at %ipx',
+  async (width) => {
+    const user = userEvent.setup()
+    let releaseCoast!: (reference: CoastReference) => void
+    const api = {
+      ...syntheticReadApi,
+      reference: vi.fn(
+        () =>
+          new Promise<CoastReference>((resolve) => {
+            releaseCoast = resolve
+          }),
+      ),
+    }
+    mount(<EcasInboxReadPage api={api} />)
+    act(() => setViewportWidth(width))
+    await user.click(screen.getByRole('button', { name: 'Search' }))
+    await user.click(await screen.findByRole('button', { name: /Open ECAS .*mark ZZ9997/ }))
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Submission details' })).toHaveFocus(),
+    )
+    expect(screen.getByText('Loading details…')).toBeInTheDocument()
+    const filter = screen.getByRole('textbox', { name: 'ECAS ID' })
+    await user.click(filter)
+    expect(filter).toHaveFocus()
+
+    await act(async () => releaseCoast(fixture.ecasCoastMultiMarkReference))
+    await screen.findByRole('heading', { name: 'Coast reference' })
+    // Let any animation-frame focus scheduled by the completed request run.
+    await act(async () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())))
+
+    expect(filter).toHaveFocus()
+  },
+)
 
 test('switching reference aborts the old Coast species response and preserves detail focus', async () => {
   const user = userEvent.setup()
@@ -243,7 +310,9 @@ test('switching reference aborts the old Coast species response and preserves de
   await user.click(interiorLauncher)
   await screen.findByRole('heading', { name: 'Interior reference' })
   expect(coastSignal.aborted).toBe(true)
-  await waitFor(() => expect(screen.getByRole('heading', { name: 'Read details' })).toHaveFocus())
+  await waitFor(() =>
+    expect(screen.getByRole('heading', { name: 'Submission details' })).toHaveFocus(),
+  )
   await act(async () => releaseCoast(fixture.ecasCoastMultiMarkReference))
   expect(screen.queryByRole('table', { name: 'Volume by species' })).not.toBeInTheDocument()
   expect(screen.queryByText('Single tree selection volume (m³)')).not.toBeInTheDocument()
@@ -260,7 +329,7 @@ test('preserves the licence chooser and FTA context when worksheets are empty', 
   await screen.findByRole('option', { name: 'ZZ9996' })
   await user.selectOptions(screen.getByRole('combobox', { name: 'Timber mark' }), 'ZZ9996')
   await user.click(screen.getByRole('button', { name: 'Search' }))
-  expect(await screen.findByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(await screen.findByRole('heading', { name: 'No results found' })).toBeInTheDocument()
   expect(
     within(screen.getByRole('region', { name: 'Licence information' })).getByText('ZZ9996'),
   ).toBeInTheDocument()
@@ -279,7 +348,7 @@ test('opens the fictional non-appraised preview worksheet with labelled server r
   await user.click(screen.getByRole('button', { name: 'Search' }))
   await user.click(
     await screen.findByRole('button', {
-      name: `Open NON_APPRAISED worksheet ${nonAppraisedSample.key.worksheetId}, mark ${nonAppraisedSample.timberMark}`,
+      name: `Open Non-appraised worksheet ${nonAppraisedSample.key.worksheetId}, mark ${nonAppraisedSample.timberMark}`,
     }),
   )
   const rates = within(await screen.findByRole('table', { name: 'Non-appraised rates' }))

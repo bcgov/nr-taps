@@ -77,9 +77,11 @@ export default function ProfilePanel({
           <div className="taps-profile-avatar" aria-hidden="true">
             {initials}
           </div>
-          <div>
+          <div className="taps-profile-panel__info">
             <p className="taps-profile-panel__name">{name}</p>
-            {state.session.businessName && <p>{state.session.businessName}</p>}
+            {state.session.businessName && (
+              <p className="taps-profile-panel__meta">{state.session.businessName}</p>
+            )}
           </div>
         </div>
         {state.session.roles.length > 0 && (

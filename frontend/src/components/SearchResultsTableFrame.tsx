@@ -1,6 +1,5 @@
 import { Button, DataTableSkeleton, InlineLoading } from '@carbon/react'
 import type { ReactNode } from 'react'
-import AppNotification from './AppNotification'
 import EmptyState from './EmptyState'
 import TableFrame from './TableFrame'
 
@@ -12,6 +11,7 @@ export default function SearchResultsTableFrame({
   totalItems,
   columnCount = 3,
   error,
+  errorTitle = 'Search unavailable',
   onRetry,
   pagination,
 }: {
@@ -22,22 +22,25 @@ export default function SearchResultsTableFrame({
   totalItems?: number
   columnCount?: number
   error?: string
+  errorTitle?: string
   onRetry?: () => void
   pagination?: ReactNode
 }) {
   return (
     <section className="taps-results" aria-label="Search results">
       {error && !loading ? (
-        <>
-          <AppNotification kind="error" title="Unable to load results" subtitle={error} />
-          {onRetry && (
-            <div className="taps-actions">
+        <EmptyState
+          role="alert"
+          title={errorTitle}
+          description={error}
+          action={
+            onRetry && (
               <Button size="md" onClick={onRetry}>
                 Try again
               </Button>
-            </div>
-          )}
-        </>
+            )
+          }
+        />
       ) : (
         <div className="taps-results-frame">
           <div className="taps-results-toolbar">
@@ -59,7 +62,10 @@ export default function SearchResultsTableFrame({
                 showToolbar={false}
               />
             ) : totalItems === 0 ? (
-              <EmptyState title="No results" description="Try changing your search filters." />
+              <EmptyState
+                title="No results found"
+                description="No records match your search criteria. Try adjusting your filters and searching again."
+              />
             ) : (
               children
             )}
