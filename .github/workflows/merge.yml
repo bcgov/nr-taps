@@ -24,13 +24,28 @@ jobs:
       pull-requests: read
     outputs:
       pr: ${{ steps.pr.outputs.pr }}
+      backend_image: ${{ steps.images.outputs.backend_image }}
+      frontend_image: ${{ steps.images.outputs.frontend_image }}
+      capture_attempt: ${{ steps.images.outputs.capture_attempt }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
       - id: pr
         uses: bcgov/action-get-pr@28b0adf8e4d40720d41f9c87356ce24b0a4bd6af # v0.3.1
       - name: Require PR image
         env:
           PR: ${{ steps.pr.outputs.pr }}
         run: test -n "$PR"
+      - name: Capture synchronized PR image digests
+        id: images
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.pr }}
+        run: node .github/scripts/release-images.mjs capture
 
   deploy-test:
     name: TEST Deploy
@@ -44,7 +59,9 @@ jobs:
     with:
       environment: test
       target: test
-      tag: ${{ needs.init.outputs.pr }}
+      source_ref: ${{ github.sha }}
+      backend_image: ${{ needs.init.outputs.backend_image }}
+      frontend_image: ${{ needs.init.outputs.frontend_image }}
 
   smoke:
     name: TEST Smoke
@@ -52,24 +69,34 @@ jobs:
     uses: ./.github/workflows/reusable-tests.yml
     with:
       target: test
-      tag: ${{ needs.init.outputs.pr }}
+      backend_image: ${{ needs.init.outputs.backend_image }}
+      frontend_image: ${{ needs.init.outputs.frontend_image }}
 
-  promote-test:
-    name: Tag TEST Images
+  release-candidate:
+    name: Record TEST-verified release candidate
     needs: [init, smoke]
-    runs-on: ubuntu-slim
-    timeout-minutes: 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     permissions:
-      packages: write
-    strategy:
-      matrix:
-        package: [backend, frontend]
+      contents: read
     steps:
-      - uses: shrink/actions-docker-registry-tag@e6aaef25c595b6e0edd18bf4c7dbfea3abd43299 # v5
+      - uses: actions/checkout@v6
         with:
-          registry: ghcr.io
-          repository: ${{ github.repository }}/${{ matrix.package }}
-          target: ${{ needs.init.outputs.pr }}
-          tags: test
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Record tested images
+        env:
+          CAPTURE_ATTEMPT: ${{ needs.init.outputs.capture_attempt }}
+          BACKEND_IMAGE: ${{ needs.init.outputs.backend_image }}
+          FRONTEND_IMAGE: ${{ needs.init.outputs.frontend_image }}
+        run: node .github/scripts/release-images.mjs record "$RUNNER_TEMP/release-candidate.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-candidate-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/release-candidate.json
+          retention-days: 90
+          if-no-files-found: error
 
-  # PROD promotion remains disabled pending provisioning and acceptance.
+  # PROD is reachable only through the manual Release PROD workflow.
