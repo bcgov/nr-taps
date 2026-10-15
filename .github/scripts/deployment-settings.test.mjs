@@ -99,6 +99,15 @@ test('no automatic workflow calls PROD, and releases stage the selected template
   assert.equal((deploy.match(/ref: \$\{\{ needs.validate.outputs.source_ref \}\}/g) ?? []).length, 2)
 })
 
+test('older releases tolerate newer parameters and PROD records only the released commit', () => {
+  const deploy = readFileSync(new URL('../workflows/reusable-deploy.yml', import.meta.url), 'utf8')
+  assert.match(deploy, /OC_PROCESS_FLAGS: \$\{\{ inputs.source_ref != '' && inputs.source_ref != github.sha && '--ignore-unknown-parameters' \|\| '' \}\}/)
+  // Backend, frontend and route templates all come from the selected commit.
+  assert.equal((deploy.match(/^\s+\$OC_PROCESS_FLAGS$/gm) ?? []).length, 3)
+  const result = deploy.slice(deploy.indexOf('\n  deployment-result:'))
+  assert.match(result, /environment:\n\s+name: \$\{\{ inputs.environment \}\}\n(?:\s+#.*\n)?\s+deployment: \$\{\{ inputs.environment != 'prod' \}\}/)
+})
+
 
 test('deployed Oracle remains enabled and the same port reaches certificate init and JDBC', () => {
   const deploy = readFileSync(new URL('../workflows/reusable-deploy.yml', import.meta.url), 'utf8')

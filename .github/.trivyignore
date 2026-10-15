@@ -56,9 +56,9 @@ AVD-KSV-0104
 # KSV-0013 (AVD-KSV-0013): Image tag ':latest' used
 # ------------------------------------------------------------------------------
 # Why Ignored:
-# False positive on templated image references. The OpenShift templates use
-# "${NAME}/<component>:${IMAGE_TAG}" and the pipeline always sets IMAGE_TAG
-# explicitly (commit SHA for DEV previews, PR number for TEST).
+# False positive on templated image references. The OpenShift templates take a
+# complete ${IMAGE_REF}: the commit-SHA tag for DEV previews and a SHA-256
+# digest for TEST and PROD, so runtime images are never :latest.
 # ------------------------------------------------------------------------------
 KSV0013
 KSV-0013
