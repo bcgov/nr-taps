@@ -49,6 +49,7 @@ test('uses code-backed method/status selections and exact sorting with calendar-
   const user = userEvent.setup()
   const submit = vi.fn()
   render(<Form onSearch={submit} />)
+  expect(screen.getByLabelText('ECAS ID')).toHaveAttribute('inputmode', 'numeric')
   await user.selectOptions(screen.getByLabelText('Appraisal method'), 'I')
   await user.click(screen.getByRole('combobox', { name: /^Statuses/ }))
   await user.click(screen.getByText('DFT — Draft', { exact: true }))

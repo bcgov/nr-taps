@@ -2,13 +2,23 @@
   min-inline-size: 62rem;
 }
 
+.taps-detail-return {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  inline-size: fit-content;
+  padding-block: 0.25rem;
+  margin-block-end: 1.5rem;
+  text-decoration: none;
+}
+
+.taps-detail-return:hover {
+  text-decoration: underline;
+}
+
 .taps-table-frame .cds--data-table.taps-species-volume-table {
   min-inline-size: 0;
   inline-size: 100%;
-
-  th:last-child .cds--table-header-label {
-    text-align: inherit;
-  }
 
   td:first-child {
     white-space: normal;
@@ -20,12 +30,37 @@
   }
 }
 
-// Field groups in the detail panel keep 16px above and 24px below.
-.taps-detail-panel .taps-field-grid {
-  margin-block: 1rem 1.5rem;
+.taps-table-frame .cds--data-table.taps-stored-rates-table,
+.taps-table-frame .cds--data-table.taps-submitted-marks-table {
+  min-inline-size: 0;
+  inline-size: 100%;
 }
 
-.taps-appraisal-mark-list {
-  padding-inline-start: 1.25rem;
-  margin-block: 1rem;
+.taps-table-frame .cds--data-table .taps-numeric-cell {
+  text-align: right;
+
+  .cds--table-header-label {
+    text-align: inherit;
+  }
+}
+
+.taps-table-frame .cds--data-table td.taps-numeric-cell {
+  white-space: nowrap;
+}
+
+// Give long stored text a readable column while preserving the other metadata columns.
+.taps-table-frame .taps-attachment-table th:first-child {
+  min-inline-size: 20rem;
+}
+.taps-table-frame .taps-attachment-table th:nth-child(3),
+.taps-table-frame .taps-audit-changes-table th:nth-last-child(-n + 2),
+.taps-table-frame .taps-gas-history-table th:nth-last-child(-n + 2) {
+  min-inline-size: 16rem;
+}
+
+// Field groups in the detail panel keep 16px above and 24px below.
+.taps-detail-panel .taps-field-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  row-gap: 1.5rem;
+  margin-block: 1rem 1.5rem;
 }

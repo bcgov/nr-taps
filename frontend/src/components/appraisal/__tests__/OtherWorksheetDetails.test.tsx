@@ -77,8 +77,24 @@ test('historic summary retains flags, exact stored rates and separate rate compo
   }
   render(<OtherWorksheetDetails summary={summary} api={syntheticFtaApi} />)
   expect(screen.getByText('Historic')).toBeInTheDocument()
+  expect(screen.queryByText('Variant')).not.toBeInTheDocument()
+  expect(screen.queryByText('INTERIOR_MPS')).not.toBeInTheDocument()
+  expect(
+    within(screen.getByText('Policy version').parentElement!).getByText('2026.1'),
+  ).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Calculation method').parentElement!).getByText('MPS'),
+  ).toBeInTheDocument()
   expect(screen.getByText('Yes')).toBeInTheDocument()
   expect(screen.getByText('No')).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Cease adjustment date').parentElement!).getByText('Oct 1, 2026'),
+  ).toBeInTheDocument()
+  expect(
+    within(screen.getByRole('table', { name: 'Historic stored rates' })).getByRole('cell', {
+      name: 'Oct 1, 2026',
+    }),
+  ).toBeInTheDocument()
   expect(
     within(screen.getByRole('table', { name: 'Historic stored rates' })).getByRole('cell', {
       name: '99.90',
@@ -145,7 +161,7 @@ test('non-appraised summary uses its own reference, classification and component
   expect(screen.getByText('ZONE')).toBeInTheDocument()
   expect(within(screen.getByText('Rate type').parentElement!).getByText('—')).toBeInTheDocument()
   expect(screen.getByText('Adjustment label')).toBeInTheDocument()
-  expect(screen.getByText('2026-10-01')).toBeInTheDocument()
+  expect(screen.getByText('Oct 1, 2026')).toBeInTheDocument()
   expect(screen.queryByRole('table', { name: 'Historic stored rates' })).not.toBeInTheDocument()
   expect(screen.getByRole('cell', { name: '12.30' })).toBeInTheDocument()
   const components = within(screen.getByRole('table', { name: 'Non-appraised rates' }))
@@ -174,6 +190,8 @@ test('non-appraised summary uses its own reference, classification and component
   expect(components.queryByRole('cell', { name: rate.rateId })).not.toBeInTheDocument()
   const addons = within(screen.getByRole('table', { name: 'Selected rate add-ons' }))
   expect(addons.getByRole('cell', { name: 'EXPIRED - Historic selection' })).toBeInTheDocument()
+  expect(addons.getByRole('cell', { name: '2000-01-01T00:00:00' })).toBeInTheDocument()
+  expect(addons.getByRole('cell', { name: '2001-01-01T00:00:00' })).toBeInTheDocument()
   expect(addons.getByRole('cell', { name: '2000-01-02T12:34:56' })).toBeInTheDocument()
   expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
   expect(screen.queryByRole('table', { name: 'Historic species' })).not.toBeInTheDocument()
@@ -199,6 +217,10 @@ test('an empty selected-add-on list is explicit and does not imply a calculated 
     />,
   )
   expect(screen.getByText('No selected rate add-ons recorded.')).toBeInTheDocument()
+  expect(
+    screen.getByText('No non-appraised rates are recorded for this worksheet.'),
+  ).toBeInTheDocument()
+  expect(screen.queryByRole('table', { name: 'Non-appraised rates' })).not.toBeInTheDocument()
   expect(screen.queryByRole('table', { name: 'Selected rate add-ons' })).not.toBeInTheDocument()
   expect(screen.queryByText('0.00')).not.toBeInTheDocument()
 })
@@ -245,4 +267,49 @@ test('appraised summary offers collapsed typed worksheet history', () => {
     <OtherWorksheetDetails summary={workflowFixture.gasAppraisedSummary} api={syntheticFtaApi} />,
   )
   expect(screen.getByRole('button', { name: 'History' })).toHaveAttribute('aria-expanded', 'false')
+})
+
+test('appraised summary distinguishes missing stored rates from a zero rate', () => {
+  render(
+    <OtherWorksheetDetails
+      summary={{ ...workflowFixture.gasAppraisedSummary, rates: [] }}
+      api={syntheticFtaApi}
+    />,
+  )
+  expect(
+    screen.getByText('No stored stumpage rates are recorded for this worksheet.'),
+  ).toBeInTheDocument()
+  expect(screen.queryByRole('table', { name: 'Stored stumpage rates' })).not.toBeInTheDocument()
+  expect(screen.queryByText('0.00')).not.toBeInTheDocument()
+})
+
+test('historic summary states when both stored rate collections are empty', () => {
+  render(
+    <OtherWorksheetDetails
+      api={syntheticFtaApi}
+      summary={{
+        ...common,
+        key: { type: 'HISTORIC', worksheetId: '42' },
+        variant: 'INTERIOR_MPS',
+        rateCalculationMethodCode: 'MPS',
+        tenureObligationAdjustment: null,
+        adjustQuarterly: null,
+        active: null,
+        policyVersion: null,
+        ceaseAdjustmentDate: null,
+        rates: [],
+        nonAppraisedRates: [],
+        historicSpecies: [],
+        coastSpeciesGrades: [],
+      }}
+    />,
+  )
+  expect(
+    screen.getByText('No stored stumpage rates are recorded for this worksheet.'),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByText('No non-appraised rates are recorded for this worksheet.'),
+  ).toBeInTheDocument()
+  expect(screen.queryByRole('table', { name: 'Historic stored rates' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('table', { name: 'Non-appraised rates' })).not.toBeInTheDocument()
 })

@@ -60,7 +60,12 @@ function AttachmentInventory({ ecasId, api }: { ecasId: string; api: AttachmentA
             <p role="status">No accessible individual documents on this page.</p>
           ) : (
             <TableFrame ariaLabel="Attachment information rows">
-              <Table useZebraStyles size="md" aria-label="Attachment information">
+              <Table
+                useZebraStyles
+                size="md"
+                aria-label="Attachment information"
+                className="taps-attachment-table"
+              >
                 <TableHead>
                   <TableRow>
                     {[
@@ -79,13 +84,13 @@ function AttachmentInventory({ ecasId, api }: { ecasId: string; api: AttachmentA
                 <TableBody>
                   {result.value.items.map((item) => (
                     <TableRow key={item.documentId}>
-                      <TableCell>{item.fileName ?? '—'}</TableCell>
+                      <TableCell className="taps-wrap-cell">{item.fileName ?? '—'}</TableCell>
                       <TableCell>
                         {item.documentType.description
                           ? `${item.documentType.code} — ${item.documentType.description}`
                           : item.documentType.code}
                       </TableCell>
-                      <TableCell>{item.description ?? '—'}</TableCell>
+                      <TableCell className="taps-wrap-cell">{item.description ?? '—'}</TableCell>
                       <TableCell>{transmission(item.transmissionTypeCode)}</TableCell>
                       <TableCell>{item.revisionCount ?? '—'}</TableCell>
                       <TableCell>{item.createdAt ?? '—'}</TableCell>

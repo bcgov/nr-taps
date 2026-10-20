@@ -1,8 +1,20 @@
 import { SidePanel } from '@carbon/ibm-products'
 import { useTheme } from '@carbon/react'
-import { useEffect, useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react'
 import { createPortal } from 'react-dom'
 import useMediaQuery from './useMediaQuery'
+
+const SLIDE_OVER_MARKER = 'data-taps-detail-panel-slide-over'
+const closesOpenMenu = (target: Element) =>
+  target.getAttribute('aria-expanded') === 'true' &&
+  (target.getAttribute('role') === 'combobox' || target.hasAttribute('aria-haspopup'))
 
 export default function DetailSidePanel({
   open,
@@ -23,9 +35,8 @@ export default function DetailSidePanel({
   contentSelector?: string
   fallbackFocusSelector?: string
 }) {
-  const slideIn = useMediaQuery('(min-width: 1312px)')
+  const besidePage = useMediaQuery('(min-width: 1312px)')
   const { theme } = useTheme()
-  const hostRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const returnFocusRef = useRef(false)
   const closeRequestedRef = useRef(false)
@@ -35,45 +46,24 @@ export default function DetailSidePanel({
   }, [open])
 
   const requestClose = () => {
-    // IBM's overlay handles Escape at both the panel and window levels.
+    // Ignore repeated close requests before the parent removes the panel.
     if (closeRequestedRef.current) return
     closeRequestedRef.current = true
     onClose()
   }
 
   useLayoutEffect(() => {
-    // IBM includes the scroll body in its Tab wrap; it needs to accept focus.
+    // Keep long drawer content keyboard-scrollable without trapping focus in the panel.
     const scrollBody = panelRef.current?.querySelector<HTMLElement>('.c4p--side-panel--scrolls')
     if (scrollBody) scrollBody.tabIndex = 0
   }, [open])
 
-  useLayoutEffect(() => {
-    if (!open || slideIn || !hostRef.current) return
-    // The portal stays outside Layout's inert main content. Isolate the whole
-    // shell, including its header/navigation, while the drawer is modal.
-    const background = [...document.body.children]
-      .filter((element) => element !== hostRef.current)
-      .map((element) => ({ element, inert: element.getAttribute('inert') }))
-    background.forEach(({ element }) => element.setAttribute('inert', ''))
-    return () => {
-      background.forEach(({ element, inert }) => {
-        if (inert === null) element.removeAttribute('inert')
-        else element.setAttribute('inert', inert)
-      })
-    }
-  }, [open, slideIn])
-
   useEffect(() => {
     if (open) {
-      const opening = !returnFocusRef.current
       returnFocusRef.current = true
-      const frame = requestAnimationFrame(() => {
-        // After a resize, bring background focus into the modal drawer while
-        // preserving focus (and edited content) already inside the panel.
-        if (opening || (!slideIn && !panelRef.current?.contains(document.activeElement))) {
-          panelRef.current?.querySelector<HTMLElement>(initialFocusSelector)?.focus()
-        }
-      })
+      const frame = requestAnimationFrame(() =>
+        panelRef.current?.querySelector<HTMLElement>(initialFocusSelector)?.focus(),
+      )
       return () => cancelAnimationFrame(frame)
     }
     if (!returnFocusRef.current) return
@@ -86,9 +76,10 @@ export default function DetailSidePanel({
       target?.focus()
     })
     return () => cancelAnimationFrame(frame)
-  }, [open, slideIn, initialFocusSelector, launcherRef, fallbackFocusSelector])
+  }, [open, initialFocusSelector, launcherRef, fallbackFocusSelector])
 
   useLayoutEffect(() => {
+    if (!open || !besidePage) return
     const content = document.querySelector<HTMLElement>(contentSelector)
     if (!content) return
     const properties = ['margin-inline-end', 'inline-size', 'transition']
@@ -100,31 +91,54 @@ export default function DetailSidePanel({
         else content.style.removeProperty(property)
       })
     }
-  }, [contentSelector, open, slideIn])
+  }, [contentSelector, open, besidePage])
+
+  const panelEscapeTarget = (event: KeyboardEvent<HTMLDivElement>): Element | null => {
+    const target = event.target
+    return event.key === 'Escape' &&
+      !event.defaultPrevented &&
+      target instanceof Element &&
+      panelRef.current?.contains(target) &&
+      !target.closest('[role="dialog"], [role="alertdialog"]')
+      ? target
+      : null
+  }
+
+  const onKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
+    const target = panelEscapeTarget(event)
+    // Carbon's closed ListBox can stop native Escape before the bubble handler sees it.
+    if (
+      target?.getAttribute('role') !== 'combobox' ||
+      target.getAttribute('aria-expanded') !== 'false'
+    )
+      return
+    event.stopPropagation()
+    requestClose()
+  }
+
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const target = panelEscapeTarget(event)
+    if (!target || closesOpenMenu(target)) return
+    event.stopPropagation()
+    requestClose()
+  }
 
   if (!open) return null
   return createPortal(
     <div
-      ref={hostRef}
-      className={`taps-detail-panel-host cds--${theme} cds--layer-one${slideIn ? '' : ' is-modal'}`}
-      onKeyDown={(event) => {
-        if (slideIn && event.key === 'Escape' && !event.defaultPrevented) {
-          event.stopPropagation()
-          requestClose()
-        }
-      }}
+      className={`taps-detail-panel-host cds--${theme} cds--layer-one`}
+      onKeyDownCapture={onKeyDownCapture}
+      onKeyDown={onKeyDown}
     >
+      {!besidePage && <span hidden {...{ [SLIDE_OVER_MARKER]: '' }} />}
       <SidePanel
         ref={panelRef}
         open
         title={title}
         size="md"
-        className="taps-detail-panel"
-        {...(slideIn ? {} : { role: 'dialog', 'aria-modal': true })}
-        slideIn={slideIn}
-        selectorPageContent={contentSelector}
-        selectorPrimaryFocus={initialFocusSelector}
-        includeOverlay={!slideIn}
+        className={`taps-detail-panel${besidePage ? '' : ' taps-detail-panel--over-page'}`}
+        slideIn
+        selectorPageContent={besidePage ? contentSelector : `[${SLIDE_OVER_MARKER}]`}
         preventCloseOnClickOutside
         animateTitle={false}
         onRequestClose={requestClose}

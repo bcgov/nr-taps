@@ -4,34 +4,40 @@ import './local-synthetic.scss'
 import { Select, SelectItem } from '@carbon/react'
 import {
   Outlet,
-  RouterProvider,
   createMemoryHistory,
   createRootRoute,
   createRoute,
   createRouter,
   useLocation,
 } from '@tanstack/react-router'
-import { StrictMode, useMemo, useState } from 'react'
-import { createRoot } from 'react-dom/client'
+import { useMemo, useState } from 'react'
 import { ApplicationPage, ApplicationScreenPage } from '@/components/ApplicationPages'
 import Dashboard from '@/components/Dashboard'
 import Layout from '@/components/Layout'
 import NotFound from '@/components/NotFound'
+import RouteError from '@/components/RouteError'
+import RequireAccess from '@/components/RequireAccess'
 import { AuthContext, type AuthContextValue, type AuthState } from '@/context/auth/AuthContext'
 import { Capability } from '@/context/auth/capabilities'
 import ThemeProvider from '@/context/theme/ThemeProvider'
 import type { Session } from '@/service/session-service'
 import ControlsSample from './ControlsSample'
 import WorkflowPreview from './WorkflowPreview'
-import AsyncReadPreview from './AsyncReadPreview'
+import ReadFeedbackPreview from './ReadFeedbackPreview'
+import AsyncReadPreview, {
+  SyntheticEcasInboxPage,
+  SyntheticGasSearchPage,
+} from './AsyncReadPreview'
 
 const scenarios = [
   { id: 'signed-out', label: 'Synthetic signed-out session' },
+  { id: 'signed-out-expired', label: 'Synthetic expired signed-out session' },
   { id: 'loading', label: 'Synthetic loading session' },
   { id: 'error', label: 'Synthetic session error' },
   { id: 'no-role', label: 'Synthetic signed-in session without a role' },
   { id: 'staff', label: 'Synthetic staff: ECAS and GAS' },
   { id: 'ecas', label: 'Synthetic ECAS-only session' },
+  { id: 'long-identity', label: 'Synthetic long name and organization' },
   { id: 'gas-reports', label: 'Synthetic GAS client-report-only session' },
 ] as const
 
@@ -40,21 +46,25 @@ type Scenario = (typeof scenarios)[number]['id']
 const previewPaths = [
   { path: '/', label: 'TAPS dashboard' },
   { path: '/ecas', label: 'ECAS module' },
-  { path: '/ecas/ECAS05', label: 'ECAS Inbox Search shell' },
+  { path: '/ecas/ECAS05', label: 'ECAS Inbox Search' },
   { path: '/ecas/ECAS88', label: 'ECAS profile shell' },
   { path: '/gas', label: 'GAS module' },
-  { path: '/gas/showAppraisalSearch', label: 'GAS Appraisal Search shell' },
+  { path: '/gas/showAppraisalSearch', label: 'GAS Appraisal Search' },
   { path: '/gas/showAppraisedSummary', label: 'GAS appraised summary shell' },
   { path: '/gas/showNonAppraisedSummary', label: 'GAS non-appraised summary shell' },
   { path: '/ui-controls', label: 'Synthetic reusable controls' },
   { path: '/workflow', label: 'Synthetic ECAS and GAS workflow' },
   { path: '/async-reads', label: 'Synthetic asynchronous read pages' },
+  { path: '/read-feedback', label: 'Synthetic read feedback' },
+  { path: '/not-a-page', label: 'Page not found' },
+  { path: '/route-error', label: 'Synthetic route failure' },
 ]
 
 const previewHistory = createMemoryHistory({ initialEntries: ['/'] })
 
 function syntheticState(scenario: Scenario): AuthState {
   if (scenario === 'signed-out' || scenario === 'loading') return { kind: scenario }
+  if (scenario === 'signed-out-expired') return { kind: 'signed-out', expired: true }
   if (scenario === 'error') {
     return { kind: 'error', message: 'Synthetic session error. No service request was made.' }
   }
@@ -62,7 +72,7 @@ function syntheticState(scenario: Scenario): AuthState {
   const capabilities =
     scenario === 'staff'
       ? Object.values(Capability)
-      : scenario === 'ecas'
+      : scenario === 'ecas' || scenario === 'long-identity'
         ? Object.values(Capability).filter((capability) => capability.startsWith('ECAS_'))
         : scenario === 'gas-reports'
           ? [Capability.GasClientReports]
@@ -70,10 +80,18 @@ function syntheticState(scenario: Scenario): AuthState {
   const session: Session = {
     ecasMyToDoAvailable: scenario === 'staff',
     userId: 'synthetic-preview-user',
-    displayName: 'Synthetic preview user',
+    displayName:
+      scenario === 'long-identity'
+        ? 'SyntheticLongNameWithoutSpacesForProfileWrappingValidation'
+        : 'Synthetic preview user',
     email: null,
     identityProvider: scenario === 'staff' ? 'IDIR' : 'BCEID_BUSINESS',
-    businessName: scenario === 'staff' ? null : 'Synthetic preview organization',
+    businessName:
+      scenario === 'staff'
+        ? null
+        : scenario === 'long-identity'
+          ? 'SyntheticOrganizationWithAnIntentionallyUnbrokenNameForLayoutReview'
+          : 'Synthetic preview organization',
     roles:
       scenario === 'no-role'
         ? []
@@ -143,10 +161,12 @@ function PreviewRoot() {
     <ThemeProvider>
       <AuthContext value={auth}>
         {/* Signed-out sessions get the login page without the shell, so keep the controls above it. */}
-        {scenario === 'signed-out' && <div className="taps-preview-landing-controls">{banner}</div>}
-        <Layout>
+        {auth.state.kind === 'signed-out' && (
+          <div className="taps-preview-landing-controls">{banner}</div>
+        )}
+        <Layout loginConfigured>
           <div className="taps-preview-workspace">
-            {scenario !== 'signed-out' && banner}
+            {auth.state.kind !== 'signed-out' && banner}
             <Outlet />
           </div>
         </Layout>
@@ -155,10 +175,15 @@ function PreviewRoot() {
   )
 }
 
-function createPreviewRouter() {
+export function createPreviewRouter() {
   const rootRoute = createRootRoute({
     component: PreviewRoot,
     notFoundComponent: NotFound,
+    errorComponent: () => (
+      <ThemeProvider>
+        <RouteError />
+      </ThemeProvider>
+    ),
   })
   const indexRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -178,16 +203,30 @@ function createPreviewRouter() {
   const ecasScreenRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/ecas/$screenId',
-    component: () => (
-      <ApplicationScreenPage application="ecas" screenId={ecasScreenRoute.useParams().screenId} />
-    ),
+    component: () => {
+      const { screenId } = ecasScreenRoute.useParams()
+      return screenId === 'ECAS05' ? (
+        <RequireAccess capabilities={[Capability.EcasSubmissionView]}>
+          <SyntheticEcasInboxPage />
+        </RequireAccess>
+      ) : (
+        <ApplicationScreenPage application="ecas" screenId={screenId} />
+      )
+    },
   })
   const gasScreenRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: '/gas/$screenId',
-    component: () => (
-      <ApplicationScreenPage application="gas" screenId={gasScreenRoute.useParams().screenId} />
-    ),
+    component: () => {
+      const { screenId } = gasScreenRoute.useParams()
+      return screenId === 'showAppraisalSearch' ? (
+        <RequireAccess capabilities={[Capability.GasAppraisalView]}>
+          <SyntheticGasSearchPage />
+        </RequireAccess>
+      ) : (
+        <ApplicationScreenPage application="gas" screenId={screenId} />
+      )
+    },
   })
   const controlsRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -204,6 +243,18 @@ function createPreviewRouter() {
     path: '/async-reads',
     component: AsyncReadPreview,
   })
+  const failureRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/route-error',
+    component: () => {
+      throw new Error('Synthetic preview route failure')
+    },
+  })
+  const feedbackRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/read-feedback',
+    component: ReadFeedbackPreview,
+  })
 
   return createRouter({
     history: previewHistory,
@@ -216,14 +267,8 @@ function createPreviewRouter() {
       controlsRoute,
       workflowRoute,
       readsRoute,
+      feedbackRoute,
+      failureRoute,
     ]),
   })
-}
-
-export function mountLocalSyntheticPreview() {
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <RouterProvider router={createPreviewRouter()} />
-    </StrictMode>,
-  )
 }

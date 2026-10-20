@@ -41,7 +41,15 @@ export const nonAppraisedSample: GasNonAppraisedSummary = {
       totalStumpageRate: '0.00',
     },
   ],
-  selectedRateAddons: [],
+  selectedRateAddons: [
+    {
+      code: 'SYNTHETIC-ADDON',
+      description: 'Synthetic stored rate add-on selection',
+      effectiveDate: '2026-10-01',
+      expiryDate: '2027-09-30',
+      updateTimestamp: '2026-10-01T09:00:00',
+    },
+  ],
 }
 
 export const nonAppraisedSampleItem: GasAppraisalItem = {

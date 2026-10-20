@@ -133,6 +133,7 @@ export default function EcasSearchFilters({
           id="read-ecas-id"
           labelText="ECAS ID"
           maxLength={12}
+          inputMode="numeric"
           value={draft.ecasId}
           onChange={(event) => set('ecasId', event.target.value)}
           invalid={Boolean(errors.ecasId)}
@@ -207,6 +208,7 @@ export default function EcasSearchFilters({
         </Select>
         <FilterableMultiSelect<{ id: EcasDateType; text: string }>
           id="read-ecas-date-types"
+          className="taps-filter-date-types"
           titleText="Dates to match"
           placeholder="Select date fields"
           items={dateOptions}

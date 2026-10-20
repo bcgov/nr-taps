@@ -16,6 +16,47 @@ import GasSearchFilters, { type GasFilters } from '../GasSearchFilters'
 const { reloadSession } = vi.hoisted(() => ({ reloadSession: vi.fn(async () => {}) }))
 vi.mock('@/context/auth/AuthContext', () => ({ useAuth: () => ({ reloadSession }) }))
 
+test('search results display calendar dates in words and retain the original row dates', async () => {
+  const onOpen = vi.fn()
+  const item = { ...fixture.ecasInboxItem, effectiveDate: '2026-09-28' }
+  const { rerender } = render(<EcasInboxResults items={[item]} onOpen={onOpen} />)
+  expect(screen.getByRole('cell', { name: 'Sep 28, 2026' })).toBeInTheDocument()
+  await userEvent.click(screen.getByRole('button', { name: /Open ECAS/ }))
+  expect(onOpen).toHaveBeenCalledWith(item, expect.any(HTMLButtonElement))
+
+  rerender(
+    <GasSearchResults
+      result={{
+        ...fixture.gasSearchResult,
+        licenceInformation: {
+          ...fixture.gasSearchResult.licenceInformation!,
+          markExpiryDate: '2027-01-01',
+          markExtendDate: null,
+        },
+        appraisals: {
+          ...fixture.gasSearchResult.appraisals,
+          items: [
+            {
+              ...fixture.gasSearchResult.appraisals.items[0],
+              effectiveDate: '2026-09-28',
+              expiryDate: '2026-12-31',
+            },
+          ],
+        },
+      }}
+      onOpen={onOpen}
+    />,
+  )
+  expect(screen.getByRole('cell', { name: 'Sep 28, 2026' })).toBeInTheDocument()
+  expect(screen.getByRole('cell', { name: 'Dec 31, 2026' })).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Mark expiry date').parentElement!).getByText('Jan 1, 2027'),
+  ).toBeInTheDocument()
+  expect(
+    within(screen.getByText('Mark extension date').parentElement!).getByText('—'),
+  ).toBeInTheDocument()
+})
+
 test('retains ECAS marks and permits sharing the same submission and opens the selected row', async () => {
   const user = userEvent.setup()
   const onOpen = vi.fn()
@@ -52,10 +93,10 @@ test('keeps GAS marks and worksheet families distinct and preserves rows across 
     />,
   )
   expect(
-    screen.getByRole('button', { name: /APPRAISED worksheet .*mark ZZ9997/ }),
+    screen.getByRole('button', { name: /Appraised worksheet .*mark ZZ9997/ }),
   ).toBeInTheDocument()
   expect(
-    screen.getByRole('button', { name: /APPRAISED worksheet .*mark ZZ9998/ }),
+    screen.getByRole('button', { name: /Appraised worksheet .*mark ZZ9998/ }),
   ).toBeInTheDocument()
   expect(screen.getAllByRole('cell', { name: 'ZZ9998' })).toHaveLength(2)
 })
@@ -78,7 +119,7 @@ test('shows all FTA fields independently when no worksheet rows exist', () => {
   expect(within(info).getByText('ZZ9996', { exact: true })).toBeInTheDocument()
   expect(within(info).getAllByRole('term')).toHaveLength(11)
   expect(screen.getByRole('status')).toHaveTextContent('0 results found')
-  expect(screen.getByRole('heading', { name: 'No results' })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: 'No results found' })).toBeInTheDocument()
 })
 
 test('preserves aggregated permits, nullable licence values and rows without FTA data', () => {
@@ -148,6 +189,67 @@ test('submits the displayed selection when a licence lookup no longer contains t
   expect(onSearch).toHaveBeenCalledWith({ licence: 'X99998', timberMark: '' })
 })
 
+test('announces no marks only after the current licence lookup finishes successfully', () => {
+  const props = {
+    draft: { licence: 'X99998', timberMark: '' },
+    onChange: vi.fn(),
+    onSearch: vi.fn(),
+    onReset: vi.fn(),
+  }
+  const emptyMessage = 'No timber marks returned for this licence.'
+  const { rerender } = render(<GasSearchFilters {...props} licenceMarks={null} />)
+  expect(screen.queryByText(emptyMessage)).not.toBeInTheDocument()
+
+  rerender(<GasSearchFilters {...props} licenceMarks={{ licence: 'X99999', timberMarks: [] }} />)
+  expect(screen.queryByText(emptyMessage)).not.toBeInTheDocument()
+
+  rerender(
+    <GasSearchFilters
+      {...props}
+      licenceMarks={{ licence: 'X99998', timberMarks: [] }}
+      lookupLoading
+    />,
+  )
+  expect(screen.getByText('Loading timber marks…')).toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: 'Timber mark' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
+  expect(screen.queryByText(emptyMessage)).not.toBeInTheDocument()
+
+  rerender(<GasSearchFilters {...props} licenceMarks={{ licence: 'X99998', timberMarks: [] }} />)
+  expect(screen.queryByText('Loading timber marks…')).not.toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveTextContent(emptyMessage)
+  expect(screen.getByRole('combobox', { name: 'Timber mark' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Search' })).toBeEnabled()
+
+  rerender(<GasSearchFilters {...props} licenceMarks={fixture.gasLicenceMarks} />)
+  expect(screen.queryByText(emptyMessage)).not.toBeInTheDocument()
+})
+
+test('shows a retryable notification for failed mark choices without claiming no marks exist', async () => {
+  const retry = vi.fn()
+  const onSearch = vi.fn()
+  render(
+    <GasSearchFilters
+      draft={{ licence: 'X99998', timberMark: 'ZZ9998' }}
+      licenceMarks={{ licence: 'X99998', timberMarks: [] }}
+      onChange={vi.fn()}
+      onSearch={onSearch}
+      onReset={vi.fn()}
+      lookupError="The read service is unavailable. Please try again."
+      onRetryLookup={retry}
+    />,
+  )
+  const alert = screen.getByText('Timber marks unavailable').closest('[role="alert"]')
+  expect(alert).toHaveTextContent('Timber marks unavailable')
+  expect(alert).toHaveTextContent('The read service is unavailable. Please try again.')
+  expect(screen.queryByText('No timber marks returned for this licence.')).not.toBeInTheDocument()
+  expect(screen.getByRole('combobox', { name: 'Timber mark' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Search' })).toBeDisabled()
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Retry timber marks' }))
+  expect(retry).toHaveBeenCalledOnce()
+  expect(onSearch).not.toHaveBeenCalled()
+})
+
 function renderWorkflow() {
   setViewportWidth(1440)
   return render(
@@ -163,7 +265,14 @@ test('connects the Coast reference to both related GAS mark rows and exact store
   await user.click(screen.getByRole('button', { name: /Open ECAS .*mark ZZ9997/ }))
   const reference = screen.getByRole('complementary', { name: 'Coast reference 999900000002' })
   expect(within(reference).getByRole('heading', { name: 'Coast reference' })).toBeInTheDocument()
-  expect(within(reference).getByText(/ZZ9997 — volume/)).toBeInTheDocument()
+  expect(
+    within(within(reference).getByRole('table', { name: 'Submitted timber marks' })).getByRole(
+      'row',
+      {
+        name: 'ZZ9997 67.89 No 4',
+      },
+    ),
+  ).toBeInTheDocument()
   const species = within(within(reference).getByRole('table', { name: 'Volume by species' }))
   expect(species.getAllByRole('row')).toHaveLength(
     fixture.ecasCoastMultiMarkReference.speciesVolumes.length + 1,
@@ -180,7 +289,17 @@ test('connects the Coast reference to both related GAS mark rows and exact store
   const launcher = within(table).getByRole('button', { name: /mark ZZ9997/ })
   await user.click(launcher)
   const summary = screen.getByRole('complementary', { name: 'Appraised worksheet 999900000011' })
-  expect(within(summary).getByText('COAST_MPS_TOA_N')).toBeInTheDocument()
+  expect(within(summary).queryByText('Summary variant')).not.toBeInTheDocument()
+  expect(within(summary).queryByText('COAST_MPS_TOA_N')).not.toBeInTheDocument()
+  expect(
+    within(within(summary).getByText('Worksheet type').parentElement!).getByText('Appraised'),
+  ).toBeInTheDocument()
+  expect(
+    within(within(summary).getByText('Rate calculation method').parentElement!).getByText('MPS'),
+  ).toBeInTheDocument()
+  expect(
+    within(within(summary).getByText('TOA eligible').parentElement!).getByText('No'),
+  ).toBeInTheDocument()
   expect(within(summary).getByRole('cell', { name: '12.30' })).toBeInTheDocument()
   await user.click(within(summary).getByRole('button', { name: 'History' }))
   expect(
@@ -196,16 +315,16 @@ test('keeps Interior reference fields separate and links its own worksheet', asy
   await user.click(screen.getByRole('button', { name: /Open ECAS 999900000001/ }))
   const reference = screen.getByRole('complementary', { name: 'Interior reference 999900000001' })
   expect(within(reference).getByText('Comparative cruise')).toBeInTheDocument()
-  expect(within(reference).queryByText('Net cruise volume')).not.toBeInTheDocument()
+  expect(within(reference).queryByText('Net cruise volume (m³)')).not.toBeInTheDocument()
   expect(
     within(reference).queryByRole('table', { name: 'Volume by species' }),
   ).not.toBeInTheDocument()
   await user.click(within(reference).getByRole('button', { name: 'View related GAS worksheets' }))
   expect(
-    screen.getByRole('button', { name: /APPRAISED worksheet 999900000010/ }),
+    screen.getByRole('button', { name: /Appraised worksheet 999900000010/ }),
   ).toBeInTheDocument()
   expect(
-    screen.queryByRole('button', { name: /APPRAISED worksheet 999900000011/ }),
+    screen.queryByRole('button', { name: /Appraised worksheet 999900000011/ }),
   ).not.toBeInTheDocument()
 })
 

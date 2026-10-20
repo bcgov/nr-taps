@@ -20,6 +20,9 @@ test('checks without saving, leaves stored data unchanged and resets locally', a
   const effective = screen.getByRole('textbox', { name: 'Appraisal effective date' })
   const expiry = screen.getByRole('textbox', { name: 'Appraisal expiry date' })
   expect(effective).toHaveValue('2026-10-01')
+  expect(effective).not.toHaveAttribute('aria-required', 'true')
+  expect(expiry).not.toHaveAttribute('aria-required', 'true')
+  expect(screen.queryByText(/Required fields/)).not.toBeInTheDocument()
   await user.type(expiry, '2026-10-02')
   expect(screen.getByRole('status')).toHaveTextContent('Unsaved date changes')
   await user.click(screen.getByRole('button', { name: 'Check dates' }))
@@ -43,6 +46,14 @@ test('retains invalid input, explains dependent failures and focuses the first i
   )
   const effective = screen.getByRole('textbox', { name: 'Appraisal effective date' })
   const expiry = screen.getByRole('textbox', { name: 'Appraisal expiry date' })
+  expect(effective).toHaveAttribute('aria-required', 'true')
+  expect(expiry).not.toHaveAttribute('aria-required', 'true')
+  expect(screen.getByText(/Required fields/)).toBeInTheDocument()
+  expect(document.querySelectorAll('.taps-required-marker')).toHaveLength(2)
+  for (const marker of document.querySelectorAll('.taps-required-marker')) {
+    expect(marker).toHaveTextContent('*')
+    expect(marker).toHaveAttribute('aria-hidden', 'true')
+  }
   await user.type(expiry, '2026-10-02')
   await user.click(screen.getByRole('button', { name: 'Check dates' }))
   expect(effective).toHaveFocus()
@@ -52,13 +63,16 @@ test('retains invalid input, explains dependent failures and focuses the first i
     screen.getByText('Enter an effective date before entering an expiry date.'),
   ).toBeInTheDocument()
   await user.type(effective, '2026-02-30')
+  expect(effective).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.getByText('Enter a valid effective date in YYYY-MM-DD format.')).toBeInTheDocument()
+  expect(screen.queryByText('Check the appraisal dates')).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Check dates' }))
   expect(effective).toHaveValue('2026-02-30')
   expect(screen.getByText('Enter a valid effective date in YYYY-MM-DD format.')).toBeInTheDocument()
   expect(document.querySelector('.flatpickr-calendar')).not.toBeInTheDocument()
 })
 
-test('rejects reversed expiry and clears the prior check on edit', async () => {
+test('keeps date errors visible until their values are corrected', async () => {
   const user = userEvent.setup()
   render(
     <CoastAppraisalDatesDraft
@@ -74,6 +88,15 @@ test('rejects reversed expiry and clears the prior check on edit', async () => {
   expect(
     screen.getByText('The expiry date must be on or after the effective date.'),
   ).toBeInTheDocument()
+  fireEvent.change(expiry, { target: { value: '2026-10-0' } })
+  expect(expiry).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.getByText('Enter a valid expiry date in YYYY-MM-DD format.')).toBeInTheDocument()
+  fireEvent.change(expiry, { target: { value: '2026-10-03' } })
+  expect(expiry).not.toHaveAttribute('aria-invalid', 'true')
+  expect(
+    screen.queryByText('Enter a valid expiry date in YYYY-MM-DD format.'),
+  ).not.toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveTextContent('Date fields pass the local checks')
 })
 
 test('new record or revision resets the draft and discards previous errors', async () => {

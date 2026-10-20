@@ -32,20 +32,24 @@ export default function GasFtaContext({
           <dt>Timber mark</dt>
           <dd>{mark ?? '—'}</dd>
         </div>
-        <div>
-          <dt>FTA Status</dt>
-          <dd>{displayCode(context.value?.markStatus ?? null)}</dd>
-        </div>
-        <div>
-          <dt>Cruise based</dt>
-          <dd>
-            {context.value?.cruiseBased === true
-              ? 'Yes'
-              : context.value?.cruiseBased === false
-                ? 'No'
-                : '—'}
-          </dd>
-        </div>
+        {context.value && (
+          <>
+            <div>
+              <dt>FTA Status</dt>
+              <dd>{displayCode(context.value.markStatus)}</dd>
+            </div>
+            <div>
+              <dt>Cruise based</dt>
+              <dd>
+                {context.value.cruiseBased === true
+                  ? 'Yes'
+                  : context.value.cruiseBased === false
+                    ? 'No'
+                    : '—'}
+              </dd>
+            </div>
+          </>
+        )}
       </dl>
       {!mark && <p>No primary timber mark is recorded for this worksheet.</p>}
       {context.loading && <InlineLoading description="Loading FTA information…" />}

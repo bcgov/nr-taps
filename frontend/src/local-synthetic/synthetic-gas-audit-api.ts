@@ -4,6 +4,8 @@ import { ReadApiError } from '@/service/read-service'
 import { nonAppraisedSample } from './non-appraised-sample'
 import source from '../../../backend/src/test/resources/contracts/synthetic-workflow.json'
 
+const longNotice = `SYNTHETIC_NOTICE_${'LONGTOKEN'.repeat(24)}\nSecond synthetic notice line retains its stored line break.`
+
 // Fictional preselected event pages only. This preview does not derive differences or authorize records.
 const events: GasAuditEvent[] = Array.from({ length: 12 }, (_, index) => ({
   eventId:
@@ -37,8 +39,18 @@ export const syntheticGasAuditApi: GasAuditApi = {
               rateId: index === 0 ? null : appraised.rates[0].rateId,
               userId: 'IDIR\\SYNTHETIC',
               eventDate: `2026-10-${String(12 - index).padStart(2, '0')}T10:00:00`,
-              attribute: index === 0 ? 'Discount Percent' : 'Total stumpage rate',
-              value: index === 0 ? '10.0' : appraised.rates[0].totalStumpageRate,
+              attribute:
+                index === 0
+                  ? 'Discount Percent'
+                  : index === 1
+                    ? 'Adjustment Notice Message'
+                    : 'Total stumpage rate',
+              value:
+                index === 0
+                  ? '10.0'
+                  : index === 1
+                    ? longNotice
+                    : appraised.rates[0].totalStumpageRate,
               comment: index === 1 ? '<script>Fictional appraised comment as text</script>' : null,
             }))
           : null

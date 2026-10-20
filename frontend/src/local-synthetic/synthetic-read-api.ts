@@ -1,6 +1,7 @@
 import { ReadApiError, type ReadApi } from '@/service/read-service'
 import { workflowFixture as fixture } from './WorkflowPreview'
 import { nonAppraisedSample, nonAppraisedSampleItem } from './non-appraised-sample'
+import { historicSample, historicSampleItem } from './historic-sample'
 import { syntheticFtaApi } from './synthetic-fta-api'
 
 const inbox = [...fixture.ecasInboxMultiMarkItems, fixture.ecasInboxItem]
@@ -8,9 +9,10 @@ const worksheets = [
   ...fixture.gasSearchResult.appraisals.items,
   ...fixture.gasSearchPage.items,
   nonAppraisedSampleItem,
+  historicSampleItem,
 ]
 const appraisedSummaries = [fixture.gasMultiMarkAppraisedSummary, fixture.gasAppraisedSummary]
-const summaries = [...appraisedSummaries, nonAppraisedSample]
+const summaries = [...appraisedSummaries, nonAppraisedSample, historicSample]
 const normalized = (value: string) => value.trim().toUpperCase()
 async function delayed<T>(signal: AbortSignal, value: T): Promise<T> {
   await new Promise<void>((resolve) => setTimeout(resolve, 200))

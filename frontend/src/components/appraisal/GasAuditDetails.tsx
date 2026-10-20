@@ -104,7 +104,12 @@ function HistoryContents({
           <p>No history events on this page.</p>
         ) : (
           <TableFrame ariaLabel="Worksheet history">
-            <Table useZebraStyles size="md" aria-label="Worksheet history">
+            <Table
+              useZebraStyles
+              size="md"
+              aria-label="Worksheet history"
+              className="taps-gas-history-table"
+            >
               <TableHead>
                 <TableRow>
                   {['Update user', 'Date modified', 'Attribute', 'Value', 'Comment'].map(
@@ -127,10 +132,8 @@ function HistoryContents({
                         </div>
                       )}
                     </TableCell>
-                    <TableCell>{event.value ?? '—'}</TableCell>
-                    <TableCell style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-                      {event.comment ?? '—'}
-                    </TableCell>
+                    <TableCell className="taps-wrap-cell">{event.value ?? '—'}</TableCell>
+                    <TableCell className="taps-wrap-cell">{event.comment ?? '—'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

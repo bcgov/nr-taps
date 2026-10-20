@@ -38,7 +38,12 @@ export default function Dashboard() {
             <Tile className="taps-card">
               <CardTitle icon={Apps}>Modules</CardTitle>
               <TableFrame ariaLabel="Available modules table">
-                <Table size="md" useZebraStyles aria-label="Available modules">
+                <Table
+                  size="md"
+                  useZebraStyles
+                  aria-label="Available modules"
+                  className="taps-overview-table"
+                >
                   <TableHead>
                     <TableRow>
                       <TableHeader>Module</TableHeader>

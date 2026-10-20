@@ -14,3 +14,12 @@
   gap: 1.5rem;
   margin-block: 1.5rem;
 }
+
+.taps-reference-draft .taps-required-fields-legend {
+  font-size: 0.875rem;
+  line-height: 1.125rem;
+}
+
+.taps-required-marker {
+  color: var(--cds-text-error);
+}

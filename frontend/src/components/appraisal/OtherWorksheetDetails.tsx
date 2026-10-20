@@ -2,11 +2,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { GasWorksheetSummary, StoredNonAppraisedRate } from '@/contracts/appraisal'
 import TableFrame from '../TableFrame'
 import { GasStoredSummary } from './AppraisalDetails'
-import { displayCode } from './AppraisalResults'
+import { displayCode, worksheetTypeLabels } from './AppraisalResults'
 import type { GasAuditApi } from '@/service/gas-audit-service'
 import GasAuditDetails from './GasAuditDetails'
 import type { ReadApi } from '@/service/read-service'
 import GasFtaContext from './GasFtaContext'
+import { formatDisplayDate } from '../iso-date'
 
 const yesNo = (value: boolean | null) => (value === null ? '—' : value ? 'Yes' : 'No')
 
@@ -14,10 +15,12 @@ function StoredDetailsTable({
   title,
   headers,
   rows,
+  numericColumns = [],
 }: {
   title: string
   headers: string[]
   rows: { id: string; values: (string | null)[] }[]
+  numericColumns?: number[]
 }) {
   return (
     <>
@@ -29,8 +32,13 @@ function StoredDetailsTable({
           <Table useZebraStyles size="md" aria-label={title}>
             <TableHead>
               <TableRow>
-                {headers.map((header) => (
-                  <TableHeader key={header}>{header}</TableHeader>
+                {headers.map((header, index) => (
+                  <TableHeader
+                    key={header}
+                    className={numericColumns.includes(index) ? 'taps-numeric-cell' : undefined}
+                  >
+                    {header}
+                  </TableHeader>
                 ))}
               </TableRow>
             </TableHead>
@@ -38,7 +46,12 @@ function StoredDetailsTable({
               {rows.map((row) => (
                 <TableRow key={row.id}>
                   {row.values.map((value, index) => (
-                    <TableCell key={headers[index]}>{value ?? '—'}</TableCell>
+                    <TableCell
+                      key={headers[index]}
+                      className={numericColumns.includes(index) ? 'taps-numeric-cell' : undefined}
+                    >
+                      {value ?? '—'}
+                    </TableCell>
                   ))}
                 </TableRow>
               ))}
@@ -51,6 +64,7 @@ function StoredDetailsTable({
 }
 
 function RateComponents({ rates }: { rates: StoredNonAppraisedRate[] }) {
+  if (rates.length === 0) return <p>No non-appraised rates are recorded for this worksheet.</p>
   return (
     <TableFrame ariaLabel="Non-appraised rates">
       <Table useZebraStyles size="md" aria-label="Non-appraised rates">
@@ -66,8 +80,10 @@ function RateComponents({ rates }: { rates: StoredNonAppraisedRate[] }) {
               'Upset rate',
               'Bonus bid',
               'Total rate',
-            ].map((label) => (
-              <TableHeader key={label}>{label}</TableHeader>
+            ].map((label, index) => (
+              <TableHeader key={label} className={index >= 3 ? 'taps-numeric-cell' : undefined}>
+                {label}
+              </TableHeader>
             ))}
           </TableRow>
         </TableHead>
@@ -86,6 +102,7 @@ function RateComponents({ rates }: { rates: StoredNonAppraisedRate[] }) {
                 rate.totalStumpageRate,
               ].map((value, index) => (
                 <TableCell
+                  className={index >= 3 ? 'taps-numeric-cell' : undefined}
                   key={
                     [
                       'species',
@@ -129,13 +146,13 @@ export default function OtherWorksheetDetails({
         {(
           [
             ['Worksheet', summary.key.worksheetId],
-            ['Type', historic ? 'Historic' : 'Non-appraised'],
+            ['Type', worksheetTypeLabels[summary.key.type]],
             ['Licence', summary.licence],
             ['Timber mark', summary.timberMark],
             ['Method', summary.appraisalMethod === 'C' ? 'Coast' : 'Interior'],
             ['Status', displayCode(summary.status)],
-            ['Effective date', summary.effectiveDate],
-            ['Expiry date', summary.expiryDate],
+            ['Effective date', formatDisplayDate(summary.effectiveDate)],
+            ['Expiry date', formatDisplayDate(summary.expiryDate)],
           ] as const
         ).map(([label, value]) => (
           <div key={label}>
@@ -151,11 +168,8 @@ export default function OtherWorksheetDetails({
       />
       {historic ? (
         <>
+          <h3>Calculation settings</h3>
           <dl className="taps-field-grid">
-            <div>
-              <dt>Variant</dt>
-              <dd>{summary.variant}</dd>
-            </div>
             <div>
               <dt>Policy version</dt>
               <dd>{summary.policyVersion ?? '—'}</dd>
@@ -178,34 +192,44 @@ export default function OtherWorksheetDetails({
             </div>
             <div>
               <dt>Cease adjustment date</dt>
-              <dd>{summary.ceaseAdjustmentDate ?? '—'}</dd>
+              <dd>{formatDisplayDate(summary.ceaseAdjustmentDate)}</dd>
             </div>
           </dl>
           <h3>Stored stumpage rates</h3>
-          <TableFrame ariaLabel="Historic stored rates">
-            <Table useZebraStyles size="md" aria-label="Historic stored rates">
-              <TableHead>
-                <TableRow>
-                  <TableHeader>Rate ID</TableHeader>
-                  <TableHeader>Effective date</TableHeader>
-                  <TableHeader>Rate</TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {summary.rates.map((rate) => (
-                  <TableRow key={rate.rateId}>
-                    <TableCell>{rate.rateId}</TableCell>
-                    <TableCell>{rate.effectiveDate}</TableCell>
-                    <TableCell>{rate.totalStumpageRate}</TableCell>
+          {summary.rates.length === 0 ? (
+            <p>No stored stumpage rates are recorded for this worksheet.</p>
+          ) : (
+            <TableFrame ariaLabel="Historic stored rates">
+              <Table
+                useZebraStyles
+                size="md"
+                aria-label="Historic stored rates"
+                className="taps-stored-rates-table"
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableHeader>Rate ID</TableHeader>
+                    <TableHeader>Effective date</TableHeader>
+                    <TableHeader className="taps-numeric-cell">Rate</TableHeader>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableFrame>
+                </TableHead>
+                <TableBody>
+                  {summary.rates.map((rate) => (
+                    <TableRow key={rate.rateId}>
+                      <TableCell>{rate.rateId}</TableCell>
+                      <TableCell>{formatDisplayDate(rate.effectiveDate)}</TableCell>
+                      <TableCell className="taps-numeric-cell">{rate.totalStumpageRate}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableFrame>
+          )}
           <h3>Non-appraised rates</h3>
           <RateComponents rates={summary.nonAppraisedRates} />
           <StoredDetailsTable
             title="Historic species"
+            numericColumns={[2, 3, 4, 5, 6]}
             headers={[
               'Species',
               'Selling price zone',
@@ -230,6 +254,7 @@ export default function OtherWorksheetDetails({
           />
           <StoredDetailsTable
             title="Coast species grades"
+            numericColumns={[3]}
             headers={['Species', 'Product', 'Grade', 'Grade %']}
             rows={summary.coastSpeciesGrades.map((grade) => ({
               id: grade.speciesGradeId,
@@ -244,6 +269,7 @@ export default function OtherWorksheetDetails({
         </>
       ) : (
         <>
+          <h3>Rate classifications</h3>
           <dl className="taps-field-grid">
             {(
               [
@@ -254,7 +280,7 @@ export default function OtherWorksheetDetails({
                 ['Forest zone', displayCode(summary.appraisalForestZone)],
                 ['Rate type', displayCode(summary.nonAppraisedRateType)],
                 ['Adjustment type', displayCode(summary.rateAdjustmentType)],
-                ['SDM acceptance date', summary.sdmDeclarationAcceptanceDate],
+                ['SDM acceptance date', formatDisplayDate(summary.sdmDeclarationAcceptanceDate)],
               ] as const
             ).map(([label, value]) => (
               <div key={label}>
@@ -273,8 +299,8 @@ export default function OtherWorksheetDetails({
               values: [
                 addon.code,
                 addon.description,
-                addon.effectiveDate,
-                addon.expiryDate,
+                formatDisplayDate(addon.effectiveDate),
+                formatDisplayDate(addon.expiryDate),
                 addon.updateTimestamp,
               ],
             }))}

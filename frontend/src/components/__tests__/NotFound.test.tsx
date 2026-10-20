@@ -14,10 +14,14 @@ describe('NotFound', () => {
     navigate.mockClear()
   })
 
-  test('renders a heading with the correct text', () => {
+  test('renders one page heading and an accessible description', () => {
     render(<NotFound />)
-    const headingElement = screen.getByRole('heading', { name: /404/i })
-    expect(headingElement).toBeInTheDocument()
+    expect(screen.getAllByRole('heading')).toHaveLength(1)
+    expect(screen.getByRole('heading', { level: 1, name: '404' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: '404' })).toHaveAccessibleDescription(
+      'The page you’re looking for does not exist.',
+    )
+    expect(screen.getByRole('button', { name: /back home/i })).toHaveClass('cds--btn--tertiary')
   })
 
   test('navigates home when the Back Home button is clicked', async () => {
