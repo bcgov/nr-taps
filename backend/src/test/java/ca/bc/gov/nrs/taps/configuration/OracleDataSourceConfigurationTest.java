@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import ca.bc.gov.nrs.taps.read.oracle.OracleEcasInbox;
@@ -12,8 +14,12 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Map;
+import java.util.Properties;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
@@ -60,9 +66,10 @@ class OracleDataSourceConfigurationTest {
       assertThat(dataSource.getJdbcUrl()).isEqualTo("jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=TCPS)"
           + "(HOST=oracle.example.test)(PORT=1543))(CONNECT_DATA=(SERVICE_NAME=taps.example.test)(SERVER=DEDICATED)))");
       assertThat(dataSource.getUsername()).isEqualTo("synthetic");
-      assertThat(dataSource.getMaximumPoolSize()).isEqualTo(10);
-      assertThat(dataSource.getMinimumIdle()).isEqualTo(1);
-      assertThat(dataSource.getConnectionTimeout()).isEqualTo(30000);
+      assertThat(dataSource.getMaximumPoolSize()).isEqualTo(2);
+      assertThat(dataSource.getMinimumIdle()).isZero();
+      assertThat(dataSource.getConnectionTimeout()).isEqualTo(3000);
+      assertThat(application.getEnvironment().getProperty("spring.sql.init.mode")).isEqualTo("never");
       // TCPS trusts the init-generated certificate; no separate server DN match.
       assertThat(dataSource.getDataSourceProperties()).doesNotContainKey("oracle.net.ssl_server_dn_match")
           .containsEntry("oracle.net.CONNECT_TIMEOUT", "10000")
@@ -81,6 +88,43 @@ class OracleDataSourceConfigurationTest {
               .containsEntry("oracle.jdbc.ReadTimeout", "5000")
               .containsEntry("javax.net.ssl.trustStore", "/mounted/trust.jks");
         });
+  }
+
+  @Test
+  void deploymentVariablesConfigureTheSmallPool() {
+    pool.withPropertyValues("DATABASE_MAX_POOL_SIZE=3", "DATABASE_MIN_IDLE=1",
+        "DATABASE_CONNECTION_TIMEOUT_MS=5000").run(application -> {
+          HikariDataSource dataSource = application.getBean(HikariDataSource.class);
+          assertThat(dataSource.getMaximumPoolSize()).isEqualTo(3);
+          assertThat(dataSource.getMinimumIdle()).isEqualTo(1);
+          assertThat(dataSource.getConnectionTimeout()).isEqualTo(5000);
+        });
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {-1, 0, 21})
+  void queryTimeoutCannotDisableCancellationOrExceedTheBudget(int timeout) {
+    assertThatThrownBy(() -> new OracleDataSourceConfiguration().oracleJdbcTemplate(validDataSource(), timeout))
+        .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("query timeout");
+  }
+
+  @ParameterizedTest
+  @CsvSource({"0,0,3000,10000,30000", "11,0,3000,10000,30000", "2,3,3000,10000,30000",
+      "2,0,0,10000,30000", "2,0,30001,10000,30000", "2,0,3000,0,30000", "2,0,3000,10000,0"})
+  void startupRejectsUnboundedPoolAndSocketOverridesBeforeConnecting(
+      int max, int idle, long wait, int connect, int read) throws Exception {
+    var dataSource = mock(HikariDataSource.class);
+    when(dataSource.getMaximumPoolSize()).thenReturn(max);
+    when(dataSource.getMinimumIdle()).thenReturn(idle);
+    when(dataSource.getConnectionTimeout()).thenReturn(wait);
+    Properties properties = new Properties();
+    properties.put("oracle.net.CONNECT_TIMEOUT", String.valueOf(connect));
+    properties.put("oracle.jdbc.ReadTimeout", String.valueOf(read));
+    when(dataSource.getDataSourceProperties()).thenReturn(properties);
+
+    assertThatThrownBy(() -> new OracleDataSourceConfiguration().warmOraclePool(dataSource).afterPropertiesSet())
+        .isInstanceOf(IllegalArgumentException.class);
+    verify(dataSource, never()).getConnection();
   }
 
   @Test

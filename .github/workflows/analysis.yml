@@ -101,8 +101,8 @@ jobs:
         with:
           node-version: 24
 
-      - name: Test local rehearsal issuer
-        run: node --test scripts/local-read-issuer.test.mjs
+      - name: Test release guards and local rehearsal issuer
+        run: node --test .github/scripts/*.test.mjs scripts/local-read-issuer.test.mjs
 
   trivy:
     name: Trivy Security Scan

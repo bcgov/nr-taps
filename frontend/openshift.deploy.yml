@@ -10,7 +10,7 @@ parameters:
     description: App name prefix
     value: nr-taps
   - name: ZONE
-    description: PR number or 'test'
+    description: PR number, 'test' or 'prod'
     required: true
   - name: REPLICAS
     description: Pod count
@@ -23,8 +23,8 @@ parameters:
     value: "200m"
   - name: MAX_MEM
     value: "128Mi"
-  - name: IMAGE_TAG
-    description: Container image tag (PR number or commit SHA)
+  - name: IMAGE_REF
+    description: Full image reference; TEST and PROD require a SHA-256 digest
     required: true
   - name: ROLLOUT_TRIGGER
     description: Value placed on the pod template to force a rollout when a reused image tag is rebuilt
@@ -81,7 +81,7 @@ objects:
           initContainers:
             # The entrypoint rewrites config.js, so serve a writable copy of /srv.
             - name: seed-srv
-              image: ghcr.io/bcgov/${NAME}/frontend:${IMAGE_TAG}
+              image: ${IMAGE_REF}
               imagePullPolicy: Always
               command:
                 - sh
@@ -109,7 +109,7 @@ objects:
                   type: RuntimeDefault
           containers:
             - name: ${NAME}-frontend
-              image: ghcr.io/bcgov/${NAME}/frontend:${IMAGE_TAG}
+              image: ${IMAGE_REF}
               imagePullPolicy: Always
               ports:
                 - name: http
@@ -122,7 +122,7 @@ objects:
                 - name: BACKEND_URL
                   value: http://${NAME}-backend-${ZONE}:8080
                 - name: TAPS_IMAGE_REFERENCE
-                  value: ghcr.io/bcgov/${NAME}/frontend:${IMAGE_TAG}
+                  value: ${IMAGE_REF}
                 - name: XDG_CONFIG_HOME
                   value: /tmp/caddy
                 - name: XDG_DATA_HOME

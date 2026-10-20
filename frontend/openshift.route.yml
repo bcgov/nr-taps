@@ -10,10 +10,10 @@ parameters:
     description: App name prefix used by the main deployment
     value: nr-taps
   - name: ZONE
-    description: PR number or 'test'; must match the main deployment
+    description: PR number, 'test' or 'prod'; must match the main deployment
     required: true
   - name: SLOT
-    description: Route hostname slot, PR % 50 for DEV previews, or test
+    description: Route hostname slot, PR % 50 for DEV previews, or test/prod
     required: true
   - name: DOMAIN
     description: Cluster apps domain, without scheme or leading dot
