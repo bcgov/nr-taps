@@ -127,6 +127,51 @@ class OracleReadIT {
   }
 
   @Test
+  void dedicatedReadPrincipalCanQueryButCannotWriteOrLockLegacyTables() throws Exception {
+    // This account exists only inside this test's disposable Oracle container.
+    String readerPassword = "TapsRead" + UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+    var system = new JdbcTemplate(new DriverManagerDataSource(ORACLE.getJdbcUrl(), "system", ORACLE.getPassword()));
+    system.execute("CREATE USER TAPS_READ_FIXTURE IDENTIFIED BY \"" + readerPassword + "\"");
+    system.execute("GRANT CREATE SESSION TO TAPS_READ_FIXTURE");
+    for (String table : jdbc.queryForList("SELECT TABLE_NAME FROM USER_TABLES", String.class)) {
+      system.execute("GRANT READ ON TAPS_FIXTURE." + table + " TO TAPS_READ_FIXTURE");
+    }
+    system.execute("GRANT EXECUTE ON TAPS_FIXTURE.SIL_GET_CLIENT_NAME TO TAPS_READ_FIXTURE");
+    var readerSource = new SingleConnectionDataSource(ORACLE.getJdbcUrl(), "TAPS_READ_FIXTURE", readerPassword, true);
+    readerSource.setAutoCommit(false);
+    try {
+      JdbcTemplate reader = new JdbcTemplate(readerSource);
+      reader.setQueryTimeout(5);
+      reader.execute("ALTER SESSION SET CURRENT_SCHEMA = TAPS_FIXTURE");
+      assertThat(reader.queryForObject("SELECT USER FROM DUAL", String.class)).isEqualTo("TAPS_READ_FIXTURE");
+      assertThat(new OracleEcasReference(reader).coast(CARIBOO, "1001").orElseThrow().speciesVolumes()).hasSize(2);
+      assertThat(new OracleGasSearch(reader).search(CARIBOO, gas(null, null, 0)).total()).isEqualTo(4);
+      assertThat(reader.queryForObject("SELECT SIL_GET_CLIENT_NAME('00000001') FROM DUAL", String.class))
+          .isNotBlank();
+      for (String statement : List.of(
+          "UPDATE APPRAISAL_DATA_SUBMISSION SET REVISION_COUNT = 99 WHERE ECAS_ID = 1001",
+          "DELETE FROM APPRAISAL_DATA_SUBMISSION WHERE ECAS_ID = 1001",
+          "INSERT INTO ADS_SPECIES_VOLUME (ECAS_ID, HDBS_TREE_SPECIES, SPECIES_VOLUME) VALUES (1001, 'XX', 1)",
+          "SELECT ECAS_ID FROM APPRAISAL_DATA_SUBMISSION WHERE ECAS_ID = 1001 FOR UPDATE NOWAIT",
+          "LOCK TABLE APPRAISAL_DATA_SUBMISSION IN EXCLUSIVE MODE NOWAIT",
+          "CREATE TABLE TAPS_READ_FIXTURE.SHOULD_NOT_EXIST (ID NUMBER)")) {
+        assertThatThrownBy(() -> reader.execute(statement))
+            .as("read principal must reject %s", statement)
+            .isInstanceOf(org.springframework.dao.DataAccessException.class)
+            .satisfies(rejected -> {
+              // Newer Oracle versions report missing object privileges as ORA-41900.
+              assertThat(((java.sql.SQLException) rejected.getCause()).getErrorCode()).isIn(1031, 41900);
+            });
+      }
+    } finally {
+      readerSource.getConnection().rollback();
+      readerSource.destroy();
+    }
+    assertThat(jdbc.queryForObject("SELECT REVISION_COUNT FROM APPRAISAL_DATA_SUBMISSION WHERE ECAS_ID = 1001", Integer.class))
+        .isEqualTo(3);
+  }
+
+  @Test
   void auditHistoryCommentsAndChangesStayBoundToTheirSubmission() { EcasAuditOracleAssertions.verify(jdbc); }
 
   @Test
