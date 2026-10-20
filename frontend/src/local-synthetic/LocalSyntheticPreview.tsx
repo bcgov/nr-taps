@@ -4,15 +4,13 @@ import './local-synthetic.scss'
 import { Select, SelectItem } from '@carbon/react'
 import {
   Outlet,
-  RouterProvider,
   createMemoryHistory,
   createRootRoute,
   createRoute,
   createRouter,
   useLocation,
 } from '@tanstack/react-router'
-import { StrictMode, useMemo, useState } from 'react'
-import { createRoot } from 'react-dom/client'
+import { useMemo, useState } from 'react'
 import { ApplicationPage, ApplicationScreenPage } from '@/components/ApplicationPages'
 import Dashboard from '@/components/Dashboard'
 import Layout from '@/components/Layout'
@@ -273,12 +271,4 @@ export function createPreviewRouter() {
       failureRoute,
     ]),
   })
-}
-
-export function mountLocalSyntheticPreview() {
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <RouterProvider router={createPreviewRouter()} />
-    </StrictMode>,
-  )
 }
